@@ -1,0 +1,122 @@
+"use client";
+import React from "react";
+import Image from "next/image";
+import SpinIcon from "../../../../public/spin.png";
+import CashbacksIcon from "../../../../public/cashbacks.png";
+import FAQIcon from "../../../../public/faq.png";
+import ReferIcon from "../../../../public/refer.png";
+
+interface RewardCard {
+  id: number;
+  title: string;
+  description: string;
+  icon: any;
+  bgColor: string;
+  bgPattern?: string;
+}
+
+const rewardCards: RewardCard[] = [
+  {
+    id: 1,
+    title: "Spin to Win",
+    description: "Spin to win instant rewards",
+    icon: SpinIcon,
+    bgColor: "bg-gradient-to-br from-red-500 to-orange-500",
+    bgPattern: "radial",
+  },
+  {
+    id: 2,
+    title: "Refer and Earn",
+    description: "Invite friends and earn rewards!",
+    icon: ReferIcon,
+    bgColor: "bg-blue-600",
+  },
+  {
+    id: 3,
+    title: "Cashbacks",
+    description: "Get instant rewards every time you spend.",
+    icon: CashbacksIcon,
+    bgColor: "bg-gradient-to-br from-red-500 to-orange-500",
+    bgPattern: "radial",
+  },
+  {
+    id: 4,
+    title: "FAQS",
+    description: "",
+    icon: FAQIcon,
+    bgColor: "bg-blue-600",
+  },
+];
+
+export default function RewardsPage() {
+  return (
+    <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6">
+      {/* Header */}
+      <header className="text-center py-6">
+        <h1 className="text-2xl font-bold text-white">Rewards</h1>
+      </header>
+
+      <div className="flex flex-col gap-4 px-4 overflow-y-auto">
+        {/* Thunder Rewards Banner */}
+        <div className="assets rounded-2xl p-5 flex justify-between items-center">
+          <div className="flex flex-col">
+            <h2 className="text-xl font-bold text-white mb-1">Thunder Rewards</h2>
+            <p className="text-blue-100 text-xs">Number of thunder bonus</p>
+          </div>
+          <div className="text-2xl font-bold text-white">₦0</div>
+        </div>
+
+        {/* Refer and Earn Banner */}
+        <div className="bg-gradient-to-br from-orange-500 to-yellow-500 rounded-2xl p-5 relative overflow-hidden">
+          <div className="relative z-10">
+            <h2 className="text-xl font-bold text-[#FFFFFF] mb-2">Refer and Earn</h2>
+            <p className="text-white/90 text-xs mb-4 leading-relaxed">
+              Share Thunder and get rewarded when your friends join.
+            </p>
+            <button className="border-2 border-[#FFFFFF] text-white font-semibold px-5 py-2 rounded-full text-xs hover:bg-pink-500/20 transition-colors">
+              Refer now
+            </button>
+          </div>
+          {/* Decorative coins and gift box illustration - using background pattern */}
+          <div className="absolute right-0 top-0 bottom-0 w-32 opacity-20">
+            <div className="relative w-full h-full">
+              {/* Simplified decorative elements */}
+              <div className="absolute top-4 right-4 w-8 h-8 bg-yellow-400 rounded-full"></div>
+              <div className="absolute top-12 right-8 w-6 h-6 bg-yellow-400 rounded-full"></div>
+              <div className="absolute bottom-8 right-6 w-10 h-10 bg-yellow-400 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Rewards Options Grid */}
+        <div className="grid grid-cols-2 gap-4">
+          {rewardCards.map((card) => (
+            <div
+              key={card.id}
+              className={`rounded-2xl flex flex-col p-4 min-h-[160px] relative overflow-hidden`}
+            >
+              {/* Image Container */}
+              <div className="flex justify-center items-center mb-3 flex-shrink-0 w-full">
+                <Image
+                  src={card.icon}
+                  alt={card.title}
+                  width={70}
+                  height={70}
+                  className="object-contain w-full"
+                />
+              </div>
+              
+              {/* Text Content */}
+              <div className="relative z-10 flex flex-col">
+                <h3 className="text-white font-bold text-base mb-1">{card.title}</h3>
+                {card.description && (
+                  <p className="text-white/90 text-xs leading-tight">{card.description}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

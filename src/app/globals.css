@@ -31,3 +31,19 @@ body {
   width: 100%;
   background-position: center;
 }
+.assets{
+  background-image: url('../../public/totalassetimg.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  width: 100%;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -45,7 +45,7 @@ export default function Home() {
 
         {/* Title */}
         <h1 className="text-2xl md:text-4xl font-semibold text-center mb-3 mt-20">
-          Welcome to TunderPay
+          Welcome to Thunderpay
         </h1>
 
         {/* Subtitle */}

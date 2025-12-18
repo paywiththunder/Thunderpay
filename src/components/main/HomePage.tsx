@@ -24,8 +24,8 @@ export default function HomePage() {
       <header className="flex justify-between items-center">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-gray-600/50 overflow-hidden">
-             {/* Placeholder for avatar */}
-             <div className="w-full h-full bg-gradient-to-br from-gray-400 to-gray-600"></div>
+            {/* Placeholder for avatar */}
+            <div className="w-full h-full bg-gradient-to-br from-gray-400 to-gray-600"></div>
           </div>
           <h1 className="font-semibold text-lg">Hi Agbani</h1>
         </div>
@@ -49,9 +49,20 @@ export default function HomePage() {
       <div className="assets p-4 rounded-2xl flex flex-col gap-3 relative overflow-hidden">
         {/* Background swirls decorative elements */}
         <div>
-          <div className="flex items-center gap-2 text-blue-100 text-sm">
-            <span>Total assets</span>
-            <HiOutlineEye />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-blue-100 text-sm">
+              <span>Total assets</span>
+              <HiOutlineEye />
+            </div>
+
+            {/* Add Wallet Link */}
+            <Link
+              href="/home/add-wallet"
+              className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 transition-colors px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm border border-white/10"
+            >
+              <span className="text-lg leading-none transform translate-y-[-1px]">+</span>
+              Add Wallet
+            </Link>
           </div>
           <h2 className="text-3xl font-bold mt-1">₦0.00</h2>
         </div>
@@ -70,7 +81,7 @@ export default function HomePage() {
       </div>
 
       <Wlcomemessages />
-      
+
       {/* Recent Transactions */}
       <div>
         <h3 className="font-semibold mb-4">Recent transactions</h3>

@@ -1,11 +1,27 @@
 "use client";
-import { useState, useRef, KeyboardEvent } from "react";
-import Link from "next/link";
-import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 
-export default function PhoneVerification() {
-  const [codes, setCodes] = useState<string[]>(["", "", "", ""]);
+import { useState, useRef, KeyboardEvent, useEffect } from "react";
+import Link from "next/link";
+import axios from "axios";
+import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
+import { useRouter } from "next/navigation";
+
+export default function MailVerification() {
+  const [codes, setCodes] = useState<string[]>(["", "", "", "", "", ""]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const router = useRouter();
+  /* --------------------------------------------------
+   Auto-fill OTP from localStorage (DEV UX)
+  -------------------------------------------------- */
+  useEffect(() => {
+    const savedOtp = localStorage.getItem("signupOtp");
+
+    if (savedOtp && savedOtp.length === 6) {
+      setCodes(savedOtp.split(""));
+    }
+  }, []);
 
   const handleChange = (index: number, value: string) => {
     if (value.length > 1) return;
@@ -14,7 +30,7 @@ export default function PhoneVerification() {
     newCodes[index] = value;
     setCodes(newCodes);
 
-    if (value && index < 3) {
+    if (value && index < codes.length - 1) {
       inputRefs.current[index + 1]?.focus();
     }
   };
@@ -25,17 +41,73 @@ export default function PhoneVerification() {
     }
   };
 
-  const handlePaste = (e: React.ClipboardEvent) => {
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").slice(0, 4);
+    const pasted = e.clipboardData.getData("text").slice(0, 6);
     const newCodes = [...codes];
 
     pasted.split("").forEach((char, i) => {
-      if (i < 4) newCodes[i] = char;
+      if (i < 6) newCodes[i] = char;
     });
 
     setCodes(newCodes);
-    inputRefs.current[Math.min(pasted.length - 1, 3)]?.focus();
+    inputRefs.current[Math.min(pasted.length - 1, 5)]?.focus();
+  };
+
+  /* --------------------------------------------------
+   Verify OTP
+  -------------------------------------------------- */
+  const handleVerify = async () => {
+    setError("");
+    setLoading(true);
+
+    const otp = codes.join("");
+    const email = localStorage.getItem("signupEmail");
+
+    if (!email) {
+      setError("Email not found. Please restart signup.");
+      setLoading(false);
+      return;
+    }
+
+    if (otp.length !== 6) {
+      setError("Please enter the 6-digit code.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await axios.post(
+        "https://aapi.paywiththunder.com/api/v1/auth/verify",
+        { email, otp },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      const { success, data } = res.data;
+
+      if (!success) {
+        throw new Error("Verification failed");
+      }
+
+      /* --------------------------------------------------
+       CLEAN UP (IMPORTANT)
+      -------------------------------------------------- */
+      localStorage.removeItem("signupOtp");
+      // localStorage.removeItem("signupEmail");
+
+      console.log("Verification successful:", data);
+
+      // 👉 redirect or continue flow here
+      router.push("/auth/login");
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.description ||
+          err?.message ||
+          "Verification failed"
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -59,10 +131,10 @@ export default function PhoneVerification() {
         </div>
 
         <h2 className="text-2xl font-semibold my-2">
-          Verify your Phone Number
+          Verify your Email Address
         </h2>
         <p className="text-sm text-[#98A0A8] mb-6">
-          We've sent a 4-digit code to your phone — enter it to complete
+          We've sent a 6-digit code to your email — enter it to complete
           verification.
         </p>
 
@@ -87,13 +159,14 @@ export default function PhoneVerification() {
           ))}
         </div>
 
-        <p className="text-sm text-[#98A0A8] mb-6">
-          Didn't get a code? <button className="text-[#3EA6FF]">Resend</button>
-        </p>
+        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
-        {/* Submit */}
-        <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium mt-4 transition">
-          Verify
+        <button
+          onClick={handleVerify}
+          disabled={loading}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium mt-4 transition disabled:opacity-60"
+        >
+          {loading ? "Verifying..." : "Verify"}
         </button>
       </div>
     </div>

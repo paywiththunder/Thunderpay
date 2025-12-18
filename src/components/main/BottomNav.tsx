@@ -27,7 +27,7 @@ const BottomNav = () => {
               key={item.name}
               href={item.href}
               className={`flex items-center justify-center gap-1 w-full rounded-[100px] py-3 md:py-4 px-2 sm:px-4 ${
-                isActive ? "text-white bg-red-500" : "text-gray-500"
+                isActive ? "text-white bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/10 shadow-[inset_0_1px_4px_rgba(255,255,255,0.2)]" : "text-gray-500"
               }`}
             >
               <Icon className={`w-6 h-6 ${isActive ? "text-white" : "text-gray-500"}`} />

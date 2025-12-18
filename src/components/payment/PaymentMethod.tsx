@@ -2,6 +2,7 @@
 import React from "react";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import { HiCheckCircle } from "react-icons/hi2";
+import { getWallets } from "@/services/wallet";
 
 export interface PaymentOption {
   id: string;
@@ -12,6 +13,7 @@ export interface PaymentOption {
   cryptoAmount?: string;
   value: string;
   type: "fiat" | "crypto";
+  currencyCode?: string;
 }
 
 interface PaymentMethodProps {
@@ -20,59 +22,80 @@ interface PaymentMethodProps {
   amount: number;
 }
 
-const paymentOptions: PaymentOption[] = [
-  {
-    id: "naira",
-    name: "Naira",
-    icon: "N",
-    iconBg: "bg-green-500",
-    balance: "₦100,000.00",
-    value: "100000",
-    type: "fiat",
-  },
-  {
-    id: "usdt",
-    name: "USDT",
-    icon: "T",
-    iconBg: "bg-green-500",
-    cryptoAmount: "500 USDT",
-    value: "$500.00",
-    type: "crypto",
-  },
-  {
-    id: "bitcoin",
-    name: "Bitcoin",
-    icon: "B",
-    iconBg: "bg-orange-500",
-    cryptoAmount: "0.0000095 BTC",
-    value: "$1,400.44",
-    type: "crypto",
-  },
-  {
-    id: "ethereum",
-    name: "Ethereum",
-    icon: "E",
-    iconBg: "bg-gray-500",
-    cryptoAmount: "0.00028 ETH",
-    value: "$120.00",
-    type: "crypto",
-  },
-  {
-    id: "solana",
-    name: "Solana",
-    icon: "S",
-    iconBg: "bg-gradient-to-br from-purple-500 to-blue-500",
-    cryptoAmount: "17,185.79 SOL",
-    value: "$5,100.00",
-    type: "crypto",
-  },
-];
+const getIconForCurrency = (code: string) => {
+  switch (code.toUpperCase()) {
+    case "BTC":
+    case "BITCOIN":
+      return { icon: "B", bg: "bg-orange-500" };
+    case "ETH":
+    case "ETHEREUM":
+      return { icon: "E", bg: "bg-gray-500" };
+    case "USDT":
+      return { icon: "T", bg: "bg-green-500" };
+    case "SOL":
+    case "SOLANA":
+      return { icon: "S", bg: "bg-gradient-to-br from-purple-500 to-blue-500" };
+    case "TRX":
+    case "TRON":
+      return { icon: "T", bg: "bg-red-500" };
+    default:
+      return { icon: code[0] || "?", bg: "bg-blue-500" };
+  }
+};
 
 export default function PaymentMethod({
   onBack,
   onSelect,
   amount,
 }: PaymentMethodProps) {
+  const [wallets, setWallets] = React.useState<PaymentOption[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState("");
+
+  React.useEffect(() => {
+    const fetchWallets = async () => {
+      try {
+        const response = await getWallets();
+        console.log("Fetched wallets:", response);
+
+        // Assuming response.data is the array of wallets, or response itself is the array
+        // Adjust based on actual API shape using the logs
+        const walletList = Array.isArray(response) ? response : response.data || [];
+
+        const mappedWallets: PaymentOption[] = walletList.map((wallet: any) => {
+          console.log("Raw wallet item:", wallet);
+          const currencyCode = wallet.currency?.code || wallet.currency || "UNKNOWN";
+          const styling = getIconForCurrency(currencyCode);
+
+          return {
+            id: wallet.walletId?.toString() || "", // Prefer explicit ID, avoid random for payments
+            name: wallet.currency?.name || currencyCode,
+            icon: styling.icon,
+            iconBg: styling.bg,
+            // Formatting balance if available, otherwise just showing value
+            balance: wallet.balance ? `${wallet.balance}` : undefined,
+            cryptoAmount: wallet.balance ? `${wallet.balance} ${currencyCode}` : undefined,
+            value: "0.00", // valid fiat value would need conversion rate
+            type: "crypto", // Assuming mostly crypto for now
+            currencyCode: currencyCode,
+          };
+        });
+
+        // Add static Naira if needed, or if backend doesn't return it
+        // mappedWallets.unshift({ ...naira... }) 
+
+        setWallets(mappedWallets);
+      } catch (err) {
+        console.error("Failed to fetch wallets:", err);
+        setError("Failed to load wallets");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWallets();
+  }, []);
+
   return (
     <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6">
       {/* Header */}
@@ -87,40 +110,48 @@ export default function PaymentMethod({
       </header>
 
       <div className="flex flex-col gap-3 px-4 overflow-y-auto pb-6">
-        {paymentOptions.map((option) => (
-          <button
-            key={option.id}
-            onClick={() => onSelect(option)}
-            className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors"
-          >
-            <div className="flex items-center gap-4">
-              <div
-                className={`w-12 h-12 rounded-full ${option.iconBg} flex items-center justify-center flex-shrink-0`}
-              >
-                <span className="text-white text-lg font-bold">
-                  {option.icon}
-                </span>
-              </div>
-              <div className="flex flex-col items-start">
-                <span className="text-white font-medium text-base">
-                  {option.name}
-                </span>
-                {option.cryptoAmount && (
-                  <span className="text-gray-400 text-sm">
-                    {option.cryptoAmount}
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          </div>
+        ) : error ? (
+          <div className="text-red-500 text-center py-4">{error}</div>
+        ) : (
+          wallets.map((option) => (
+            <button
+              key={option.id}
+              onClick={() => onSelect(option)}
+              className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors"
+            >
+              <div className="flex items-center gap-4">
+                <div
+                  className={`w-12 h-12 rounded-full ${option.iconBg} flex items-center justify-center flex-shrink-0`}
+                >
+                  <span className="text-white text-lg font-bold">
+                    {option.icon}
                   </span>
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-white font-medium text-base">
+                    {option.name}
+                  </span>
+                  {option.cryptoAmount && (
+                    <span className="text-gray-400 text-sm">
+                      {option.cryptoAmount}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col items-end">
+                {option.balance ? (
+                  <span className="text-white font-medium">{option.balance}</span>
+                ) : (
+                  <span className="text-white font-medium">{option.value}</span>
                 )}
               </div>
-            </div>
-            <div className="flex flex-col items-end">
-              {option.balance ? (
-                <span className="text-white font-medium">{option.balance}</span>
-              ) : (
-                <span className="text-white font-medium">{option.value}</span>
-              )}
-            </div>
-          </button>
-        ))}
+            </button>
+          ))
+        )}
       </div>
     </div>
   );

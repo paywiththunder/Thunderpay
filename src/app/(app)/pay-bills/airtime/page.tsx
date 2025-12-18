@@ -10,6 +10,7 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
+import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment } from "@/services/bills";
 
 interface NetworkProvider {
   id: string;
@@ -66,6 +67,10 @@ export default function AirtimePage() {
     useState<TransactionResult>(null);
   const [transactionToken, setTransactionToken] = useState("");
 
+  const [quote, setQuote] = useState<AirtimeQuoteResponse | null>(null);
+  const [isQuoteLoading, setIsQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState("");
+
   // Mock phone verification
   useEffect(() => {
     if (phoneNumber.length >= 10) {
@@ -101,14 +106,55 @@ export default function AirtimePage() {
     }
   };
 
-  const handlePaymentMethodSelect = (paymentMethod: PaymentOption) => {
+  const handlePaymentMethodSelect = async (paymentMethod: PaymentOption) => {
     setSelectedPaymentMethod(paymentMethod);
-    setStep("confirmation");
+    setQuoteError("");
+    setQuote(null);
+
+    // If it's fiat, we might strictly not need a quote or maybe we do for fees? 
+    // Assuming we do for consistency or specifically when it's crypto.
+    // The user example had "sourceCurrencyTicker": "trx", implying crypto.
+
+    if (paymentMethod.currencyCode) {
+      setIsQuoteLoading(true);
+      try {
+        const payload = {
+          phone: phoneNumber,
+          purchaseAmount: parseFloat(amount),
+          sourceCurrencyTicker: paymentMethod.currencyCode.toLowerCase(),
+          walletId: paymentMethod.id, // ID from the wallet list
+          baseCostCurrency: "NGN", // Assuming base is NGN for airtime
+          serviceId: selectedNetwork.id.toUpperCase() // e.g., MTN
+        };
+
+        console.log("Fetching quote with:", payload);
+        const response = await getAirtimeQuote(payload);
+        const quoteData = response.data || response;
+        setQuote(quoteData);
+        localStorage.setItem("currentAirtimeQuote", JSON.stringify(quoteData));
+        setStep("confirmation");
+      } catch (err: any) {
+        console.error(err);
+        setQuoteError(err?.description || "Failed to get quote");
+        // Optionally still go to confirmation but show error, or stay on payment?
+        // For now, let's stay and show error (alert or simple log)
+        alert(err?.description || "Failed to get quote");
+      } finally {
+        setIsQuoteLoading(false);
+      }
+    } else {
+      // Fallback for fiat or if no currency code (legacy hardcoded items)
+      setStep("confirmation");
+    }
   };
 
   const calculatePaymentAmount = (): string => {
     if (!selectedPaymentMethod || !amount) return "0";
     const amountNum = parseFloat(amount);
+
+    if (quote) {
+      return `${quote.deductionAmount.toFixed(6)} ${quote.deductionCurrency.toUpperCase()}`;
+    }
 
     if (selectedPaymentMethod.type === "fiat") {
       return `₦${amountNum.toLocaleString()}.00`;
@@ -123,6 +169,10 @@ export default function AirtimePage() {
 
     const rate = rates[selectedPaymentMethod.id] || 1;
     const cryptoAmount = amountNum / (rate * 1500);
+
+    if (selectedPaymentMethod.currencyCode) {
+      return `${cryptoAmount.toFixed(6)} ${selectedPaymentMethod.currencyCode}`;
+    }
 
     if (selectedPaymentMethod.id === "usdt") {
       return `${cryptoAmount.toFixed(4)} USDT`;
@@ -174,11 +224,39 @@ export default function AirtimePage() {
   };
 
   const handlePinComplete = async (pin: string) => {
-    const token = generateTransactionToken();
-    setTransactionToken(token);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const isSuccess = Math.random() > 0.3;
-    setTransactionResult(isSuccess ? "success" : "failure");
+    try {
+      // Retrieve quote from state first, fallback to localStorage if needed (though state should persist if not refreshed)
+      // If retrieving from localStorage, need to parse it.
+      let currentQuote = quote;
+      if (!currentQuote) {
+        const stored = localStorage.getItem("currentAirtimeQuote");
+        if (stored) {
+          currentQuote = JSON.parse(stored);
+        }
+      }
+
+      if (!currentQuote?.quoteReference) {
+        throw new Error("No valid quote found. Please try again.");
+      }
+
+      const payload = {
+        quoteReference: currentQuote.quoteReference,
+        pin: parseInt(pin, 10)
+      };
+
+      const response = await executeBillPayment(payload);
+
+      if (response.success) {
+        setTransactionToken(response.data.transactionReference);
+        setTransactionResult("success");
+      } else {
+        setTransactionResult("failure");
+      }
+    } catch (error: any) {
+      console.error("Payment Error:", error);
+      setTransactionResult("failure");
+      // Optionally show error message toast
+    }
     setStep("result");
   };
 
@@ -219,11 +297,21 @@ export default function AirtimePage() {
 
   if (step === "payment") {
     return (
-      <PaymentMethod
-        onBack={() => setStep("form")}
-        onSelect={handlePaymentMethodSelect}
-        amount={parseFloat(amount) || 0}
-      />
+      <>
+        {isQuoteLoading && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
+            <div className="bg-[#161616] p-4 rounded-xl border border-white/10 flex flex-col items-center gap-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+              <span className="text-white text-sm">Getting Quote...</span>
+            </div>
+          </div>
+        )}
+        <PaymentMethod
+          onBack={() => setStep("form")}
+          onSelect={handlePaymentMethodSelect}
+          amount={parseFloat(amount) || 0}
+        />
+      </>
     );
   }
 
@@ -442,11 +530,10 @@ export default function AirtimePage() {
               <button
                 key={option.amount}
                 onClick={() => handleAmountSelect(option.amount)}
-                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${
-                  amount === option.amount.toString()
-                    ? "ring-2 ring-blue-500 border-blue-500"
-                    : ""
-                }`}
+                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString()
+                  ? "ring-2 ring-blue-500 border-blue-500"
+                  : ""
+                  }`}
               >
                 <span className="text-white font-bold text-base">
                   ₦{option.amount.toLocaleString()}
@@ -463,11 +550,10 @@ export default function AirtimePage() {
         <button
           onClick={handlePayClick}
           disabled={!phoneNumber || !amount || !phoneVerified}
-          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${
-            !phoneNumber || !amount || !phoneVerified
-              ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
-              : ""
-          }`}
+          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!phoneNumber || !amount || !phoneVerified
+            ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
+            : ""
+            }`}
         >
           Pay
         </button>

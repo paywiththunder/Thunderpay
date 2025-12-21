@@ -102,8 +102,8 @@ export default function MailVerification() {
     } catch (err: any) {
       setError(
         err?.response?.data?.description ||
-          err?.message ||
-          "Verification failed"
+        err?.message ||
+        "Verification failed"
       );
     } finally {
       setLoading(false);

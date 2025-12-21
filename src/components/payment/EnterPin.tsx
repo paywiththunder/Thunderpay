@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useRef } from "react";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
+import Link from "next/link";
 
 interface EnterPinProps {
   onBack: () => void;
@@ -55,30 +56,38 @@ export default function EnterPin({ onBack, onComplete }: EnterPinProps) {
 
       <div className="flex flex-col items-center justify-center flex-1 px-4 pb-6">
         {/* PIN Input Fields */}
-        <div className="flex justify-center gap-4">
-          {codes.map((digit, i) => (
-            <input
-              key={i}
-              ref={(el) => {
-                inputRefs.current[i] = el;
-              }}
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={1}
-              value={digit}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, "");
-                handleChange(i, val);
-              }}
-              onKeyDown={(e) => handleKeyDown(i, e)}
-              className={`w-14 h-14 text-center text-2xl font-medium rounded-xl border bg-[#0f1112] focus:outline-none focus:ring-2 transition-all ${
-                digit
+        <div className="flex flex-col items-center gap-8">
+          <div className="flex justify-center gap-4">
+            {codes.map((digit, i) => (
+              <input
+                key={i}
+                ref={(el) => {
+                  inputRefs.current[i] = el;
+                }}
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={1}
+                value={digit}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  handleChange(i, val);
+                }}
+                onKeyDown={(e) => handleKeyDown(i, e)}
+                className={`w-14 h-14 text-center text-2xl font-medium rounded-xl border bg-[#0f1112] focus:outline-none focus:ring-2 transition-all ${digit
                   ? "border-blue-500/50 text-white ring-blue-500 shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]"
                   : "border-[#2B2F33] text-gray-400 focus:border-blue-500 focus:ring-blue-500"
-              }`}
-            />
-          ))}
+                  }`}
+              />
+            ))}
+          </div>
+
+          <Link
+            href="/auth/forget-password"
+            className="text-blue-500 text-sm font-medium hover:text-blue-400"
+          >
+            Forgot PIN?
+          </Link>
         </div>
       </div>
     </div>

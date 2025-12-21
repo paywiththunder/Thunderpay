@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 
@@ -12,7 +12,7 @@ const amountOptions = [
   { amount: 20000, cashback: 200 },
 ];
 
-export default function PeerToPeerAmountPage() {
+function PeerToPeerAmount() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const peerName = searchParams.get("name") || "Unknown";
@@ -71,11 +71,10 @@ export default function PeerToPeerAmountPage() {
             <button
               key={option.amount}
               onClick={() => handleAmountSelect(option.amount)}
-              className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${
-                amount === option.amount.toString()
+              className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString()
                   ? "ring-2 ring-blue-500 border-blue-500"
                   : ""
-              }`}
+                }`}
             >
               <span className="text-white font-bold text-base">
                 ₦{option.amount.toLocaleString()}
@@ -91,16 +90,23 @@ export default function PeerToPeerAmountPage() {
         <button
           onClick={handleRequest}
           disabled={!amount}
-          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${
-            !amount
+          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!amount
               ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
               : ""
-          }`}
+            }`}
         >
           Request
         </button>
       </div>
     </div>
+  );
+}
+
+export default function PeerToPeerAmountPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black" />}>
+      <PeerToPeerAmount />
+    </Suspense>
   );
 }
 

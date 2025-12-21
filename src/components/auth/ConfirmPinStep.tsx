@@ -8,11 +8,13 @@ export default function ConfirmPinStep({
   setConfirmPin,
   onConfirm,
   onPrev,
+  isLoading,
 }: {
   confirmPin: string;
   setConfirmPin: (value: string) => void;
   onConfirm: () => void;
   onPrev: () => void;
+  isLoading?: boolean;
 }) {
   const inputRefs = [
     useRef<HTMLInputElement>(null),
@@ -49,7 +51,8 @@ export default function ConfirmPinStep({
       <div className="flex items-center justify-between mb-6 w-full">
         <button
           onClick={onPrev}
-          className="p-3 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] text-[1.2rem] border border-white/20"
+          disabled={isLoading}
+          className="p-3 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] text-[1.2rem] border border-white/20 disabled:opacity-50"
         >
           <MdOutlineKeyboardDoubleArrowLeft />
         </button>
@@ -62,32 +65,42 @@ export default function ConfirmPinStep({
       </div>
 
       {/* PIN Boxes */}
-      <div className="flex justify-center gap-4 my-20">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <input
-            key={index}
-            ref={inputRefs[index]}
-            type="password"
-            maxLength={1}
-            value={confirmPin[index] || ""}
-            onChange={(e) => handleChange(index, e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Backspace") {
-                handleBackspace(index, confirmPin[index] || "");
-              }
-            }}
-            className="w-14 h-14 text-center text-2xl font-medium rounded-lg border border-[#2B2F33] bg-[#0f1112] focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        ))}
+      <div className="flex flex-col items-center gap-6 my-20">
+        <div className="flex justify-center gap-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <input
+              key={index}
+              ref={inputRefs[index]}
+              type="password"
+              maxLength={1}
+              disabled={isLoading}
+              value={confirmPin[index] || ""}
+              onChange={(e) => handleChange(index, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Backspace") {
+                  handleBackspace(index, confirmPin[index] || "");
+                }
+              }}
+              className="w-14 h-14 text-center text-2xl font-medium rounded-lg border border-[#2B2F33] bg-[#0f1112] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            />
+          ))}
+        </div>
+
+        <Link
+          href="/auth/forget-password"
+          className="text-blue-500 text-sm font-medium hover:text-blue-400"
+        >
+          Forgot PIN?
+        </Link>
       </div>
 
       {/* Button */}
       <button
-        disabled={confirmPin.length < 4}
+        disabled={confirmPin.length < 4 || isLoading}
         onClick={onConfirm}
-        className="w-11/12 py-3 md:w-1/2 md:py-4 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]"
+        className="w-11/12 py-3 md:w-1/2 md:py-4 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] flex items-center justify-center gap-2 disabled:opacity-50"
       >
-        Confirm PIN
+        {isLoading ? "Setting PIN..." : "Confirm PIN"}
       </button>
     </div>
   );

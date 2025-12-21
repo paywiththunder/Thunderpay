@@ -3,6 +3,7 @@ import { useState } from "react";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import Link from "next/link";
 import axios from "axios";
+import { useRouter } from "next/navigation";
 
 export default function ContinueSignup() {
   const [firstName, setFirstName] = useState("");
@@ -10,9 +11,10 @@ export default function ContinueSignup() {
   const [dob, setDob] = useState("");
   const [address, setAddress] = useState("");
   const [nin, setNin] = useState("");
-  const [referralCode, setReferralCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const router = useRouter();
 
   const handleContinueSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,19 +22,21 @@ export default function ContinueSignup() {
     setLoading(true);
 
     try {
+      const token = localStorage.getItem("authToken");
+      console.log('token', token);
       const res = await axios.post(
-        "https://aapi.paywiththunder.com/api/v1/auth/continue-signup",
+        "https://aapi.paywiththunder.com/api/v1/auth/complete-signup",
         {
           firstName,
           lastName,
           dob,
           address,
           nin,
-          referralCode,
         },
         {
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
         }
       );
@@ -43,14 +47,26 @@ export default function ContinueSignup() {
         throw new Error("Continue signup failed");
       }
 
-      console.log("Signup continued successfully:", data);
-      // 👉 redirect
+      console.log("Signup continued successfully:", res.data);
+
+      router.push("/home");
+      localStorage.setItem("firstName", data.firstName);
+      localStorage.setItem("lastName", data.lastName);
+      localStorage.setItem("dob", data.dob);
+      localStorage.setItem("address", data.address);
+      localStorage.setItem("nin", data.nin);
+
     } catch (err: any) {
-      setError(
+      const errorMessage =
         err?.response?.data?.description ||
-          err.message ||
-          "Something went wrong"
-      );
+        err.message ||
+        "Something went wrong";
+
+      if (errorMessage.includes('Already completed signup, please proceed to login')) {
+        router.push("/home");
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -130,24 +146,15 @@ export default function ContinueSignup() {
               onChange={(e) => setNin(e.target.value)}
               className="w-full bg-[#161616] border border-[#2B2F33] text-white placeholder-gray-600 px-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium"
             />
-
-            <input
-              type="text"
-              placeholder="Referral Code (optional)"
-              value={referralCode}
-              onChange={(e) => setReferralCode(e.target.value)}
-              className="w-full bg-[#161616] border border-[#2B2F33] text-white placeholder-gray-600 px-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium"
-            />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-4 rounded-full font-medium transition-all ${
-              !loading
-                ? "bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]"
-                : "bg-[#111] text-gray-600 border border-[#222] cursor-not-allowed"
-            }`}
+            className={`w-full py-4 rounded-full font-medium transition-all ${!loading
+              ? "bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]"
+              : "bg-[#111] text-gray-600 border border-[#222] cursor-not-allowed"
+              }`}
           >
             {loading ? "Processing..." : "Continue"}
           </button>

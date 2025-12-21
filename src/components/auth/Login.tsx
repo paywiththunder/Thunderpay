@@ -85,11 +85,10 @@ const PhoneInputStep: React.FC<PhoneStepProps> = ({
         <button
           onClick={onNext}
           disabled={!email}
-          className={`w-full py-4 rounded-full font-medium transition-all ${
-            email
-              ? "bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]"
-              : "bg-[#111] text-gray-600 border border-[#222] cursor-not-allowed"
-          }`}
+          className={`w-full py-4 rounded-full font-medium transition-all ${email
+            ? "bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]"
+            : "bg-[#111] text-gray-600 border border-[#222] cursor-not-allowed"
+            }`}
         >
           Continue
         </button>
@@ -189,11 +188,10 @@ const PinEntryStep: React.FC<PinStepProps> = ({
             }
             onKeyDown={(e) => handleKeyDown(i, e)}
             onPaste={handlePaste}
-            className={`w-14 h-14 text-center text-2xl font-medium rounded-xl border bg-[#0f1112] focus:outline-none focus:ring-1 transition-all ${
-              digit
-                ? "border-blue-500/50 text-white ring-blue-500 shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]"
-                : "border-[#2B2F33] text-gray-400 focus:border-blue-500 focus:ring-blue-500"
-            }`}
+            className={`w-14 h-14 text-center text-2xl font-medium rounded-xl border bg-[#0f1112] focus:outline-none focus:ring-1 transition-all ${digit
+              ? "border-blue-500/50 text-white ring-blue-500 shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]"
+              : "border-[#2B2F33] text-gray-400 focus:border-blue-500 focus:ring-blue-500"
+              }`}
           />
         ))}
       </div>
@@ -209,11 +207,10 @@ const PinEntryStep: React.FC<PinStepProps> = ({
         <button
           onClick={onConfirm}
           disabled={pin.length < 4}
-          className={`w-full py-4 rounded-full font-medium transition-all ${
-            pin.length === 4
-              ? "bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]"
-              : "bg-[#111] text-gray-600 border border-[#222] cursor-not-allowed"
-          }`}
+          className={`w-full py-4 rounded-full font-medium transition-all ${pin.length === 4
+            ? "bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]"
+            : "bg-[#111] text-gray-600 border border-[#222] cursor-not-allowed"
+            }`}
         >
           Confirm
         </button>
@@ -249,7 +246,7 @@ export default function Login() {
           },
         }
       );
-      console.log(res);
+      console.log(res)
 
       const { success, data, description } = res.data;
 
@@ -259,16 +256,21 @@ export default function Login() {
 
       // ✅ Store token
       localStorage.setItem("authToken", data.token);
+      const isContinueSignup = data.hasCompletedSignup
 
       console.log("Login successful:", data);
 
       // 👉 redirect
-      router.push("/home"); 
+      if (!isContinueSignup) {
+        router.push("/auth/continue-signup");
+      } else {
+        router.push("/home");
+      }
     } catch (err: any) {
       setError(
         err?.response?.data?.description ||
-          err?.message ||
-          "Login failed"
+        err?.message ||
+        "Login failed"
       );
     } finally {
       setLoading(false);
@@ -308,15 +310,15 @@ export default function Login() {
             <label className="text-xs font-medium text-gray-400 block">
               Email Address
             </label>
-              <div className="flex-1 relative">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="input email address"
-                  className="w-full bg-[#161616] border border-[#2B2F33] text-white placeholder-gray-600 px-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium"
-                />
-              </div>
+            <div className="flex-1 relative">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="input email address"
+                className="w-full bg-[#161616] border border-[#2B2F33] text-white placeholder-gray-600 px-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium"
+              />
+            </div>
           </div>
 
           {/* Password */}
@@ -348,11 +350,10 @@ export default function Login() {
           <button
             onClick={handleLogin}
             disabled={!email || !password || loading}
-            className={`w-full py-4 rounded-full font-medium transition-all ${
-              email && password
-                ? "bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]"
-                : "bg-[#111] text-gray-600 border border-[#222] cursor-not-allowed"
-            }`}
+            className={`w-full py-4 rounded-full font-medium transition-all ${email && password
+              ? "bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]"
+              : "bg-[#111] text-gray-600 border border-[#222] cursor-not-allowed"
+              }`}
           >
             {loading ? "Logging in..." : "Login"}
           </button>

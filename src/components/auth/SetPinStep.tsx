@@ -74,27 +74,36 @@ export default function SetPinStep({
       </div>
 
       {/* PIN INPUTS */}
-      <div className="flex justify-center gap-4 my-20">
-        {codes.map((digit, i) => (
-          <input
-            key={i}
-            ref={(el) => {
-              inputRefs.current[i] = el;
-            }}
-            type="password" // <— hides the digit
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={1}
-            value={digit}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, ""); // allow only numbers
-              handleChange(i, val);
-            }}
-            onKeyDown={(e) => handleKeyDown(i, e)}
-            onPaste={handlePaste}
-            className="w-14 h-14 text-center text-2xl font-medium rounded-lg border border-[#2B2F33] bg-[#0f1112] focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        ))}
+      <div className="flex flex-col items-center gap-6 my-20">
+        <div className="flex justify-center gap-4">
+          {codes.map((digit, i) => (
+            <input
+              key={i}
+              ref={(el) => {
+                inputRefs.current[i] = el;
+              }}
+              type="password" // <— hides the digit
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={1}
+              value={digit}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, ""); // allow only numbers
+                handleChange(i, val);
+              }}
+              onKeyDown={(e) => handleKeyDown(i, e)}
+              onPaste={handlePaste}
+              className="w-14 h-14 text-center text-2xl font-medium rounded-lg border border-[#2B2F33] bg-[#0f1112] focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          ))}
+        </div>
+
+        <Link
+          href="/auth/forget-password"
+          className="text-blue-500 text-sm font-medium hover:text-blue-400"
+        >
+          Forgot PIN?
+        </Link>
       </div>
 
       {/* CONTINUE BUTTON */}

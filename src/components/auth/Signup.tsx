@@ -52,8 +52,8 @@ export default function SignupForm() {
       console.log(err);
       setError(
         err?.response?.data?.description ||
-          err.message ||
-          "Something went wrong"
+        err.message ||
+        "Something went wrong"
       );
     } finally {
       setLoading(false);

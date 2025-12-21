@@ -1,4 +1,5 @@
-import React from "react";
+'use client'
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   HiOutlineQrCode,
@@ -18,6 +19,14 @@ import Image from "next/image";
 import NoTransaction from "../../../public/walletimg.png";
 
 export default function HomePage() {
+  const [firstName, setFirstName] = useState("");
+
+  useEffect(() => {
+    const savedName = localStorage.getItem("firstName");
+    if (savedName) {
+      setFirstName(savedName);
+    }
+  }, []);
   return (
     <div className="flex flex-col gap-3 w-full">
       {/* Header */}
@@ -27,7 +36,7 @@ export default function HomePage() {
             {/* Placeholder for avatar */}
             <div className="w-full h-full bg-gradient-to-br from-gray-400 to-gray-600"></div>
           </div>
-          <h1 className="font-semibold text-lg">Hi Agbani</h1>
+          <h1 className="font-semibold text-lg">Hi {firstName}</h1>
         </div>
         <div className="flex gap-4 text-white">
           <HiOutlineQrCode className="w-6 h-6" />

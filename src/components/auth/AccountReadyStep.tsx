@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 
 const AccountReadyScreen: React.FC = () => {
   const router = useRouter();
-  
+
   useEffect(() => {
     confetti({
       particleCount: 100,
@@ -85,7 +85,7 @@ const AccountReadyScreen: React.FC = () => {
 
       {/* Footer Button */}
       <div className="w-full max-w-md mt-auto mb-4 z-10">
-        <button onClick={()=> router.push("/auth/login")} className="w-full py-3 md:py-4 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]">
+        <button onClick={() => router.push("/auth/login")} className="w-full py-3 md:py-4 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]">
           Continue
         </button>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef, KeyboardEvent, useEffect } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Eye, EyeOff } from "lucide-react";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import Link from "next/link";
 import axios from "axios";
@@ -224,6 +224,7 @@ const PinEntryStep: React.FC<PinStepProps> = ({
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -326,14 +327,22 @@ export default function Login() {
             <label className="text-xs font-medium text-gray-400 block">
               Password
             </label>
-
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="w-full bg-[#161616] border border-[#2B2F33] text-white placeholder-gray-600 px-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="w-full bg-[#161616] border border-[#2B2F33] text-white placeholder-gray-600 px-4 py-3.5 pr-12 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </div>
 
           <Link

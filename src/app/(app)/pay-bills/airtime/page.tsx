@@ -10,7 +10,7 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
-import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment } from "@/services/bills";
+import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse } from "@/services/bills";
 
 interface NetworkProvider {
   id: string;
@@ -29,6 +29,11 @@ const networkProviders: NetworkProvider[] = [
   { id: "airtel", name: "Airtel", logo: "A" },
   { id: "glo", name: "GLO", logo: "G" },
   { id: "9mobile", name: "9mobile", logo: "9" },
+  { id: "glo_sme", name: "GLO SME", logo: "G" },
+  { id: "etisalat", name: "ETISALAT", logo: "E" },
+  { id: "foreign_airtime", name: "FOREIGN AIRTIME", logo: "F" },
+  { id: "smile", name: "SMILE", logo: "S" },
+  { id: "spectranet", name: "SPECTRANET", logo: "S" },
 ];
 
 const amountOptions = [
@@ -65,7 +70,9 @@ export default function AirtimePage() {
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [transactionResult, setTransactionResult] =
     useState<TransactionResult>(null);
+  const [failureReason, setFailureReason] = useState("");
   const [transactionToken, setTransactionToken] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const [quote, setQuote] = useState<AirtimeQuoteResponse | null>(null);
   const [isQuoteLoading, setIsQuoteLoading] = useState(false);
@@ -123,7 +130,7 @@ export default function AirtimePage() {
           purchaseAmount: parseFloat(amount),
           sourceCurrencyTicker: paymentMethod.currencyCode.toLowerCase(),
           walletId: paymentMethod.id, // ID from the wallet list
-          baseCostCurrency: "NGN", // Assuming base is NGN for airtime
+          baseCostCurrency: "ngn", // Assuming base is NGN for airtime
           serviceId: selectedNetwork.id.toUpperCase() // e.g., MTN
         };
 
@@ -224,9 +231,9 @@ export default function AirtimePage() {
   };
 
   const handlePinComplete = async (pin: string) => {
+    setIsProcessing(true);
     try {
-      // Retrieve quote from state first, fallback to localStorage if needed (though state should persist if not refreshed)
-      // If retrieving from localStorage, need to parse it.
+      // Retrieve quote from state first, fallback to localStorage if needed
       let currentQuote = quote;
       if (!currentQuote) {
         const stored = localStorage.getItem("currentAirtimeQuote");
@@ -244,20 +251,33 @@ export default function AirtimePage() {
         pin: parseInt(pin, 10)
       };
 
-      const response = await executeBillPayment(payload);
+      const response = (await executeBillPayment(payload)) as BillExecutionResponse;
 
-      if (response.success) {
+      if (response.success && response.data) {
         setTransactionToken(response.data.transactionReference);
         setTransactionResult("success");
+        setStep("result");
       } else {
+        setFailureReason(response.description || "Payment failed");
         setTransactionResult("failure");
+        setStep("result");
       }
     } catch (error: any) {
       console.error("Payment Error:", error);
+      let reason = "An unexpected error occurred";
+
+      if (typeof error === "string") {
+        reason = error;
+      } else if (typeof error === "object") {
+        reason = error.description || error.message || reason;
+      }
+
+      setFailureReason(reason);
       setTransactionResult("failure");
-      // Optionally show error message toast
+      setStep("result");
+    } finally {
+      setIsProcessing(false);
     }
-    setStep("result");
   };
 
   const handleAddToBeneficiary = () => {
@@ -343,6 +363,7 @@ export default function AirtimePage() {
       <EnterPin
         onBack={() => setStep("confirmation")}
         onComplete={handlePinComplete}
+        isLoading={isProcessing}
       />
     );
   }
@@ -377,9 +398,10 @@ export default function AirtimePage() {
     } else if (transactionResult === "failure") {
       return (
         <PaymentFailure
+          title="Airtime Purchase Failed"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason="Service provider down"
+          failureReason={failureReason || "Service provider down"}
           biller={selectedNetwork.name}
           meterNumber={phoneNumber}
           customerName={phoneNumber}

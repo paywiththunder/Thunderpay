@@ -10,6 +10,7 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
+import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse, getDataPlans, DataPlan as ApiDataPlan, getDataQuote, DataQuotePayload } from "@/services/bills";
 
 interface NetworkProvider {
   id: string;
@@ -38,7 +39,7 @@ const networkProviders: NetworkProvider[] = [
   { id: "9mobile", name: "9mobile", logo: "9" },
 ];
 
-const hotOffersPlans: DataPlan[] = [
+const FALLBACK_PLANS: DataPlan[] = [
   { id: "1gb", data: "1GB", price: 500, duration: "1 Day", cashback: 5 },
   { id: "2.5gb", data: "2.5GB", price: 700, duration: "2 Days", cashback: 7 },
   { id: "3.2gb", data: "3.2GB", price: 1000, duration: "2 Days", cashback: 10 },
@@ -74,7 +75,54 @@ export default function DataPage() {
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [transactionResult, setTransactionResult] =
     useState<TransactionResult>(null);
+  const [failureReason, setFailureReason] = useState("");
   const [transactionToken, setTransactionToken] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [pinError, setPinError] = useState("");
+
+  const [availablePlans, setAvailablePlans] = useState<DataPlan[]>(FALLBACK_PLANS);
+  const [isPlansLoading, setIsPlansLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      setIsPlansLoading(true);
+      try {
+        const response = await getDataPlans(selectedNetwork.id);
+        if (response.success && response.data) {
+          // Map API plans to UI structure
+          const mappedPlans: DataPlan[] = response.data.map((p: ApiDataPlan) => {
+            // Extract duration from name if possible, else "N/A"
+            // Example name: "N100 100MB - 24 hrs"
+            const nameParts = p.name.split('-');
+            const duration = nameParts.length > 1 ? nameParts[1].trim() : "N/A";
+
+            // Extract data amount if possible
+            // Often in the name like "100MB"
+            // Simple heuristic: Looks for digits followed by MB/GB
+            const dataMatch = p.name.match(/(\d+(\.\d+)?(MB|GB))/i);
+            const dataAmount = dataMatch ? dataMatch[0] : p.name;
+
+            return {
+              id: p.variation_code,
+              data: dataAmount,
+              price: parseFloat(p.variation_amount),
+              duration: duration,
+              cashback: 0 // API doesn't seem to return cashback yet
+            };
+          });
+          setAvailablePlans(mappedPlans);
+        }
+      } catch (error) {
+        console.error("Failed to fetch data plans", error);
+        // Fallback to empty or keep previous?
+        setAvailablePlans([]);
+      } finally {
+        setIsPlansLoading(false);
+      }
+    };
+
+    fetchPlans();
+  }, [selectedNetwork]);
 
   useEffect(() => {
     if (phoneNumber.length >= 10) {
@@ -86,6 +134,57 @@ export default function DataPage() {
       setPhoneVerified(false);
     }
   }, [phoneNumber]);
+
+  const getFilteredPlans = () => {
+    if (!availablePlans.length) return [];
+
+    return availablePlans.filter((plan) => {
+      const durationLower = plan.duration.toLowerCase();
+
+      switch (offerCategory) {
+        case "daily":
+          // Matches "24 hrs", "1 day", "2 days"
+          // Excludes "30 days" or "7 days" implicitly if we are strict, 
+          // but valid logic: anything with 'hr' OR 'day' but NOT '7 days' or '30 days'?
+          // Better logic: 
+          // 1. Explicitly match "hr" or "hour"
+          // 2. Match "day" if the number preceding it is <= 3
+          if (durationLower.includes("hr")) return true;
+          if (durationLower.includes("day")) {
+            // Extract number of days
+            const days = parseInt(durationLower) || 1;
+            // Logic: If it starts with a number like "2 days", parseInt gets 2.
+            // If "1 day", gets 1.
+            // If "30 days", gets 30.
+            return days <= 3;
+          }
+          return false;
+
+        case "weekly":
+          // Matches "week", "7 days", "14 days"
+          if (durationLower.includes("week")) return true;
+          if (durationLower.includes("day")) {
+            const days = parseInt(durationLower) || 0;
+            return days > 3 && days <= 14;
+          }
+          return false;
+
+        case "hot-offers":
+        default:
+          // Default bucket (Monthly / 30 days / Others)
+          // Or explicitly >= 15 days
+          if (durationLower.includes("month")) return true;
+          if (durationLower.includes("day")) {
+            const days = parseInt(durationLower) || 0;
+            return days > 14;
+          }
+          // If duration is unknown/N/A, maybe put in Hot Offers
+          return !durationLower.includes("hr") && !durationLower.includes("week");
+      }
+    });
+  };
+
+  const filteredPlans = getFilteredPlans();
 
   const handlePlanSelect = (plan: DataPlan) => {
     setSelectedPlan(plan);
@@ -103,16 +202,53 @@ export default function DataPage() {
     setPhoneVerified(true);
   };
 
-  const handlePayClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    if (phoneNumber && selectedPlan) {
+  const handlePayClick = () => {
+    if (phoneNumber && selectedPlan && phoneVerified) {
       setStep("payment");
     }
   };
 
-  const handlePaymentMethodSelect = (paymentMethod: PaymentOption) => {
-    setSelectedPaymentMethod(paymentMethod);
-    setStep("confirmation");
+  const handlePaymentMethodSelect = async (method: PaymentOption) => {
+    setSelectedPaymentMethod(method);
+
+    // Fetch Data Quote
+    if (selectedPlan && phoneNumber) {
+      setIsProcessing(true); // Reuse or add new loading state for quote
+      try {
+        const payload: DataQuotePayload = {
+          phone: phoneNumber,
+          billersCode: phoneNumber,
+          variationCode: selectedPlan.id,
+          purchaseAmount: selectedPlan.price,
+          sourceCurrencyTicker: method.currency || "NGN", // Default if fiat
+          walletId: method.id,
+          baseCostCurrency: "NGN",
+          serviceId: selectedNetwork.id.toUpperCase() // e.g., AIRTEL, MTN
+        };
+
+        const response = await getDataQuote(payload);
+        if (response.success && response.data) {
+          // Store quote in state/localStorage to use in EnterPin step
+          const quoteData = response.data;
+          localStorage.setItem("currentDataQuote", JSON.stringify(quoteData));
+
+          // Also update local state for UI display if needed (e.g. deduction amount)
+          // For now, proceeding to Confirmation
+          setStep("confirmation");
+        } else {
+          setFailureReason(response.description || "Failed to generate quote");
+          setTransactionResult("failure");
+          setStep("result");
+        }
+      } catch (error: any) {
+        console.error("Quote Error", error);
+        setFailureReason(error?.description || error?.message || "Failed to generate quote");
+        setTransactionResult("failure");
+        setStep("result");
+      } finally {
+        setIsProcessing(false);
+      }
+    }
   };
 
   const calculatePaymentAmount = (): string => {
@@ -181,12 +317,69 @@ export default function DataPage() {
   };
 
   const handlePinComplete = async (pin: string) => {
-    const token = generateTransactionToken();
-    setTransactionToken(token);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const isSuccess = Math.random() > 0.3;
-    setTransactionResult(isSuccess ? "success" : "failure");
-    setStep("result");
+    setIsProcessing(true);
+    setPinError(""); // Reset previous errors
+
+    try {
+      // Retrieve quote for Data
+      const storedQuote = localStorage.getItem("currentDataQuote");
+      let quoteReference = "";
+
+      if (storedQuote) {
+        const parsed = JSON.parse(storedQuote);
+        quoteReference = parsed.quoteReference;
+      }
+
+      if (!quoteReference) {
+        throw new Error("Session expired or invalid quote. Please try again.");
+      }
+
+      const payload = {
+        quoteReference: quoteReference,
+        pin: pin
+      };
+
+      console.log("PIN to execute:", pin, "Parsed:", payload.pin);
+
+      const response = (await executeBillPayment(payload)) as BillExecutionResponse;
+
+      if (response.success && response.data) {
+        setTransactionToken(response.data.transactionReference);
+        setTransactionResult("success");
+        setStep("result");
+      } else {
+        const reason = response.description || "Payment failed";
+        // Heuristic: If error mentions PIN, stay on this step
+        if (reason.toLowerCase().includes("pin")) {
+          setPinError(reason);
+        } else {
+          setFailureReason(reason);
+          setTransactionResult("failure");
+          setStep("result");
+        }
+      }
+
+    } catch (error: any) {
+      console.error("Payment Error:", error);
+      let reason = "An unexpected error occurred";
+
+      if (typeof error === "string") {
+        reason = error;
+      } else if (typeof error === "object") {
+        reason = error.description || error.message || reason;
+      }
+
+      if (reason.toLowerCase().includes("pin")) {
+        setPinError(reason);
+      } else {
+        setFailureReason(reason);
+        setTransactionResult("failure");
+        setStep("result");
+      }
+    } finally {
+      setIsProcessing(false);
+      localStorage.removeItem("currentDataQuote"); // Clean up quote after use
+    }
   };
 
   const handleAddToBeneficiary = () => {
@@ -262,6 +455,8 @@ export default function DataPage() {
       <EnterPin
         onBack={() => setStep("confirmation")}
         onComplete={handlePinComplete}
+        isLoading={isProcessing}
+        error={pinError}
       />
     );
   }
@@ -296,9 +491,10 @@ export default function DataPage() {
     } else if (transactionResult === "failure") {
       return (
         <PaymentFailure
+          title="Data Purchase Failed"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason="Service provider down"
+          failureReason={failureReason}
           biller={selectedNetwork.name}
           meterNumber={phoneNumber}
           customerName={phoneNumber}
@@ -428,33 +624,30 @@ export default function DataPage() {
           <div className="flex items-center gap-0 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl overflow-hidden">
             <button
               onClick={() => setOfferCategory("hot-offers")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                offerCategory === "hot-offers"
-                  ? "bg-gray-700 text-white"
-                  : "text-white/70 hover:text-white"
-              }`}
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${offerCategory === "hot-offers"
+                ? "bg-gray-700 text-white"
+                : "text-white/70 hover:text-white"
+                }`}
             >
               Hot Offers
             </button>
             <div className="w-px bg-white/20"></div>
             <button
               onClick={() => setOfferCategory("daily")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                offerCategory === "daily"
-                  ? "bg-gray-700 text-white"
-                  : "text-white/70 hover:text-white"
-              }`}
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${offerCategory === "daily"
+                ? "bg-gray-700 text-white"
+                : "text-white/70 hover:text-white"
+                }`}
             >
               Daily
             </button>
             <div className="w-px bg-white/20"></div>
             <button
               onClick={() => setOfferCategory("weekly")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                offerCategory === "weekly"
-                  ? "bg-gray-700 text-white"
-                  : "text-white/70 hover:text-white"
-              }`}
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${offerCategory === "weekly"
+                ? "bg-gray-700 text-white"
+                : "text-white/70 hover:text-white"
+                }`}
             >
               Weekly
             </button>
@@ -464,31 +657,39 @@ export default function DataPage() {
         {/* Select Plan Section */}
         <div className="flex flex-col gap-2">
           <label className="text-white text-sm font-medium">Select Plan</label>
-          <div className="grid grid-cols-2 gap-3">
-            {hotOffersPlans.map((plan) => (
-              <button
-                key={plan.id}
-                onClick={() => handlePlanSelect(plan)}
-                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${
-                  selectedPlan?.id === plan.id
+          <div className="grid grid-cols-3 gap-3">
+            {isPlansLoading ? (
+              <div className="col-span-3 flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+              </div>
+            ) : filteredPlans.length > 0 ? (
+              filteredPlans.map((plan, i) => (
+                <button
+                  key={`${plan.id}-${i}`}
+                  onClick={() => handlePlanSelect(plan)}
+                  className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${selectedPlan?.id === plan.id
                     ? "ring-2 ring-blue-500 border-blue-500"
                     : ""
-                }`}
-              >
-                <span className="text-white font-bold text-base mb-1">
-                  {plan.data}
-                </span>
-                <span className="text-white font-bold text-lg mb-1">
-                  ₦{plan.price.toLocaleString()}
-                </span>
-                <span className="text-gray-400 text-xs mb-1">
-                  {plan.duration}
-                </span>
-                <span className="text-gray-400 text-xs">
-                  ₦{plan.cashback} Cashback
-                </span>
-              </button>
-            ))}
+                    }`}
+                >
+                  <span className="text-white font-bold text-base mb-1">
+                    {plan.data}
+                  </span>
+                  <span className="text-white font-bold text-lg mb-1">
+                    ₦{plan.price.toLocaleString()}
+                  </span>
+                  <span className="text-gray-400 text-xs mb-1">
+                    {plan.duration}
+                  </span>
+                  <span className="text-gray-400 text-xs">
+                    ₦{plan.cashback} Cashback
+                  </span>
+                </button>
+              ))) : (
+              <div className="col-span-3 text-center text-gray-500 py-8">
+                No plans available for this network.
+              </div>
+            )}
           </div>
         </div>
 
@@ -496,11 +697,10 @@ export default function DataPage() {
         <button
           onClick={handlePayClick}
           disabled={!phoneNumber || !selectedPlan || !phoneVerified}
-          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${
-            !phoneNumber || !selectedPlan || !phoneVerified
-              ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
-              : ""
-          }`}
+          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!phoneNumber || !selectedPlan || !phoneVerified
+            ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
+            : ""
+            }`}
         >
           Pay
         </button>

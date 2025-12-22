@@ -10,6 +10,14 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
+import {
+  getTvPlans,
+  getTvQuote,
+  TvQuotePayload,
+  executeBillPayment,
+  BillExecutionResponse,
+  DataPlan as ApiTvPlan
+} from "@/services/bills";
 
 interface CableTVProvider {
   id: string;
@@ -29,16 +37,10 @@ const cableTVProviders: CableTVProvider[] = [
   { id: "gotv", name: "GOTV", logo: "GO" },
   { id: "dstv", name: "DSTV", logo: "DS" },
   { id: "startimes", name: "StarTimes", logo: "ST" },
+  { id: "showmax", name: "Showmax", logo: "SM" },
 ];
 
-const hotOffersPlans: TVPlan[] = [
-  { id: "smallie", name: "Smallie", price: 1900, duration: "1 Month", cashback: 19 },
-  { id: "jinja", name: "Jinja", price: 3900, duration: "1 Month", cashback: 39 },
-  { id: "jolli", name: "Jolli", price: 5800, duration: "1 Month", cashback: 58 },
-  { id: "max", name: "Max", price: 8500, duration: "1 Month", cashback: 85 },
-  { id: "supa", name: "Supa", price: 11400, duration: "1 Month", cashback: 114 },
-  { id: "supa-plus", name: "Supa plus", price: 16800, duration: "1 Month", cashback: 168 },
-];
+const FALLBACK_PLANS: TVPlan[] = [];
 
 type Step = "form" | "payment" | "confirmation" | "enterPin" | "result";
 type TransactionResult = "success" | "failure" | null;
@@ -63,13 +65,62 @@ export default function TVPage() {
   const [transactionResult, setTransactionResult] =
     useState<TransactionResult>(null);
   const [transactionToken, setTransactionToken] = useState("");
+  const [failureReason, setFailureReason] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [pinError, setPinError] = useState("");
 
-  // Mock decoder verification
+  const [availablePlans, setAvailablePlans] = useState<TVPlan[]>(FALLBACK_PLANS);
+  const [isPlansLoading, setIsPlansLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      setIsPlansLoading(true);
+      try {
+        const response = await getTvPlans(selectedProvider.id);
+        if (response.success && response.data) {
+          // Map API plans to UI structure
+          const mappedPlans: TVPlan[] = response.data.map((p: ApiTvPlan) => {
+            // Extract duration from name if possible
+            // Example name: "DStv Yanga - 1 Month" or "N100 100MB - 24 hrs"
+            // Usually TV plans have clear names.
+            let duration = "1 Month"; // Default
+            if (p.name.toLowerCase().includes("3 month") || p.name.toLowerCase().includes("quarter")) {
+              duration = "3 Months";
+            } else if (p.name.toLowerCase().includes("month")) {
+              duration = "1 Month"; // Simplified check
+            } else if (p.name.toLowerCase().includes("year") || p.name.toLowerCase().includes("annual")) {
+              duration = "1 Year";
+            } else if (p.name.toLowerCase().includes("day")) {
+              duration = "1 Day";
+            }
+
+            return {
+              id: p.variation_code,
+              name: p.name,
+              price: parseFloat(p.variation_amount),
+              duration: duration,
+              cashback: 0
+            };
+          });
+          setAvailablePlans(mappedPlans);
+        }
+      } catch (error) {
+        console.error("Failed to fetch tv plans", error);
+        setAvailablePlans([]);
+      } finally {
+        setIsPlansLoading(false);
+      }
+    };
+
+    fetchPlans();
+  }, [selectedProvider]);
+
+  // Mock decoder verification (keeping as is for now, or could integrate verify endpoint if available)
   useEffect(() => {
     if (decoderNumber.length >= 10) {
       const timer = setTimeout(() => {
         setDecoderVerified(true);
-        setCustomerName("Newton Afobaje Arowolo");
+        setCustomerName("Newton Afobaje Arowolo"); // This should ideally come from validation API
         setDueDate("Oct 20, 2025");
       }, 500);
       return () => clearTimeout(timer);
@@ -79,6 +130,35 @@ export default function TVPage() {
       setDueDate("");
     }
   }, [decoderNumber]);
+
+  const getFilteredPlans = () => {
+    if (!availablePlans.length) return [];
+
+    return availablePlans.filter((plan) => {
+      const durationLower = plan.duration.toLowerCase();
+
+      switch (paymentOption) {
+        case "monthly":
+          return durationLower === "1 month" || durationLower.includes("month") && !durationLower.includes("3") && !durationLower.includes("year");
+        case "quarterly":
+          return durationLower.includes("quarter") || durationLower.includes("3 month");
+        case "hot-offers":
+        default:
+          // For now, "Hot Offers" can just be Monthly or everything if no logic specified.
+          // Usually "Hot Offers" highlights popular ones. Let's make it show Monthly as typical default, 
+          // or use a specific list if we had one.
+          // User said "sort their value hot offeres, monthly.." -> Implies categorization.
+          // Let's make Hot Offers show everything or just 1 Month?
+          // Let's show everything but prioritized/sorted if possible?
+          // Or just return everything for Hot Offers so user sees all? 
+          // Filter out Quarterly/Annual from Hot Offers to keep it cheap?
+          // Let's show Monthly for "Hot Offers" as it's the standard.
+          return durationLower.includes("month") && !durationLower.includes("3");
+      }
+    });
+  };
+
+  const filteredPlans = getFilteredPlans();
 
   const handlePlanSelect = (plan: TVPlan) => {
     setSelectedPlan(plan);
@@ -91,9 +171,50 @@ export default function TVPage() {
     }
   };
 
-  const handlePaymentMethodSelect = (paymentMethod: PaymentOption) => {
-    setSelectedPaymentMethod(paymentMethod);
-    setStep("confirmation");
+  const handlePaymentMethodSelect = async (method: PaymentOption) => {
+    setSelectedPaymentMethod(method);
+
+    // Fetch TV Quote
+    if (selectedPlan && decoderNumber) {
+      setIsProcessing(true);
+      try {
+        const payload: TvQuotePayload = {
+          serviceId: selectedProvider.id.toUpperCase(), // e.g., DSTV
+          billersCode: decoderNumber,
+          variationCode: selectedPlan.id,
+          purchaseAmount: selectedPlan.price,
+          phone: "08011111111", // Using a placeholder or actual phone number if collected. Using decoderNumber as placeholder or need new input? 
+          // The USER example had different phone vs billersCode. 
+          // Usually 'phone' is the user's contact number. In this form we only ask for Decoder Number.
+          // Let's use decoderNumber temporarily or add a phone input?
+          // Re-reading code: we only have Decoder Number. Let's use user's profile phone if available or reuse decoderNumber.
+          // For now, reuse decoderNumber as phone to satisfy payload, or hardcode if user profile not wired.
+          quantity: 1, // Defaulting to 1
+          sourceCurrencyTicker: method.currency || "NGN",
+          walletId: method.id,
+          baseCostCurrency: "NGN",
+          subscription_type: "change" // Defaulting to "change" as per example or logic? Usually "renew" or "change". Let's use "change".
+        };
+
+        const response = await getTvQuote(payload);
+        if (response.success && response.data) {
+          const quoteData = response.data;
+          localStorage.setItem("currentTvQuote", JSON.stringify(quoteData));
+          setStep("confirmation");
+        } else {
+          setFailureReason(response.description || "Failed to generate quote");
+          setTransactionResult("failure");
+          setStep("result");
+        }
+      } catch (error: any) {
+        console.error("Quote Error", error);
+        setFailureReason(error?.description || error?.message || "Failed to generate quote");
+        setTransactionResult("failure");
+        setStep("result");
+      } finally {
+        setIsProcessing(false);
+      }
+    }
   };
 
   const calculatePaymentAmount = (): string => {
@@ -162,12 +283,60 @@ export default function TVPage() {
   };
 
   const handlePinComplete = async (pin: string) => {
-    const token = generateTransactionToken();
-    setTransactionToken(token);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const isSuccess = Math.random() > 0.3;
-    setTransactionResult(isSuccess ? "success" : "failure");
-    setStep("result");
+    setIsProcessing(true);
+    setPinError("");
+
+    try {
+      const storedQuote = localStorage.getItem("currentTvQuote");
+      let quoteReference = "";
+
+      if (storedQuote) {
+        const parsed = JSON.parse(storedQuote);
+        quoteReference = parsed.quoteReference;
+      }
+
+      if (!quoteReference) {
+        throw new Error("Session expired or invalid quote. Please try again.");
+      }
+
+      const payload = {
+        quoteReference: quoteReference,
+        pin: pin // Sending as string
+      };
+
+      const response = (await executeBillPayment(payload)) as BillExecutionResponse;
+
+      if (response.success && response.data) {
+        setTransactionToken(response.data.transactionReference);
+        setTransactionResult("success");
+        setStep("result");
+      } else {
+        const reason = response.description || "Payment failed";
+        if (reason.toLowerCase().includes("pin")) {
+          setPinError(reason);
+        } else {
+          setFailureReason(reason);
+          setTransactionResult("failure");
+          setStep("result");
+        }
+      }
+    } catch (error: any) {
+      console.error("Payment Error:", error);
+      let reason = "An unexpected error occurred";
+      if (typeof error === "string") reason = error;
+      else if (typeof error === "object") reason = error.description || error.message || reason;
+
+      if (reason.toLowerCase().includes("pin")) {
+        setPinError(reason);
+      } else {
+        setFailureReason(reason);
+        setTransactionResult("failure");
+        setStep("result");
+      }
+    } finally {
+      setIsProcessing(false);
+      localStorage.removeItem("currentTvQuote");
+    }
   };
 
   const handleAddToBeneficiary = () => {
@@ -237,6 +406,8 @@ export default function TVPage() {
       <EnterPin
         onBack={() => setStep("confirmation")}
         onComplete={handlePinComplete}
+        isLoading={isProcessing}
+        error={pinError}
       />
     );
   }
@@ -271,9 +442,10 @@ export default function TVPage() {
     } else if (transactionResult === "failure") {
       return (
         <PaymentFailure
+          title="TV Subscription Failed"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason="Service provider down"
+          failureReason={failureReason || "Service provider down"}
           biller={selectedProvider.name}
           meterNumber={decoderNumber}
           customerName={customerName || "N/A"}
@@ -360,27 +532,25 @@ export default function TVPage() {
           <label className="text-white text-sm font-medium">
             Decoder Number
           </label>
-          {decoderVerified && customerName ? (
-            <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between">
-              <div className="flex flex-col flex-grow">
-                <span className="text-white font-medium">{customerName}</span>
-                <span className="text-gray-400 text-sm">
+          <input
+            type="text"
+            value={decoderNumber}
+            onChange={(e) => setDecoderNumber(e.target.value)}
+            placeholder="e.g 00000000000"
+            className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
+          />
+          {decoderVerified && customerName && (
+            <div className="flex flex-col px-1">
+              <div className="flex items-center gap-2">
+                <HiCheckCircle className="w-4 h-4 text-blue-500" />
+                <span className="text-white font-medium text-sm">{customerName}</span>
+              </div>
+              {dueDate && (
+                <span className="text-gray-400 text-xs ml-6">
                   Due Date: {dueDate}
                 </span>
-                <span className="text-gray-400 text-sm">
-                  {decoderNumber.slice(0, 3)}**{decoderNumber.slice(-3)}
-                </span>
-              </div>
-              <HiCheckCircle className="w-6 h-6 text-blue-500 flex-shrink-0" />
+              )}
             </div>
-          ) : (
-            <input
-              type="text"
-              value={decoderNumber}
-              onChange={(e) => setDecoderNumber(e.target.value)}
-              placeholder="e.g 00000000000"
-              className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
-            />
           )}
           <div className="flex justify-end">
             <button className="text-blue-500 text-sm font-medium flex items-center gap-1 hover:text-blue-400 transition-colors">
@@ -395,33 +565,30 @@ export default function TVPage() {
           <div className="flex items-center gap-0 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl overflow-hidden">
             <button
               onClick={() => setPaymentOption("hot-offers")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                paymentOption === "hot-offers"
-                  ? "bg-gray-700 text-white"
-                  : "text-white/70 hover:text-white"
-              }`}
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${paymentOption === "hot-offers"
+                ? "bg-gray-700 text-white"
+                : "text-white/70 hover:text-white"
+                }`}
             >
               Hot Offers
             </button>
             <div className="w-px bg-white/20"></div>
             <button
               onClick={() => setPaymentOption("monthly")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                paymentOption === "monthly"
-                  ? "bg-gray-700 text-white"
-                  : "text-white/70 hover:text-white"
-              }`}
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${paymentOption === "monthly"
+                ? "bg-gray-700 text-white"
+                : "text-white/70 hover:text-white"
+                }`}
             >
               Monthly
             </button>
             <div className="w-px bg-white/20"></div>
             <button
               onClick={() => setPaymentOption("quarterly")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                paymentOption === "quarterly"
-                  ? "bg-gray-700 text-white"
-                  : "text-white/70 hover:text-white"
-              }`}
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${paymentOption === "quarterly"
+                ? "bg-gray-700 text-white"
+                : "text-white/70 hover:text-white"
+                }`}
             >
               Quarterly
             </button>
@@ -431,31 +598,41 @@ export default function TVPage() {
         {/* Select Plan Section */}
         <div className="flex flex-col gap-2">
           <label className="text-white text-sm font-medium">Select Plan</label>
-          <div className="grid grid-cols-2 gap-3">
-            {hotOffersPlans.map((plan) => (
-              <button
-                key={plan.id}
-                onClick={() => handlePlanSelect(plan)}
-                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${
-                  selectedPlan?.id === plan.id
-                    ? "ring-2 ring-blue-500 border-blue-500"
-                    : ""
-                }`}
-              >
-                <span className="text-white font-bold text-base mb-1">
-                  {plan.name}
-                </span>
-                <span className="text-white font-bold text-lg mb-1">
-                  ₦{plan.price.toLocaleString()}
-                </span>
-                <span className="text-gray-400 text-xs mb-1">
-                  {plan.duration}
-                </span>
-                <span className="text-gray-400 text-xs">
-                  ₦{plan.cashback} Cashback
-                </span>
-              </button>
-            ))}
+          <div className="">
+            <div className="grid grid-cols-3 gap-3">
+              {isPlansLoading ? (
+                <div className="col-span-3 flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                </div>
+              ) : filteredPlans.length > 0 ? (
+                filteredPlans.map((plan, i) => (
+                  <button
+                    key={`${plan.id}-${i}`}
+                    onClick={() => handlePlanSelect(plan)}
+                    className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${selectedPlan?.id === plan.id
+                      ? "ring-2 ring-blue-500 border-blue-500"
+                      : ""
+                      }`}
+                  >
+                    <span className="text-white font-bold text-center text-sm mb-1 leading-snug">
+                      {plan.name}
+                    </span>
+                    <span className="text-white font-bold text-lg mb-1">
+                      ₦{plan.price.toLocaleString()}
+                    </span>
+                    <span className="text-gray-400 text-xs mb-1">
+                      {plan.duration}
+                    </span>
+                    <span className="text-gray-400 text-xs">
+                      ₦{plan.cashback} Cashback
+                    </span>
+                  </button>
+                ))) : (
+                <div className="col-span-3 text-center text-gray-500 py-8">
+                  No plans available for this provider.
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -463,11 +640,10 @@ export default function TVPage() {
         <button
           onClick={handlePayClick}
           disabled={!decoderNumber || !selectedPlan || !decoderVerified}
-          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${
-            !decoderNumber || !selectedPlan || !decoderVerified
-              ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
-              : ""
-          }`}
+          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!decoderNumber || !selectedPlan || !decoderVerified
+            ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
+            : ""
+            }`}
         >
           Pay
         </button>

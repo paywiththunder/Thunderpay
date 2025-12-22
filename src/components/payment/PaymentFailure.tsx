@@ -3,6 +3,7 @@ import React from "react";
 import { HiXMark, HiOutlineInformationCircle } from "react-icons/hi2";
 
 interface PaymentFailureProps {
+  title?: string;
   amount: string; // e.g., "0.0060 SOL"
   amountEquivalent: string; // e.g., "≈ ₦20,000.00"
   failureReason: string;
@@ -17,6 +18,7 @@ interface PaymentFailureProps {
 }
 
 export default function PaymentFailure({
+  title = "Transaction Failed",
   amount,
   amountEquivalent,
   failureReason,
@@ -39,7 +41,7 @@ export default function PaymentFailure({
 
         {/* Title */}
         <h1 className="text-2xl font-bold text-white text-center mb-8">
-          Electricity Bill Paid Failed
+          {title}
         </h1>
 
         {/* Receipt Header */}

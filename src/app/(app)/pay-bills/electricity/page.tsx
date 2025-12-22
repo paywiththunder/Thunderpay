@@ -59,7 +59,9 @@ export default function ElectricityPage() {
   const [customerName, setCustomerName] = useState("");
   const [transactionResult, setTransactionResult] =
     useState<TransactionResult>(null);
+  const [failureReason, setFailureReason] = useState("");
   const [transactionToken, setTransactionToken] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Mock meter verification - in real app, this would be an API call
   useEffect(() => {
@@ -172,19 +174,42 @@ export default function ElectricityPage() {
   };
 
   const handlePinComplete = async (pin: string) => {
-    // Generate transaction token
-    const token = generateTransactionToken();
-    setTransactionToken(token);
+    setIsProcessing(true);
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const isSuccess = Math.random() > 0.3;
 
-    // Simulate API call to process payment
-    // In a real app, this would be an actual API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+      if (isSuccess) {
+        const token = generateTransactionToken();
+        setTransactionToken(token);
+        setTransactionResult("success");
+        setStep("result");
+      } else {
+        const mockError = {
+          description: "Service temporarily unavailable for this utility",
+          message: "Service unavailable"
+        };
+        setFailureReason(mockError.description);
+        setTransactionResult("failure");
+        setStep("result");
+      }
+    } catch (error: any) {
+      console.error("Payment Error:", error);
+      let reason = "An unexpected error occurred";
 
-    // Randomly determine success/failure for demo purposes
-    // In production, this would be based on actual API response
-    const isSuccess = Math.random() > 0.3; // 70% success rate
-    setTransactionResult(isSuccess ? "success" : "failure");
-    setStep("result");
+      if (typeof error === "string") {
+        reason = error;
+      } else if (typeof error === "object") {
+        reason = error.description || error.message || reason;
+      }
+
+      setFailureReason(reason);
+      setTransactionResult("failure");
+      setStep("result");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleAddToBeneficiary = () => {
@@ -260,6 +285,7 @@ export default function ElectricityPage() {
       <EnterPin
         onBack={() => setStep("confirmation")}
         onComplete={handlePinComplete}
+        isLoading={isProcessing}
       />
     );
   }
@@ -296,9 +322,10 @@ export default function ElectricityPage() {
     } else if (transactionResult === "failure") {
       return (
         <PaymentFailure
+          title="Electricity Purchase Failed"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason="Service provider down"
+          failureReason={failureReason || "Service provider down"}
           biller={selectedProvider.name}
           meterNumber={meterNumber}
           customerName={customerName || "N/A"}
@@ -390,22 +417,20 @@ export default function ElectricityPage() {
           <div className="flex items-center gap-0 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl overflow-hidden">
             <button
               onClick={() => setPaymentType("prepaid")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                paymentType === "prepaid"
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${paymentType === "prepaid"
                   ? "bg-gray-700 text-white"
                   : "text-white/70 hover:text-white"
-              }`}
+                }`}
             >
               Prepaid
             </button>
             <div className="w-px bg-white/20"></div>
             <button
               onClick={() => setPaymentType("postpaid")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                paymentType === "postpaid"
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${paymentType === "postpaid"
                   ? "bg-gray-700 text-white"
                   : "text-white/70 hover:text-white"
-              }`}
+                }`}
             >
               Postpaid
             </button>
@@ -465,11 +490,10 @@ export default function ElectricityPage() {
               <button
                 key={option.amount}
                 onClick={() => handleAmountSelect(option.amount)}
-                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${
-                  amount === option.amount.toString()
+                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString()
                     ? "ring-2 ring-blue-500 border-blue-500"
                     : ""
-                }`}
+                  }`}
               >
                 <span className="text-white font-bold text-base">
                   ₦{option.amount.toLocaleString()}
@@ -486,11 +510,10 @@ export default function ElectricityPage() {
         <button
           onClick={handlePayClick}
           disabled={!meterNumber || !amount || !meterVerified}
-          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${
-            !meterNumber || !amount || !meterVerified
+          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!meterNumber || !amount || !meterVerified
               ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
               : ""
-          }`}
+            }`}
         >
           Pay
         </button>

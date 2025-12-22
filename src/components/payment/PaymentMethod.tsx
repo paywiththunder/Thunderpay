@@ -14,6 +14,7 @@ export interface PaymentOption {
   value: string;
   type: "fiat" | "crypto";
   currencyCode?: string;
+  currency?: string;
 }
 
 interface PaymentMethodProps {
@@ -78,6 +79,7 @@ export default function PaymentMethod({
             value: "0.00", // valid fiat value would need conversion rate
             type: "crypto", // Assuming mostly crypto for now
             currencyCode: currencyCode,
+            currency: currencyCode,
           };
         });
 

@@ -27,7 +27,7 @@ export default function SetupThunderPin() {
     setIsLoading(true);
     setError(null);
     try {
-      await setPinApi(parseInt(pin));
+      await setPinApi(pin);
       setStep(4);
     } catch (err: any) {
       console.error("Error setting PIN:", err);

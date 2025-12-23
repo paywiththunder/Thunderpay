@@ -56,6 +56,8 @@ export default function TVPage() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [paymentOption, setPaymentOption] = useState<PaymentOptionType>("hot-offers");
   const [decoderNumber, setDecoderNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [quantity, setQuantity] = useState(1);
   const [selectedPlan, setSelectedPlan] = useState<TVPlan | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentOption | null>(null);
@@ -178,25 +180,29 @@ export default function TVPage() {
     if (selectedPlan && decoderNumber) {
       setIsProcessing(true);
       try {
+        const serviceId = selectedProvider.id.toUpperCase();
+        let subscription_type: "change" | "renew" | null = null;
+
+        // Only DSTV and GOTV require subscription_type
+        if (["DSTV", "GOTV"].includes(serviceId)) {
+          subscription_type = "change";
+        }
+
         const payload: TvQuotePayload = {
-          serviceId: selectedProvider.id.toUpperCase(), // e.g., DSTV
+          serviceId: serviceId,
           billersCode: decoderNumber,
           variationCode: selectedPlan.id,
           purchaseAmount: selectedPlan.price,
-          phone: "08011111111", // Using a placeholder or actual phone number if collected. Using decoderNumber as placeholder or need new input? 
-          // The USER example had different phone vs billersCode. 
-          // Usually 'phone' is the user's contact number. In this form we only ask for Decoder Number.
-          // Let's use decoderNumber temporarily or add a phone input?
-          // Re-reading code: we only have Decoder Number. Let's use user's profile phone if available or reuse decoderNumber.
-          // For now, reuse decoderNumber as phone to satisfy payload, or hardcode if user profile not wired.
-          quantity: 1, // Defaulting to 1
-          sourceCurrencyTicker: method.currency || "NGN",
-          walletId: method.id,
+          phone: phoneNumber,
+          quantity: quantity,
+          sourceCurrencyTicker: method.currency ?? "NGN",
+          walletId: isNaN(Number(method.id)) ? method.id : Number(method.id),
           baseCostCurrency: "NGN",
-          subscription_type: "change" // Defaulting to "change" as per example or logic? Usually "renew" or "change". Let's use "change".
+          subscription_type: subscription_type
         };
 
         const response = await getTvQuote(payload);
+        console.log("TV Quote Response", response);
         if (response.success && response.data) {
           const quoteData = response.data;
           localStorage.setItem("currentTvQuote", JSON.stringify(quoteData));
@@ -560,6 +566,20 @@ export default function TVPage() {
           </div>
         </div>
 
+        {/* Phone Number Section */}
+        <div className="flex flex-col gap-2">
+          <label className="text-white text-sm font-medium">
+            Phone Number
+          </label>
+          <input
+            type="tel"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            placeholder="e.g 08012345678"
+            className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
+          />
+        </div>
+
         {/* Payment Options */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-0 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl overflow-hidden">
@@ -597,7 +617,23 @@ export default function TVPage() {
 
         {/* Select Plan Section */}
         <div className="flex flex-col gap-2">
-          <label className="text-white text-sm font-medium">Select Plan</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-white text-sm font-medium">Select Plan</label>
+            <div className="flex items-center gap-3 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-2 px-3">
+              <span className="text-gray-400 text-xs font-medium mr-auto">Duration:</span>
+              <button
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                className="w-8 h-8 flex items-center justify-center text-white bg-gray-800/50 hover:bg-gray-700/80 rounded-full transition-colors border border-white/10"
+              >-</button>
+              <span className="text-white text-sm font-bold min-w-[70px] text-center">
+                {quantity} {quantity > 1 ? "Months" : "Month"}
+              </span>
+              <button
+                onClick={() => setQuantity(quantity + 1)}
+                className="w-8 h-8 flex items-center justify-center text-white bg-gray-800/50 hover:bg-gray-700/80 rounded-full transition-colors border border-white/10"
+              >+</button>
+            </div>
+          </div>
           <div className="">
             <div className="grid grid-cols-3 gap-3">
               {isPlansLoading ? (
@@ -639,8 +675,8 @@ export default function TVPage() {
         {/* Pay Button */}
         <button
           onClick={handlePayClick}
-          disabled={!decoderNumber || !selectedPlan || !decoderVerified}
-          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!decoderNumber || !selectedPlan || !decoderVerified
+          disabled={!decoderNumber || !selectedPlan || !decoderVerified || !phoneNumber}
+          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!decoderNumber || !selectedPlan || !decoderVerified || !phoneNumber
             ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
             : ""
             }`}

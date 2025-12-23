@@ -80,10 +80,10 @@ export default function EnterPin({ onBack, onComplete, isLoading = false, error 
                 }}
                 onKeyDown={(e) => handleKeyDown(i, e)}
                 className={`w-14 h-14 text-center text-2xl font-medium rounded-xl border bg-[#0f1112] focus:outline-none focus:ring-2 transition-all ${error
-                    ? "border-red-500 text-red-500 focus:border-red-500 focus:ring-red-500"
-                    : digit
-                      ? "border-blue-500/50 text-white ring-blue-500 shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]"
-                      : "border-[#2B2F33] text-gray-400 focus:border-blue-500 focus:ring-blue-500"
+                  ? "border-red-500 text-red-500 focus:border-red-500 focus:ring-red-500"
+                  : digit
+                    ? "border-blue-500/50 text-white ring-blue-500 shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]"
+                    : "border-[#2B2F33] text-gray-400 focus:border-blue-500 focus:ring-blue-500"
                   } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
               />
             ))}
@@ -104,7 +104,7 @@ export default function EnterPin({ onBack, onComplete, isLoading = false, error 
 
           {!isLoading && !error && (
             <Link
-              href="/auth/forget-password"
+              href="/profile/reset-pin"
               className="text-blue-500 text-sm font-medium hover:text-blue-400"
             >
               Forgot PIN?

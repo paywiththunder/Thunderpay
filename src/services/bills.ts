@@ -77,10 +77,11 @@ export const executeBillPayment = async (payload: BillExecutionPayload) => {
     const token = getAuthToken();
     if (!token) throw new Error("No auth token found");
 
+    const url = `${API_URL}/execute`;
     try {
-        console.log("Executing Bill Payment with Payload:", payload);
+        console.log(`Executing Bill Payment to ${url} with Payload:`, JSON.stringify(payload, null, 2));
         const response = await axios.post(
-            `${API_URL}/execute`,
+            url,
             payload,
             {
                 headers: {
@@ -92,7 +93,17 @@ export const executeBillPayment = async (payload: BillExecutionPayload) => {
         console.log("Bill Execution Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.error("Bill Execution Error:", error);
+        console.error("Bill Execution Error Details:", {
+            message: error.message,
+            code: error.code,
+            url: url,
+            response: error.response ? {
+                status: error.response.status,
+                data: error.response.data,
+                headers: error.response.headers
+            } : "No response received",
+            request: error.request ? "Request was sent but no response" : "Request setup failed"
+        });
         throw error.response?.data || error.message;
     }
 };
@@ -193,11 +204,11 @@ export interface TvQuotePayload {
     variationCode: string; // Plan ID
     purchaseAmount: number;
     phone: string;
-    quantity?: number; // Optional, defaults to 1 usually? User sent 2 in example.
+    quantity: number;
     sourceCurrencyTicker: string;
     walletId: number | string;
     baseCostCurrency: string;
-    subscription_type?: string; // "change" or "renew"
+    subscription_type?: "change" | "renew" | null;
 }
 
 export const getTvQuote = async (payload: TvQuotePayload) => {

@@ -11,6 +11,7 @@ import {
   HiOutlineCog6Tooth,
   HiOutlineArrowRightOnRectangle,
   HiChevronRight,
+  HiOutlineLockClosed,
 } from "react-icons/hi2";
 import { useRouter } from "next/navigation";
 
@@ -59,7 +60,7 @@ const menuItems: MenuItem[] = [
   {
     id: 6,
     icon: HiOutlineStar,
-    label: "Rate us",   
+    label: "Rate us",
     link: "/profile/rate-us",
   },
   {
@@ -67,6 +68,20 @@ const menuItems: MenuItem[] = [
     icon: HiOutlineCog6Tooth,
     label: "Settings",
     link: "/profile/settings",
+  },
+  {
+    id: 9,
+    icon: HiOutlineLockClosed,
+    label: "Reset PIN",   // Keep user's term 'Reset' for endpoint usage, or maybe "Forgot PIN" is better? User said 'reset pin and im done'. Let's keep both or clarification?
+    // User requested "another set-pin component... in the app".
+    // I will have both: 'Set PIN' (for changing/setting) and 'Reset PIN' (for recovery).
+    link: "/profile/reset-pin",
+  },
+  {
+    id: 10,
+    icon: HiOutlineLockClosed,
+    label: "Set New PIN",
+    link: "/profile/set-pin",
   },
   {
     id: 8,
@@ -134,15 +149,13 @@ export default function ProfilePage() {
                 onClick={() => handleClick(item.link || "")}
               >
                 <Icon
-                  className={`w-6 h-6 flex-shrink-0 ${
-                    item.isSignOut ? "text-red-500" : "text-white"
-                  }`}
+                  className={`w-6 h-6 flex-shrink-0 ${item.isSignOut ? "text-red-500" : "text-white"
+                    }`}
                 />
                 <div className="flex items-center justify-between flex-grow">
                   <span
-                    className={`font-medium ${
-                      item.isSignOut ? "text-red-500" : "text-white"
-                    }`}
+                    className={`font-medium ${item.isSignOut ? "text-red-500" : "text-white"
+                      }`}
                   >
                     {item.label}
                   </span>
@@ -151,9 +164,8 @@ export default function ProfilePage() {
                       <span className="text-gray-400 text-sm">{item.value}</span>
                     )}
                     <HiChevronRight
-                      className={`w-5 h-5 ${
-                        item.isSignOut ? "text-red-500" : "text-white"
-                      }`}
+                      className={`w-5 h-5 ${item.isSignOut ? "text-red-500" : "text-white"
+                        }`}
                     />
                   </div>
                 </div>

@@ -88,7 +88,7 @@ export default function WalletForm() {
             if (res.success) {
                 setSuccess(true);
                 setTimeout(() => {
-                    router.push("/home");
+                    router.push("/crypto/receive");
                 }, 2000);
             } else {
                 setError(res.description || "Failed to create wallet");

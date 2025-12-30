@@ -208,7 +208,7 @@ export interface TvQuotePayload {
     sourceCurrencyTicker: string;
     walletId: number | string;
     baseCostCurrency: string;
-    subscription_type?: "change" | "renew" | null;
+    subscription_type: "change" | "renew" | null; // Required: enum for DSTV/GOTV, null for others
 }
 
 export const getTvQuote = async (payload: TvQuotePayload) => {
@@ -231,6 +231,49 @@ export const getTvQuote = async (payload: TvQuotePayload) => {
         return response.data;
     } catch (error: any) {
         console.error("TV Quote Error:", error);
+        throw error.response?.data || error.message;
+    }
+};
+
+export interface ElectricityQuotePayload {
+    serviceId: string; // IKEDC, ikeja-electric, IBEDC, ibadan-electric, PHED, portharcourt-electric, KEDCO, kano-electric, AEDC, abuja-electric
+    billersCode: string; // Meter number
+    type: "prepaid" | "postpaid";
+    purchaseAmount: number; // >= 2000
+    phone: string;
+    sourceCurrencyTicker: string;
+    walletId: number | string;
+    baseCostCurrency: string;
+}
+
+export interface ElectricityQuoteResponse {
+    quoteReference: string;
+    deductionAmount: number;
+    deductionCurrency: string;
+    exchangeRate: number;
+    transactionFee: number;
+    expiresAtTimestamp: string;
+}
+
+export const getElectricityQuote = async (payload: ElectricityQuotePayload) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const response = await axios.post(
+            `${API_URL}/electricity/quote`,
+            payload,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+        console.log("Electricity Quote Response:", response.data);
+        return response.data;
+    } catch (error: any) {
+        console.error("Electricity Quote Error:", error);
         throw error.response?.data || error.message;
     }
 };

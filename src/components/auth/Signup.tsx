@@ -9,7 +9,7 @@ import { Eye, EyeOff } from "lucide-react";
 export default function SignupForm() {
   const router = useRouter();
 
-  const [gender, setGender] = useState("Male");
+  // const [gender, setGender] = useState("Male");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
-import { HiChevronRight, HiChevronDown, HiCheckCircle } from "react-icons/hi2";
+import { HiChevronRight, HiChevronDown } from "react-icons/hi2";
 import PaymentMethod, {
   PaymentOption,
 } from "@/components/payment/PaymentMethod";
@@ -10,21 +10,19 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
-import { getElectricityQuote, ElectricityQuotePayload, executeBillPayment } from "@/services/bills";
 
-interface ElectricityProvider {
+interface BettingPlatform {
   id: string;
   name: string;
   logo: string;
-  serviceId: string; // API service ID
+  logoBg: string;
 }
 
-const electricityProviders: ElectricityProvider[] = [
-  { id: "ikeja", name: "Ikeja Electricity", logo: "IE", serviceId: "IKEDC" },
-  { id: "ibadan", name: "Ibadan Electricity", logo: "IB", serviceId: "IBEDC" },
-  { id: "ph", name: "Port Harcourt Electricity", logo: "PH", serviceId: "PHED" },
-  { id: "kano", name: "Kano Electricity", logo: "KN", serviceId: "KEDCO" },
-  { id: "abuja", name: "Abuja Electricity", logo: "AE", serviceId: "AEDC" },
+const bettingPlatforms: BettingPlatform[] = [
+  { id: "sportybet", name: "SportyBet", logo: "S", logoBg: "bg-red-500" },
+  { id: "bet9ja", name: "Bet9ja", logo: "B", logoBg: "bg-green-500" },
+  { id: "betway", name: "Betway", logo: "W", logoBg: "bg-blue-500" },
+  { id: "1xbet", name: "1xBet", logo: "1", logoBg: "bg-yellow-500" },
 ];
 
 const amountOptions = [
@@ -39,46 +37,21 @@ const amountOptions = [
 type Step = "form" | "payment" | "confirmation" | "enterPin" | "result";
 type TransactionResult = "success" | "failure" | null;
 
-export default function ElectricityPage() {
+export default function BettingPage() {
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<Step>("form");
-  const [selectedProvider, setSelectedProvider] = useState<ElectricityProvider>(
-    electricityProviders[0]
+  const [selectedPlatform, setSelectedPlatform] = useState<BettingPlatform>(
+    bettingPlatforms[0]
   );
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [paymentType, setPaymentType] = useState<"prepaid" | "postpaid">(
-    "prepaid"
-  );
-  const [meterNumber, setMeterNumber] = useState("");
+  const [userId, setUserId] = useState("");
   const [amount, setAmount] = useState("");
-  const [phone, setPhone] = useState("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentOption | null>(null);
-  const [meterVerified, setMeterVerified] = useState(false);
-  const [customerName, setCustomerName] = useState("");
   const [transactionResult, setTransactionResult] =
     useState<TransactionResult>(null);
-  const [failureReason, setFailureReason] = useState("");
   const [transactionToken, setTransactionToken] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [quoteReference, setQuoteReference] = useState("");
-  const [quoteData, setQuoteData] = useState<any>(null);
-
-  // Mock meter verification - in real app, this would be an API call
-  useEffect(() => {
-    if (meterNumber.length >= 10) {
-      // Simulate API call delay
-      const timer = setTimeout(() => {
-        setMeterVerified(true);
-        setCustomerName("Newton Afobaje Arowolo");
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      setMeterVerified(false);
-      setCustomerName("");
-    }
-  }, [meterNumber]);
 
   const handleAmountSelect = (selectedAmount: number) => {
     setAmount(selectedAmount.toString());
@@ -86,53 +59,14 @@ export default function ElectricityPage() {
 
   const handlePayClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    if (meterNumber && amount && phone) {
+    if (userId && amount) {
       setStep("payment");
     }
   };
 
-  const handlePaymentMethodSelect = async (paymentMethod: PaymentOption) => {
+  const handlePaymentMethodSelect = (paymentMethod: PaymentOption) => {
     setSelectedPaymentMethod(paymentMethod);
-    setIsProcessing(true);
-
-    try {
-      // Fetch quote before proceeding to confirmation
-      const payload: ElectricityQuotePayload = {
-        serviceId: selectedProvider.serviceId,
-        billersCode: meterNumber,
-        type: paymentType,
-        purchaseAmount: parseFloat(amount),
-        phone: phone,
-        sourceCurrencyTicker: paymentMethod.currencyCode || "ngn",
-        walletId: paymentMethod.walletId || 100,
-        baseCostCurrency: "ngn"
-      };
-
-      const response = await getElectricityQuote(payload);
-
-      if (response.success && response.data) {
-        setQuoteReference(response.data.quoteReference);
-        setQuoteData(response.data);
-        setStep("confirmation");
-      } else {
-        throw new Error(response.description || "Failed to get quote");
-      }
-    } catch (error: any) {
-      console.error("Quote Error:", error);
-      let reason = "Failed to get quote";
-
-      if (typeof error === "string") {
-        reason = error;
-      } else if (typeof error === "object") {
-        reason = error.description || error.message || reason;
-      }
-
-      setFailureReason(reason);
-      setTransactionResult("failure");
-      setStep("result");
-    } finally {
-      setIsProcessing(false);
-    }
+    setStep("confirmation");
   };
 
   const calculatePaymentAmount = (): string => {
@@ -143,16 +77,15 @@ export default function ElectricityPage() {
       return `₦${amountNum.toLocaleString()}.00`;
     }
 
-    // Mock conversion rates for crypto
     const rates: { [key: string]: number } = {
-      usdt: 1.0, // 1 USDT = $1
-      bitcoin: 0.000023, // Approximate rate
-      ethereum: 0.00042, // Approximate rate
-      solana: 0.006, // Approximate rate
+      usdt: 1.0,
+      bitcoin: 0.000023,
+      ethereum: 0.00042,
+      solana: 0.006,
     };
 
     const rate = rates[selectedPaymentMethod.id] || 1;
-    const cryptoAmount = amountNum / (rate * 1500); // Assuming 1 USD = 1500 NGN
+    const cryptoAmount = amountNum / (rate * 1500);
 
     if (selectedPaymentMethod.id === "usdt") {
       return `${cryptoAmount.toFixed(4)} USDT`;
@@ -180,7 +113,6 @@ export default function ElectricityPage() {
   };
 
   const generateTransactionToken = (): string => {
-    // Generate a random token in format: XXXX-XXXX-XXXX-XXXX-XXXX
     const segments = Array.from({ length: 5 }, () =>
       Math.floor(1000 + Math.random() * 9000).toString()
     );
@@ -190,18 +122,8 @@ export default function ElectricityPage() {
   const getTransactionDate = (): string => {
     const now = new Date();
     const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
     const month = months[now.getMonth()];
     const day = now.getDate();
@@ -215,52 +137,24 @@ export default function ElectricityPage() {
   };
 
   const handlePinComplete = async (pin: string) => {
-    setIsProcessing(true);
-    try {
-      // Execute bill payment with quote reference
-      const response = await executeBillPayment({
-        quoteReference: quoteReference,
-        pin: pin
-      });
-
-      if (response.success && response.data) {
-        setTransactionToken(response.data.transactionReference);
-        setTransactionResult("success");
-        setStep("result");
-      } else {
-        throw new Error(response.description || "Payment failed");
-      }
-    } catch (error: any) {
-      console.error("Payment Error:", error);
-      let reason = "An unexpected error occurred";
-
-      if (typeof error === "string") {
-        reason = error;
-      } else if (typeof error === "object") {
-        reason = error.description || error.message || reason;
-      }
-
-      setFailureReason(reason);
-      setTransactionResult("failure");
-      setStep("result");
-    } finally {
-      setIsProcessing(false);
-    }
+    const token = generateTransactionToken();
+    setTransactionToken(token);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const isSuccess = Math.random() > 0.3;
+    setTransactionResult(isSuccess ? "success" : "failure");
+    setStep("result");
   };
 
   const handleAddToBeneficiary = () => {
-    // Handle adding to beneficiary
     console.log("Add to beneficiary");
   };
 
   const handleContinue = () => {
-    // Reset and go back to form
     setStep("form");
     setTransactionResult(null);
     setTransactionToken("");
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -280,7 +174,6 @@ export default function ElectricityPage() {
     };
   }, [isDropdownOpen]);
 
-  // Render Payment Method step
   if (step === "payment") {
     return (
       <PaymentMethod
@@ -291,7 +184,6 @@ export default function ElectricityPage() {
     );
   }
 
-  // Render Confirmation step
   if (step === "confirmation" && selectedPaymentMethod) {
     return (
       <Confirmation
@@ -304,29 +196,26 @@ export default function ElectricityPage() {
             ? "Fiat"
             : `Crypto (${selectedPaymentMethod.name})`
         }
-        biller={selectedProvider.name}
-        meterNumber={meterNumber}
-        customerName={customerName || "N/A"}
-        meterType={paymentType === "prepaid" ? "Prepaid" : "Postpaid"}
-        serviceAddress="10 rd, 20 Sanusi Estate Baruwa Lagos"
+        biller={selectedPlatform.name}
+        meterNumber={userId}
+        customerName={userId}
+        meterType="Betting"
+        serviceAddress=""
         cashback={getCashback()}
         availableBalance={getAvailableBalance()}
       />
     );
   }
 
-  // Render Enter Pin step
   if (step === "enterPin") {
     return (
       <EnterPin
         onBack={() => setStep("confirmation")}
         onComplete={handlePinComplete}
-        isLoading={isProcessing}
       />
     );
   }
 
-  // Render Result step (Success or Failure)
   if (step === "result" && selectedPaymentMethod) {
     const paymentAmount = calculatePaymentAmount();
     const amountNum = parseFloat(amount) || 0;
@@ -338,12 +227,11 @@ export default function ElectricityPage() {
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
           token={transactionToken}
-          biller={selectedProvider.name}
-          meterNumber={meterNumber}
-          customerName={customerName || "N/A"}
-          meterType={paymentType === "prepaid" ? "Prepaid" : "Postpaid"}
-          serviceAddress="10 rd, 20 Sanusi Estate Baruwa Lagos"
-          unitsPurchased="22.3 kWh"
+          biller={selectedPlatform.name}
+          meterNumber={userId}
+          customerName={userId}
+          meterType="Betting"
+          serviceAddress=""
           paymentMethod={
             selectedPaymentMethod.type === "fiat"
               ? "Fiat"
@@ -358,15 +246,14 @@ export default function ElectricityPage() {
     } else if (transactionResult === "failure") {
       return (
         <PaymentFailure
-          title="Electricity Purchase Failed"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason={failureReason || "Service provider down"}
-          biller={selectedProvider.name}
-          meterNumber={meterNumber}
-          customerName={customerName || "N/A"}
-          meterType={paymentType === "prepaid" ? "Prepaid" : "Postpaid"}
-          serviceAddress="10 rd, 20 Sanusi Estate Baruwa Lagos"
+          failureReason="Service provider down"
+          biller={selectedPlatform.name}
+          meterNumber={userId}
+          customerName={userId}
+          meterType="Betting"
+          serviceAddress=""
           paymentMethod={
             selectedPaymentMethod.type === "fiat"
               ? "Fiat"
@@ -379,10 +266,8 @@ export default function ElectricityPage() {
     }
   }
 
-  // Render Form step
   return (
     <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6">
-      {/* Header */}
       <header className="relative flex items-center justify-center px-4 py-6">
         <button
           onClick={() => router.back()}
@@ -390,14 +275,14 @@ export default function ElectricityPage() {
         >
           <MdOutlineKeyboardDoubleArrowLeft className="text-white" />
         </button>
-        <h1 className="text-2xl font-bold text-white">Electricity</h1>
+        <h1 className="text-2xl font-bold text-white">Betting</h1>
       </header>
 
       <div className="flex flex-col gap-6 px-4 overflow-y-auto pb-6">
-        {/* Service Provider Section */}
+        {/* Select Platform Section */}
         <div className="flex flex-col gap-2">
           <label className="text-white text-sm font-medium">
-            Service Provider
+            Select Platform
           </label>
           <div className="relative" ref={dropdownRef}>
             <button
@@ -405,13 +290,15 @@ export default function ElectricityPage() {
               className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-yellow-500 flex items-center justify-center flex-shrink-0">
+                <div
+                  className={`w-10 h-10 rounded-full ${selectedPlatform.logoBg} flex items-center justify-center flex-shrink-0`}
+                >
                   <span className="text-white text-xs font-bold">
-                    {selectedProvider.logo}
+                    {selectedPlatform.logo}
                   </span>
                 </div>
                 <span className="text-white font-medium">
-                  {selectedProvider.name}
+                  {selectedPlatform.name}
                 </span>
               </div>
               {isDropdownOpen ? (
@@ -421,25 +308,26 @@ export default function ElectricityPage() {
               )}
             </button>
 
-            {/* Dropdown Menu */}
             {isDropdownOpen && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl shadow-lg z-10 max-h-60 overflow-y-auto">
-                {electricityProviders.map((provider) => (
+                {bettingPlatforms.map((platform) => (
                   <button
-                    key={provider.id}
+                    key={platform.id}
                     onClick={() => {
-                      setSelectedProvider(provider);
+                      setSelectedPlatform(platform);
                       setIsDropdownOpen(false);
                     }}
                     className="w-full p-4 flex items-center gap-3 hover:bg-gray-800/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
                   >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-yellow-500 flex items-center justify-center flex-shrink-0">
+                    <div
+                      className={`w-10 h-10 rounded-full ${platform.logoBg} flex items-center justify-center flex-shrink-0`}
+                    >
                       <span className="text-white text-xs font-bold">
-                        {provider.logo}
+                        {platform.logo}
                       </span>
                     </div>
                     <span className="text-white font-medium">
-                      {provider.name}
+                      {platform.name}
                     </span>
                   </button>
                 ))}
@@ -448,38 +336,13 @@ export default function ElectricityPage() {
           </div>
         </div>
 
-        {/* Payment Type Selection */}
+        {/* User ID Section */}
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-0 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl overflow-hidden">
-            <button
-              onClick={() => setPaymentType("prepaid")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${paymentType === "prepaid"
-                ? "bg-gray-700 text-white"
-                : "text-white/70 hover:text-white"
-                }`}
-            >
-              Prepaid
-            </button>
-            <div className="w-px bg-white/20"></div>
-            <button
-              onClick={() => setPaymentType("postpaid")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${paymentType === "postpaid"
-                ? "bg-gray-700 text-white"
-                : "text-white/70 hover:text-white"
-                }`}
-            >
-              Postpaid
-            </button>
-          </div>
-        </div>
-
-        {/* Meter Number Input */}
-        <div className="flex flex-col gap-2">
-          <label className="text-white text-sm font-medium">Meter Number</label>
+          <label className="text-white text-sm font-medium">User ID</label>
           <input
             type="text"
-            value={meterNumber}
-            onChange={(e) => setMeterNumber(e.target.value)}
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
             placeholder="e.g 00000000000"
             className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
           />
@@ -490,36 +353,6 @@ export default function ElectricityPage() {
             </button>
           </div>
         </div>
-
-        {/* Phone Number Input */}
-        <div className="flex flex-col gap-2">
-          <label className="text-white text-sm font-medium">Phone Number</label>
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="e.g 08011111111"
-            className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
-          />
-        </div>
-
-        {/* Meter Verification Card */}
-        {meterVerified && customerName && (
-          <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-lg font-bold">
-                  {customerName.charAt(0)}
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-white font-medium">{customerName}</span>
-                <span className="text-gray-400 text-sm">{meterNumber}</span>
-              </div>
-            </div>
-            <HiCheckCircle className="w-6 h-6 text-green-500 flex-shrink-0" />
-          </div>
-        )}
 
         {/* Select Amount Section */}
         <div className="flex flex-col gap-2">
@@ -538,10 +371,11 @@ export default function ElectricityPage() {
               <button
                 key={option.amount}
                 onClick={() => handleAmountSelect(option.amount)}
-                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString()
-                  ? "ring-2 ring-blue-500 border-blue-500"
-                  : ""
-                  }`}
+                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${
+                  amount === option.amount.toString()
+                    ? "ring-2 ring-blue-500 border-blue-500"
+                    : ""
+                }`}
               >
                 <span className="text-white font-bold text-base">
                   ₦{option.amount.toLocaleString()}
@@ -557,11 +391,12 @@ export default function ElectricityPage() {
         {/* Pay Button */}
         <button
           onClick={handlePayClick}
-          disabled={!meterNumber || !amount || !phone || !meterVerified}
-          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!meterNumber || !amount || !phone || !meterVerified
-            ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
-            : ""
-            }`}
+          disabled={!userId || !amount}
+          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${
+            !userId || !amount
+              ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
+              : ""
+          }`}
         >
           Pay
         </button>

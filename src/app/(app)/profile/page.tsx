@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   HiOutlineBell,
@@ -14,6 +14,8 @@ import {
   HiOutlineLockClosed,
 } from "react-icons/hi2";
 import { useRouter } from "next/navigation";
+import { getUserProfile } from "@/services/user";
+import { toast } from "react-hot-toast";
 
 interface MenuItem {
   id: number;
@@ -25,50 +27,50 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  {
-    id: 1,
-    icon: HiOutlineBell,
-    label: "Notifications",
-    link: "/profile/notifications",
-  },
-  {
-    id: 2,
-    icon: HiOutlineGlobeAlt,
-    label: "Language",
-    value: "English (US)",
-    link: "/profile/language",
-  },
-  {
-    id: 3,
-    icon: HiOutlineQuestionMarkCircle,
-    label: "Help center",
-    link: "/profile/help-center",
-  },
-  {
-    id: 4,
-    icon: HiOutlineExclamationCircle,
-    label: "Terms & Conditions",
-    link: "/profile/terms-and-conditions",
-  },
-  {
-    id: 5,
-    icon: HiOutlineSun,
-    label: "Theme",
-    value: "Dark mode",
-    link: "/profile/theme",
-  },
-  {
-    id: 6,
-    icon: HiOutlineStar,
-    label: "Rate us",
-    link: "/profile/rate-us",
-  },
-  {
-    id: 7,
-    icon: HiOutlineCog6Tooth,
-    label: "Settings",
-    link: "/profile/settings",
-  },
+  // {
+  //   id: 1,
+  //   icon: HiOutlineBell,
+  //   label: "Notifications",
+  //   link: "/profile/notifications",
+  // },
+  // {
+  //   id: 2,
+  //   icon: HiOutlineGlobeAlt,
+  //   label: "Language",
+  //   value: "English (US)",
+  //   link: "/profile/language",
+  // },
+  // {
+  //   id: 3,
+  //   icon: HiOutlineQuestionMarkCircle,
+  //   label: "Help center",
+  //   link: "/profile/help-center",
+  // },
+  // {
+  //   id: 4,
+  //   icon: HiOutlineExclamationCircle,
+  //   label: "Terms & Conditions",
+  //   link: "/profile/terms-and-conditions",
+  // },
+  // {
+  //   id: 5,
+  //   icon: HiOutlineSun,
+  //   label: "Theme",
+  //   value: "Dark mode",
+  //   link: "/profile/theme",
+  // },
+  // {
+  //   id: 6,
+  //   icon: HiOutlineStar,
+  //   label: "Rate us",
+  //   link: "/profile/rate-us",
+  // },
+  // {
+  //   id: 7,
+  //   icon: HiOutlineCog6Tooth,
+  //   label: "Settings",
+  //   link: "/profile/settings",
+  // },
   {
     id: 9,
     icon: HiOutlineLockClosed,
@@ -94,10 +96,51 @@ const menuItems: MenuItem[] = [
 
 export default function ProfilePage() {
   const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await getUserProfile();
+        if (response.success) {
+          setUser(response.data);
+        } else {
+          console.error("Failed to load profile:", response);
+          toast.error("Failed to load profile data");
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+        // toast.error("Error loading profile");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
 
   const handleClick = (link: string) => {
     router.push(link);
   };
+
+  const getInitials = (firstName: string, lastName: string) => {
+    const f = firstName ? firstName[0].toUpperCase() : "";
+    const l = lastName ? lastName[0].toUpperCase() : "";
+    return `${f}${l}` || "??";
+  };
+
+  const displayName = user ? `${user.firstName} ${user.lastName}` : "Loading...";
+  const initials = user ? getInitials(user.firstName, user.lastName) : "";
+
+
+  if (loading) {
+    return (
+      <div className="flex flex-col w-full flex-1 bg-black py-6 items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col w-full flex-1 bg-black py-6">
@@ -108,23 +151,24 @@ export default function ProfilePage() {
 
       <div className="flex flex-col gap-4 px-4 overflow-y-auto">
         {/* User Profile Card */}
-        <div onClick={() => handleClick("/profile/id")} className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-2xl p-2 flex items-center gap-4">
+        <div onClick={() => handleClick("/profile/details")} className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-2xl p-2 flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-gray-600/50 overflow-hidden flex-shrink-0">
             {/* Placeholder for profile picture */}
             <div className="w-full h-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center">
-              <span className="text-white text-xl font-bold">AD</span>
+              <span className="text-white text-xl font-bold">{initials}</span>
             </div>
           </div>
           <div className="flex flex-col flex-grow">
             <h2 className="text-white font-bold text-lg mb-1">
-              Agbani Darego Durojaye
+              {displayName}
             </h2>
-            <p className="text-gray-400 text-sm">Tier 2</p>
+            {/* <p className="text-gray-400 text-sm">Tier 2</p> */}
+            {user?.accountTier && <p className="text-gray-400 text-sm">Tier {user.accountTier}</p>}
           </div>
         </div>
 
         {/* Upgrade Banner */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-400 rounded-2xl p-5 flex justify-between items-center">
+        {/* <div className="bg-gradient-to-r from-blue-600 to-blue-400 rounded-2xl p-5 flex justify-between items-center">
           <div className="flex flex-col flex-grow">
             <h2 className="text-white font-bold text-lg mb-1">
               Upgrade your Bank Account
@@ -136,7 +180,7 @@ export default function ProfilePage() {
           <button className="bg-white text-blue-600 font-semibold px-6 py-2 rounded-lg text-sm hover:bg-white/90 transition-colors flex-shrink-0 ml-4">
             GO!!
           </button>
-        </div>
+        </div> */}
 
         {/* Menu Items */}
         <div className="flex flex-col gap-3 mb-20">

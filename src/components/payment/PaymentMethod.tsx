@@ -15,6 +15,7 @@ export interface PaymentOption {
   type: "fiat" | "crypto";
   currencyCode?: string;
   currency?: string;
+  walletId?: number;
 }
 
 interface PaymentMethodProps {
@@ -80,6 +81,7 @@ export default function PaymentMethod({
             type: "crypto", // Assuming mostly crypto for now
             currencyCode: currencyCode,
             currency: currencyCode,
+            walletId: wallet.walletId, // Preserve walletId for API calls
           };
         });
 

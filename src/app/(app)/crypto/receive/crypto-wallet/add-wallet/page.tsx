@@ -11,7 +11,7 @@ export default function AddWalletPage() {
                 {/* Header */}
                 <div className="flex items-center mb-8 relative">
                     <Link
-                        href="/home"
+                        href="/crypto/receive/crypto-wallet"
                         className="p-3 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] text-[1.2rem] border border-white/20 absolute left-0 z-10"
                     >
                         <MdOutlineKeyboardDoubleArrowLeft />

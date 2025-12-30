@@ -78,3 +78,35 @@ export const verifyResetPin = async (code: string) => {
         throw error.response?.data || error.message;
     }
 };
+
+export const getUserProfile = async () => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const response = await axios.get(`${API_URL}/profile`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.data;
+    } catch (error: any) {
+        throw error.response?.data || error.message;
+    }
+};
+
+export const getRecentTransactions = async () => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const response = await axios.get(`${API_URL}/transactions/recent`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.data;
+    } catch (error: any) {
+        throw error.response?.data || error.message;
+    }
+};

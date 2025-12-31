@@ -16,7 +16,8 @@ import {
   TvQuotePayload,
   executeBillPayment,
   BillExecutionResponse,
-  DataPlan as ApiTvPlan
+  DataPlan as ApiTvPlan,
+  verifyTv
 } from "@/services/bills";
 
 interface CableTVProvider {
@@ -117,21 +118,48 @@ export default function TVPage() {
     fetchPlans();
   }, [selectedProvider]);
 
-  // Mock decoder verification (keeping as is for now, or could integrate verify endpoint if available)
+  // TV Verification
   useEffect(() => {
-    if (decoderNumber.length >= 10) {
-      const timer = setTimeout(() => {
-        setDecoderVerified(true);
-        setCustomerName("Newton Afobaje Arowolo"); // This should ideally come from validation API
-        setDueDate("Oct 20, 2025");
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      setDecoderVerified(false);
-      setCustomerName("");
-      setDueDate("");
-    }
-  }, [decoderNumber]);
+    const verifyDecoder = async () => {
+      if (decoderNumber.length >= 10 && selectedProvider) {
+        setDecoderVerified(false);
+        setCustomerName("");
+        setDueDate(""); // Reset due date
+
+        try {
+          const response = await verifyTv({
+            serviceId: selectedProvider.id.toUpperCase(), // Ensure uppercase for API (GOTV, DSTV etc)
+            billersCode: decoderNumber
+          });
+
+          if (response.success && response.data?.verified) {
+            setDecoderVerified(true);
+            setCustomerName(response.data.name);
+            // API doesn't seem to return due date in the sample, but if it does, set it here.
+            // For now leaving due date empty or static if needed.
+            // setDueDate("Oct 20, 2025"); 
+          } else {
+            setDecoderVerified(false);
+            setCustomerName("");
+          }
+        } catch (error) {
+          console.error("Verification error:", error);
+          setDecoderVerified(false);
+          setCustomerName("");
+        }
+      } else {
+        setDecoderVerified(false);
+        setCustomerName("");
+        setDueDate("");
+      }
+    };
+
+    const timer = setTimeout(() => {
+      verifyDecoder();
+    }, 1000); // 1s debounce
+
+    return () => clearTimeout(timer);
+  }, [decoderNumber, selectedProvider]);
 
   const getFilteredPlans = () => {
     if (!availablePlans.length) return [];

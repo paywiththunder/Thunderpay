@@ -1,6 +1,7 @@
 import axios from "axios";
+import { API_BASE_URL } from "@/config";
 
-const API_URL = "https://aapi.paywiththunder.com/api/v1/bills";
+const API_URL = `${API_BASE_URL}/bills`;
 
 const getAuthToken = () => {
     if (typeof window !== "undefined") {
@@ -274,6 +275,90 @@ export const getElectricityQuote = async (payload: ElectricityQuotePayload) => {
         return response.data;
     } catch (error: any) {
         console.error("Electricity Quote Error:", error);
+        throw error.response?.data || error.message;
+    }
+};
+
+export interface ElectricityVerificationPayload {
+    serviceId: string;
+    billersCode: string;
+    type: "prepaid" | "postpaid";
+}
+
+export interface ElectricityVerificationResponse {
+    statusCode: string;
+    success: boolean;
+    description: string;
+    data: {
+        verified: boolean;
+        name: string;
+        address?: string;
+    } | null;
+}
+
+export const verifyElectricity = async (payload: ElectricityVerificationPayload) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    const { serviceId, ...data } = payload;
+
+    try {
+        const response = await axios.post(
+            `${API_URL}/electricity/${serviceId}/verify`,
+            data,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+        console.log("Electricity Verify Response:", response.data);
+        return response.data;
+    } catch (error: any) {
+        console.error("Electricity Verify Error:", error);
+        throw error.response?.data || error.message;
+    }
+};
+
+export interface TvVerificationPayload {
+    serviceId: string;
+    billersCode: string;
+}
+
+export interface TvVerificationResponse {
+    statusCode: string;
+    success: boolean;
+    description: string;
+    data: {
+        verified: boolean;
+        name: string;
+        error: any;
+    } | null;
+    errors: any;
+}
+
+export const verifyTv = async (payload: TvVerificationPayload) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    const { serviceId, billersCode } = payload;
+
+    try {
+        const response = await axios.post(
+            `${API_URL}/tv-cable/${serviceId}/verify`,
+            { billersCode },
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+        console.log("TV Verify Response:", response.data);
+        return response.data;
+    } catch (error: any) {
+        console.error("TV Verify Error:", error);
         throw error.response?.data || error.message;
     }
 };

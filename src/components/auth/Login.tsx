@@ -5,6 +5,7 @@ import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import Link from "next/link";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
 // --- Types ---
 type PhoneStepProps = {
@@ -236,7 +237,7 @@ export default function Login() {
 
     try {
       const res = await axios.post(
-        "https://aapi.paywiththunder.com/api/v1/auth/login",
+        `${API_BASE_URL}/auth/login`,
         {
           email,
           password,

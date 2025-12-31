@@ -65,20 +65,52 @@ export default function ElectricityPage() {
   const [quoteReference, setQuoteReference] = useState("");
   const [quoteData, setQuoteData] = useState<any>(null);
 
-  // Mock meter verification - in real app, this would be an API call
+  // Real meter verification
   useEffect(() => {
-    if (meterNumber.length >= 10) {
-      // Simulate API call delay
-      const timer = setTimeout(() => {
-        setMeterVerified(true);
-        setCustomerName("Newton Afobaje Arowolo");
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      setMeterVerified(false);
-      setCustomerName("");
-    }
-  }, [meterNumber]);
+    const verifyMeter = async () => {
+      if (meterNumber.length >= 10 && selectedProvider) {
+        setMeterVerified(false); // Reset while verifying
+        setCustomerName("");
+
+        try {
+          // Import verifyElectricity dynamically to avoid circular dependencies if any, 
+          // or just assume it's available since I added it to module imports below
+          const { verifyElectricity } = await import("@/services/bills");
+
+          const response = await verifyElectricity({
+            serviceId: selectedProvider.serviceId,
+            billersCode: meterNumber,
+            type: paymentType
+          });
+
+          if (response.success && response.data.verified) {
+            setMeterVerified(true);
+            setCustomerName(response.data.name);
+            console.log("Customer name:", response.data.name);
+            setFailureReason("");
+          } else {
+            console.log("Verification failed or not verified:", response);
+            setMeterVerified(false);
+            setCustomerName("");
+            // Optional: show toast or error message
+          }
+        } catch (error) {
+          console.error("Verification error:", error);
+          setMeterVerified(false);
+          setCustomerName("");
+        }
+      } else {
+        setMeterVerified(false);
+        setCustomerName("");
+      }
+    };
+
+    const timer = setTimeout(() => {
+      verifyMeter();
+    }, 1000); // 1s debounce
+
+    return () => clearTimeout(timer);
+  }, [meterNumber, selectedProvider, paymentType]);
 
   const handleAmountSelect = (selectedAmount: number) => {
     setAmount(selectedAmount.toString());

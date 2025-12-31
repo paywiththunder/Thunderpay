@@ -49,30 +49,30 @@ const billCategories: BillCategory[] = [
     icon: HiOutlineGlobeAlt,
     route: "/crypto/pay-bills/data",
   },
-  {
-    id: 5,
-    name: "Betting",
-    icon: GiGamepad,
-    route: "/crypto/pay-bills/betting",
-  },
-  {
-    id: 6,
-    name: "Education",
-    icon: GiGraduateCap,
-    route: "/crypto/pay-bills/education",
-  },
-  {
-    id: 7,
-    name: "Health & Insurance",
-    icon: GiHeartPlus,
-    route: "/crypto/pay-bills/insurance",
-  },
-  {
-    id: 8,
-    name: "Flight",
-    icon: GiAirplane,
-    route: "/crypto/pay-bills/flight",
-  },
+  // {
+  //   id: 5,
+  //   name: "Betting",
+  //   icon: GiGamepad,
+  //   route: "/crypto/pay-bills/betting",
+  // },
+  // {
+  //   id: 6,
+  //   name: "Education",
+  //   icon: GiGraduateCap,
+  //   route: "/crypto/pay-bills/education",
+  // },
+  // {
+  //   id: 7,
+  //   name: "Health & Insurance",
+  //   icon: GiHeartPlus,
+  //   route: "/crypto/pay-bills/insurance",
+  // },
+  // {
+  //   id: 8,
+  //   name: "Flight",
+  //   icon: GiAirplane,
+  //   route: "/crypto/pay-bills/flight",
+  // },
 ];
 
 export default function PayBillsPage() {

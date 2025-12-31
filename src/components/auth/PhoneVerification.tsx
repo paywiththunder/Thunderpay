@@ -5,6 +5,7 @@ import Link from "next/link";
 import axios from "axios";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
 export default function MailVerification() {
   const [codes, setCodes] = useState<string[]>(["", "", "", "", "", ""]);
@@ -78,7 +79,7 @@ export default function MailVerification() {
 
     try {
       const res = await axios.post(
-        "https://aapi.paywiththunder.com/api/v1/auth/verify",
+        `${API_BASE_URL}/auth/verify`,
         { email, otp },
         { headers: { "Content-Type": "application/json" } }
       );

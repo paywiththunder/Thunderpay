@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { Eye, EyeOff } from "lucide-react";
+import { API_BASE_URL } from "@/config";
 
 export default function SignupForm() {
   const router = useRouter();
@@ -38,7 +39,7 @@ export default function SignupForm() {
 
     try {
       const res = await axios.post(
-        "https://aapi.paywiththunder.com/api/v1/auth/signup",
+        `${API_BASE_URL}/auth/signup`,
         {
           email,
           password,

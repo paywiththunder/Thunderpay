@@ -8,9 +8,13 @@ interface PaymentFailureProps {
   amountEquivalent: string; // e.g., "≈ ₦20,000.00"
   failureReason: string;
   biller: string;
+  billerLabel?: string;
   meterNumber: string;
+  meterNumberLabel?: string;
   customerName: string;
+  customerNameLabel?: string;
   meterType: string;
+  meterTypeLabel?: string;
   serviceAddress: string;
   paymentMethod: string;
   transactionDate: string;
@@ -23,9 +27,13 @@ export default function PaymentFailure({
   amountEquivalent,
   failureReason,
   biller,
+  billerLabel = "Biller",
   meterNumber,
+  meterNumberLabel = "Meter Number",
   customerName,
+  customerNameLabel = "Customer Name",
   meterType,
+  meterTypeLabel = "Meter Type",
   serviceAddress,
   paymentMethod,
   transactionDate,
@@ -63,10 +71,10 @@ export default function PaymentFailure({
           {/* Transaction Details */}
           <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col gap-3 mb-4">
             <DetailRow label="Failure Reason" value={failureReason} />
-            <DetailRow label="Biller" value={biller} />
-            <DetailRow label="Meter Number" value={meterNumber} />
-            <DetailRow label="Customer Name" value={customerName} />
-            <DetailRow label="Meter Type" value={meterType} />
+            <DetailRow label={billerLabel} value={biller} />
+            <DetailRow label={meterNumberLabel} value={meterNumber} />
+            <DetailRow label={customerNameLabel} value={customerName} />
+            <DetailRow label={meterTypeLabel} value={meterType} />
             <DetailRow label="Service Address" value={serviceAddress} />
             <DetailRow label="Payment Method" value={paymentMethod} />
             <DetailRow label="Transaction Date" value={transactionDate} />

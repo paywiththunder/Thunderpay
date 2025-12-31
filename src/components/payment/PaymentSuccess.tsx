@@ -3,13 +3,18 @@ import React from "react";
 import { HiCheckCircle, HiOutlineInformationCircle } from "react-icons/hi2";
 
 interface PaymentSuccessProps {
+  title?: string;
   amount: string; // e.g., "0.0060 SOL"
   amountEquivalent: string; // e.g., "≈ ₦20,000.00"
   token: string;
   biller: string;
+  billerLabel?: string;
   meterNumber: string;
+  meterNumberLabel?: string;
   customerName: string;
+  customerNameLabel?: string;
   meterType: string;
+  meterTypeLabel?: string;
   serviceAddress: string;
   unitsPurchased?: string;
   paymentMethod: string;
@@ -20,13 +25,18 @@ interface PaymentSuccessProps {
 }
 
 export default function PaymentSuccess({
+  title = "Electricity Bill Paid Successfully",
   amount,
   amountEquivalent,
   token,
   biller,
+  billerLabel = "Biller",
   meterNumber,
+  meterNumberLabel = "Meter Number",
   customerName,
+  customerNameLabel = "Customer Name",
   meterType,
+  meterTypeLabel = "Meter Type",
   serviceAddress,
   unitsPurchased,
   paymentMethod,
@@ -45,7 +55,7 @@ export default function PaymentSuccess({
 
         {/* Title */}
         <h1 className="text-2xl font-bold text-white text-center mb-8">
-          Electricity Bill Paid Successfully
+          {title}
         </h1>
 
         {/* Receipt Header */}
@@ -67,10 +77,10 @@ export default function PaymentSuccess({
           {/* Transaction Details */}
           <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col gap-3 mb-4">
             <DetailRow label="Token" value={token} />
-            <DetailRow label="Biller" value={biller} />
-            <DetailRow label="Meter Number" value={meterNumber} />
-            <DetailRow label="Customer Name" value={customerName} />
-            <DetailRow label="Meter Type" value={meterType} />
+            <DetailRow label={billerLabel} value={biller} />
+            <DetailRow label={meterNumberLabel} value={meterNumber} />
+            <DetailRow label={customerNameLabel} value={customerName} />
+            <DetailRow label={meterTypeLabel} value={meterType} />
             <DetailRow label="Service Address" value={serviceAddress} />
             {unitsPurchased && (
               <DetailRow label="Units Purchased" value={unitsPurchased} />

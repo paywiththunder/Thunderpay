@@ -4,6 +4,7 @@ import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import Link from "next/link";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
 export default function ContinueSignup() {
   const [firstName, setFirstName] = useState("");
@@ -25,7 +26,7 @@ export default function ContinueSignup() {
       const token = localStorage.getItem("authToken");
       console.log('token', token);
       const res = await axios.post(
-        "https://aapi.paywiththunder.com/api/v1/auth/complete-signup",
+        `${API_BASE_URL}/auth/complete-signup`,
         {
           firstName,
           lastName,

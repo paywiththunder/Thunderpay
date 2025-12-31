@@ -1,6 +1,7 @@
 import axios from "axios";
+import { API_BASE_URL } from "@/config";
 
-const API_URL = "https://aapi.paywiththunder.com/api/v1/wallets";
+const API_URL = `${API_BASE_URL}/wallets`;
 
 const getAuthToken = () => {
     if (typeof window !== "undefined") {

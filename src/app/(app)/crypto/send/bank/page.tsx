@@ -10,6 +10,8 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
+import { getTransferQuote, executeTransfer } from "@/services/transfer";
+import { toast } from "react-hot-toast";
 
 interface Bank {
   id: string;
@@ -51,32 +53,7 @@ const amountOptions = [
   { amount: 50000, cashback: 500 },
 ];
 
-const recentRecipients: RecentBankRecipient[] = [
-  {
-    id: "1",
-    name: "John Adebayo",
-    accountNumber: "0123456789",
-    bankName: "Access Bank",
-    bankCode: "044",
-    initial: "J",
-  },
-  {
-    id: "2",
-    name: "Sarah Okoro",
-    accountNumber: "9876543210",
-    bankName: "GTBank",
-    bankCode: "058",
-    initial: "S",
-  },
-  {
-    id: "3",
-    name: "Michael Chukwu",
-    accountNumber: "5555666677",
-    bankName: "Zenith Bank",
-    bankCode: "057",
-    initial: "M",
-  },
-];
+const recentRecipients: RecentBankRecipient[] = [];
 
 type Step = "bank" | "account" | "amount" | "payment" | "confirmation" | "enterPin" | "result";
 type TransactionResult = "success" | "failure" | null;
@@ -178,6 +155,39 @@ export default function SendToBankPage() {
     }
   };
 
+  const generateTransactionToken = (): string => {
+    const segments = Array.from({ length: 5 }, () =>
+      Math.floor(1000 + Math.random() * 9000).toString()
+    );
+    return segments.join("-");
+  };
+
+  const getCashback = (): number => {
+    const amountNum = parseFloat(amount);
+    const option = amountOptions.find((opt) => opt.amount === amountNum);
+    return option?.cashback || 0;
+  };
+
+  const getTransactionDate = (): string => {
+    const now = new Date();
+    const months = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    const month = months[now.getMonth()];
+    const day = now.getDate();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const displayHours = hours % 12 || 12;
+    return `${month} ${day}, ${month} ${displayHours}:${minutes
+      .toString()
+      .padStart(2, "0")} ${ampm}`;
+  };
+
+  const [quote, setQuote] = useState<any>(null);
+  const [isQuoting, setIsQuoting] = useState(false);
+
   const handleAmountSelect = (selectedAmount: number) => {
     setAmount(selectedAmount.toString());
   };
@@ -198,84 +208,60 @@ export default function SendToBankPage() {
     }
   };
 
-  const handlePaymentMethodSelect = (paymentMethod: PaymentOption) => {
+  const handlePaymentMethodSelect = async (paymentMethod: PaymentOption) => {
     setSelectedPaymentMethod(paymentMethod);
+    setIsQuoting(true);
     setStep("confirmation");
-  };
 
-  const calculatePaymentAmount = (): string => {
-    if (!selectedPaymentMethod || !amount) return "0";
-    const amountNum = parseFloat(amount);
-
-    if (selectedPaymentMethod.type === "fiat") {
-      return `₦${amountNum.toLocaleString()}.00`;
+    try {
+      const payload = {
+        scope: "EXTERNAL_BANK" as const,
+        walletId: paymentMethod.walletId!,
+        amount: parseFloat(amount),
+        fixedSide: "SOURCE" as const,
+        recipientAddress: accountNumber, // Mapping account number to recipientAddress for bank
+        // For banks, we might need bank code etc, but the prompt's quote payload 
+        // didn't specify bank details. Usually EXTERNAL_BANK quote might need them.
+        // Assuming current simple payload for now or mapping bank details if needed.
+      };
+      const response = await getTransferQuote(payload);
+      if (response.success) {
+        setQuote(response.data);
+      } else {
+        toast.error(response.description || "Failed to get quote");
+        setStep("payment");
+      }
+    } catch (error: any) {
+      toast.error(error.description || "Error fetching quote");
+      setStep("payment");
+    } finally {
+      setIsQuoting(false);
     }
-
-    const rates: { [key: string]: number } = {
-      usdt: 1.0,
-      bitcoin: 0.000023,
-      ethereum: 0.00042,
-      solana: 0.006,
-    };
-
-    const rate = rates[selectedPaymentMethod.id] || 1;
-    const cryptoAmount = amountNum / (rate * 1500);
-
-    if (selectedPaymentMethod.id === "usdt") {
-      return `${cryptoAmount.toFixed(4)} USDT`;
-    } else if (selectedPaymentMethod.id === "bitcoin") {
-      return `${cryptoAmount.toFixed(8)} BTC`;
-    } else if (selectedPaymentMethod.id === "ethereum") {
-      return `${cryptoAmount.toFixed(6)} ETH`;
-    } else if (selectedPaymentMethod.id === "solana") {
-      return `${cryptoAmount.toFixed(4)} SOL`;
-    }
-
-    return `₦${amountNum.toLocaleString()}.00`;
-  };
-
-  const getCashback = (): number => {
-    const amountNum = parseFloat(amount);
-    const option = amountOptions.find((opt) => opt.amount === amountNum);
-    return option?.cashback || 0;
-  };
-
-  const getAvailableBalance = (): string => {
-    if (!selectedPaymentMethod) return "₦0.00";
-    if (selectedPaymentMethod.balance) return selectedPaymentMethod.balance;
-    return selectedPaymentMethod.value;
-  };
-
-  const generateTransactionToken = (): string => {
-    const segments = Array.from({ length: 5 }, () =>
-      Math.floor(1000 + Math.random() * 9000).toString()
-    );
-    return segments.join("-");
-  };
-
-  const getTransactionDate = (): string => {
-    const now = new Date();
-    const months = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ];
-    const month = months[now.getMonth()];
-    const day = now.getDate();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const ampm = hours >= 12 ? "PM" : "AM";
-    const displayHours = hours % 12 || 12;
-    return `${month} ${day}, ${month} ${displayHours}:${minutes
-      .toString()
-      .padStart(2, "0")} ${ampm}`;
   };
 
   const handlePinComplete = async (pin: string) => {
-    const token = generateTransactionToken();
-    setTransactionToken(token);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const isSuccess = Math.random() > 0.3;
-    setTransactionResult(isSuccess ? "success" : "failure");
+    if (!quote) return;
+
+    try {
+      const payload = {
+        quoteReference: quote.quoteId.toString(),
+        recipientIdentifier: accountNumber,
+        pin: pin,
+      };
+
+      const response = await executeTransfer(payload);
+      if (response.success) {
+        setTransactionToken(response.data?.transactionReference || generateTransactionToken());
+        setTransactionResult("success");
+      } else {
+        toast.error(response.description || "Transfer failed");
+        setStep("confirmation");
+        return;
+      }
+    } catch (error: any) {
+      toast.error(error.description || "Transaction failed");
+      setTransactionResult("failure");
+    }
     setStep("result");
   };
 
@@ -312,7 +298,7 @@ export default function SendToBankPage() {
         onBack={() => setStep("payment")}
         onPay={() => setStep("enterPin")}
         amount={parseFloat(amount) || 0}
-        paymentAmount={calculatePaymentAmount()}
+        paymentAmount={quote ? `${quote.totalDebit.toLocaleString()} ${selectedPaymentMethod.currencyCode || ""}` : "Calculating..."}
         paymentMethod={
           selectedPaymentMethod.type === "fiat"
             ? "Fiat"
@@ -324,7 +310,7 @@ export default function SendToBankPage() {
         meterType="Bank Transfer"
         serviceAddress=""
         cashback={getCashback()}
-        availableBalance={getAvailableBalance()}
+        availableBalance={selectedPaymentMethod.balance || "0.00"}
       />
     );
   }
@@ -341,9 +327,10 @@ export default function SendToBankPage() {
 
   // Result Step
   if (step === "result" && selectedPaymentMethod && selectedBank) {
-    const paymentAmount = calculatePaymentAmount();
+    const paymentAmount = quote ? `${quote.totalDebit.toLocaleString()} ${selectedPaymentMethod.currencyCode || ""}` : "0";
     const amountNum = parseFloat(amount) || 0;
     const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
+    const transactionDate = getTransactionDate();
 
     if (transactionResult === "success") {
       return (
@@ -362,7 +349,7 @@ export default function SendToBankPage() {
               : selectedPaymentMethod.name
           }
           bonusEarned={`₦${getCashback().toFixed(2)} Cashback`}
-          transactionDate={getTransactionDate()}
+          transactionDate={transactionDate}
           onAddToBeneficiary={handleAddToBeneficiary}
           onContinue={handleContinueFromResult}
         />
@@ -383,7 +370,7 @@ export default function SendToBankPage() {
               ? "Fiat"
               : selectedPaymentMethod.name
           }
-          transactionDate={getTransactionDate()}
+          transactionDate={transactionDate}
           onContinue={handleContinueFromResult}
         />
       );
@@ -436,11 +423,10 @@ export default function SendToBankPage() {
               <button
                 key={option.amount}
                 onClick={() => handleAmountSelect(option.amount)}
-                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${
-                  amount === option.amount.toString()
-                    ? "ring-2 ring-blue-500 border-blue-500"
-                    : ""
-                }`}
+                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString()
+                  ? "ring-2 ring-blue-500 border-blue-500"
+                  : ""
+                  }`}
               >
                 <span className="text-white font-bold text-base">
                   ₦{option.amount.toLocaleString()}
@@ -470,11 +456,10 @@ export default function SendToBankPage() {
           <button
             onClick={handleAmountContinue}
             disabled={!amount}
-            className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${
-              !amount
-                ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
-                : ""
-            }`}
+            className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!amount
+              ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
+              : ""
+              }`}
           >
             Pay
           </button>
@@ -541,22 +526,20 @@ export default function SendToBankPage() {
           <div className="flex items-center gap-0 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl overflow-hidden">
             <button
               onClick={() => setActiveTab("recents")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                activeTab === "recents"
-                  ? "bg-gray-700 text-white"
-                  : "text-white/70 hover:text-white"
-              }`}
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${activeTab === "recents"
+                ? "bg-gray-700 text-white"
+                : "text-white/70 hover:text-white"
+                }`}
             >
               Recents
             </button>
             <div className="w-px bg-white/20"></div>
             <button
               onClick={() => setActiveTab("beneficiaries")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                activeTab === "beneficiaries"
-                  ? "bg-gray-700 text-white"
-                  : "text-white/70 hover:text-white"
-              }`}
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${activeTab === "beneficiaries"
+                ? "bg-gray-700 text-white"
+                : "text-white/70 hover:text-white"
+                }`}
             >
               Beneficiaries
             </button>
@@ -569,11 +552,10 @@ export default function SendToBankPage() {
                 <button
                   key={recipient.id}
                   onClick={() => handleRecipientSelect(recipient)}
-                  className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors ${
-                    selectedRecipient?.id === recipient.id
-                      ? "bg-blue-500/20 border-blue-500"
-                      : ""
-                  }`}
+                  className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors ${selectedRecipient?.id === recipient.id
+                    ? "bg-blue-500/20 border-blue-500"
+                    : ""
+                    }`}
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
@@ -607,11 +589,10 @@ export default function SendToBankPage() {
           <button
             onClick={handleAccountContinue}
             disabled={!selectedBank || accountNumber.length < 10 || !accountName}
-            className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${
-              !selectedBank || accountNumber.length < 10 || !accountName
-                ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
-                : ""
-            }`}
+            className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!selectedBank || accountNumber.length < 10 || !accountName
+              ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
+              : ""
+              }`}
           >
             Continue
           </button>
@@ -747,11 +728,10 @@ export default function SendToBankPage() {
         <button
           onClick={handleBankContinue}
           disabled={!selectedBank}
-          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${
-            !selectedBank
-              ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
-              : ""
-          }`}
+          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!selectedBank
+            ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
+            : ""
+            }`}
         >
           Continue
         </button>

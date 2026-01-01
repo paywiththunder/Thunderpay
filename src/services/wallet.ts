@@ -72,3 +72,22 @@ export const getCurrencies = async () => {
         throw error.response?.data || error.message;
     }
 };
+
+export const getWalletActivity = async (walletId: number) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const response = await axios.get(`${API_URL}/${walletId}/activity`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        });
+        return response.data;
+    } catch (error: any) {
+        // Return null or empty representation on error to prevent failing all requests
+        console.error(`Failed to fetch activity for wallet ${walletId}:`, error);
+        return { success: false, data: { items: [] } };
+    }
+};

@@ -9,7 +9,7 @@ import {
     HiOutlineCreditCard,
     HiOutlineInbox,
 } from "react-icons/hi2";
-import { getRecentTransactions } from "@/services/user";
+import { getWallets, getWalletActivity } from "@/services/wallet";
 import { toast } from "react-hot-toast";
 import { format, isToday, isYesterday, parseISO } from "date-fns";
 
@@ -34,14 +34,38 @@ export default function ActivityPage() {
     useEffect(() => {
         const fetchTransactions = async () => {
             try {
-                const response = await getRecentTransactions();
-                if (response.success) {
-                    setTransactions(response.data.items);
-                } else {
-                    toast.error("Failed to load transactions");
+                // 1. Fetch all wallets first
+                const walletsResponse = await getWallets();
+                const wallets = Array.isArray(walletsResponse) ? walletsResponse : walletsResponse.data || [];
+
+                if (wallets.length === 0) {
+                    setTransactions([]);
+                    setLoading(false);
+                    return;
                 }
+
+                // 2. Fetch activity for each wallet in parallel
+                const validWallets = wallets.filter((w: any) => w.walletId);
+                const activityPromises = validWallets.map((wallet: any) => getWalletActivity(wallet.walletId));
+
+                const responses = await Promise.all(activityPromises);
+
+                // 3. Aggregate all transactions
+                let allTransactions: Transaction[] = [];
+                responses.forEach((res) => {
+                    if (res && res.success && res.data && Array.isArray(res.data.items)) {
+                        allTransactions = [...allTransactions, ...res.data.items];
+                    }
+                });
+
+                // 4. Sort by date (newest first)
+                allTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+                setTransactions(allTransactions);
+
             } catch (error) {
-                console.error("Error fetching transactions:", error);
+                console.error("Error fetching wallet activities:", error);
+                toast.error("Failed to load activity");
             } finally {
                 setLoading(false);
             }

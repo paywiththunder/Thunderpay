@@ -3,7 +3,16 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
     HiOutlineEye,
+    HiOutlineArrowUpRight,
+    HiOutlineArrowDownLeft,
+    HiOutlineArrowPath,
+    HiOutlineLightBulb,
+    HiOutlineCreditCard,
+    HiOutlineInbox,
 } from "react-icons/hi2";
+import { getRecentTransactions } from "@/services/user";
+import { format, parseISO } from "date-fns";
+import { useRouter } from "next/navigation";
 import {
     GiReceiveMoney,
     GiPayMoney,
@@ -37,16 +46,37 @@ const getAssetConfig = (symbol: string) => {
     }
 };
 
+// Transaction Interface
+interface Transaction {
+    id: number;
+    source: string;
+    amount: number;
+    fee: number;
+    status: string;
+    reference: string;
+    walletId: number;
+    fromAddress: string | null;
+    toAddress: string | null;
+    createdAt: string;
+}
+
 export default function CryptoPage() {
+    const router = useRouter();
     const [wallets, setWallets] = useState<any[]>([]);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [totalAssets, setTotalAssets] = useState(0);
     const [isAddWalletOpen, setIsAddWalletOpen] = useState(false);
 
     const fetchWallets = async () => {
         try {
-            const response = await getWallets();
-            const walletList = Array.isArray(response) ? response : response.data || [];
+            const [walletsResponse, transactionsResponse] = await Promise.all([
+                getWallets(),
+                getRecentTransactions()
+            ]);
+
+            // Handle Wallets
+            const walletList = Array.isArray(walletsResponse) ? walletsResponse : walletsResponse.data || [];
             setWallets(walletList);
 
             // Calculate total assets
@@ -55,8 +85,13 @@ export default function CryptoPage() {
             }, 0);
             setTotalAssets(total);
 
+            // Handle Transactions
+            if (transactionsResponse.success) {
+                setTransactions(transactionsResponse.data.items);
+            }
+
         } catch (error) {
-            console.error("Failed to fetch wallets:", error);
+            console.error("Failed to fetch data:", error);
         } finally {
             setLoading(false);
         }
@@ -65,6 +100,43 @@ export default function CryptoPage() {
     useEffect(() => {
         fetchWallets();
     }, []);
+
+    const getIcon = (source: string) => {
+        switch (source.toLowerCase()) {
+            case "send":
+            case "withdrawal":
+                return HiOutlineArrowUpRight;
+            case "receive":
+            case "deposit":
+                return HiOutlineArrowDownLeft;
+            case "swap":
+            case "convert":
+                return HiOutlineArrowPath;
+            case "bill":
+            case "electricity":
+                return HiOutlineLightBulb;
+            case "card":
+                return HiOutlineCreditCard;
+            default:
+                return HiOutlineInbox;
+        }
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status.toLowerCase()) {
+            case "completed":
+            case "success":
+                return "text-green-500";
+            case "pending":
+            case "processing":
+                return "text-yellow-500";
+            case "failed":
+            case "cancelled":
+                return "text-red-500";
+            default:
+                return "text-gray-400";
+        }
+    };
 
     return (
         <div className="flex flex-col gap-5 w-full pb-20">
@@ -169,11 +241,47 @@ export default function CryptoPage() {
             {/* Recent Transactions */}
             <div>
                 <h3 className="font-semibold mb-4">Recent transactions</h3>
-                <div className="flex flex-col items-center justify-center">
-                    {/* Placeholder illustration for wallet */}
-                    <Image src={NoTransaction} className="mb-3" alt="No Transaction" width={200} height={200} />
-                    <p className="text-gray-500 font-[600] text-[2rem] -mt-18 mb-16">No Transaction Yet</p>
-                </div>
+                {transactions.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center">
+                        {/* Placeholder illustration for wallet */}
+                        <Image src={NoTransaction} className="mb-3" alt="No Transaction" width={200} height={200} />
+                        <p className="text-gray-500 font-[600] text-[2rem] -mt-18 mb-16">No Transaction Yet</p>
+                    </div>
+                ) : (
+                    <div className="flex flex-col gap-3">
+                        {transactions.map((tx) => {
+                            const Icon = getIcon(tx.source);
+                            const isNegative = ["send", "withdrawal", "bill", "electricity", "card"].includes(tx.source.toLowerCase());
+                            return (
+                                <div
+                                    key={tx.id}
+                                    className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-xl p-4 flex items-center justify-between active:bg-white/5 transition-colors cursor-pointer"
+                                    onClick={() => router.push(`/crypto/activity/${tx.reference}`)}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl border border-white/20 flex items-center justify-center">
+                                            <Icon className="w-5 h-5 text-gray-400" />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-white font-medium capitalize">{tx.source}</span>
+                                            <span className="text-gray-500 text-xs truncate max-w-[150px]">
+                                                {tx.status} • {format(parseISO(tx.createdAt), "MMM dd, HH:mm")}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className={`font-medium ${isNegative ? "text-red-500" : "text-green-500"}`}>
+                                            {isNegative ? "-" : "+"}{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                                        </span>
+                                        <span className={`text-[10px] uppercase font-bold ${getStatusColor(tx.status)}`}>
+                                            {tx.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
             {/* Add Wallet Modal */}
             {isAddWalletOpen && (

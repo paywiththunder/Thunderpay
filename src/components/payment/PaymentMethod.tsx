@@ -66,22 +66,27 @@ export default function PaymentMethod({
 
         const mappedWallets: PaymentOption[] = walletList.map((wallet: any) => {
           console.log("Raw wallet item:", wallet);
-          const currencyCode = wallet.currency?.code || wallet.currency || "UNKNOWN";
+          const currency = wallet.currency;
+          const currencyCode = currency?.code || currency?.ticker || "UNKNOWN";
           const styling = getIconForCurrency(currencyCode);
 
+          // Fix: use availableBalance or totalBalance instead of just balance
+          const rawBalance = wallet.availableBalance ?? wallet.totalBalance ?? 0;
+          const formattedBalance = Number(rawBalance).toLocaleString("en-US", { maximumFractionDigits: 8 });
+
           return {
-            id: wallet.walletId?.toString() || "", // Prefer explicit ID, avoid random for payments
-            name: wallet.currency?.name || currencyCode,
+            id: wallet.walletId?.toString() || "",
+            name: currency?.name || currencyCode,
             icon: styling.icon,
             iconBg: styling.bg,
-            // Formatting balance if available, otherwise just showing value
-            balance: wallet.balance ? `${wallet.balance}` : undefined,
-            cryptoAmount: wallet.balance ? `${wallet.balance} ${currencyCode}` : undefined,
-            value: "0.00", // valid fiat value would need conversion rate
-            type: "crypto", // Assuming mostly crypto for now
+            // Use correct balance field
+            balance: formattedBalance,
+            cryptoAmount: `${formattedBalance} ${currencyCode}`,
+            value: "---",
+            type: "crypto",
             currencyCode: currencyCode,
             currency: currencyCode,
-            walletId: wallet.walletId, // Preserve walletId for API calls
+            walletId: wallet.walletId,
           };
         });
 

@@ -461,50 +461,62 @@ export default function TVPage() {
   }
 
   if (step === "result" && selectedPaymentMethod && selectedPlan) {
-    const paymentAmount = calculatePaymentAmount();
+    let paymentAmount = calculatePaymentAmount();
     const amountNum = selectedPlan.price;
     const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
 
+    if (quoteData?.deductionAmount && selectedPaymentMethod.type !== "fiat") {
+      paymentAmount = `${Number(quoteData.deductionAmount).toFixed(6)} ${quoteData.deductionCurrency}`;
+    }
+
+    const commonDetails = [
+      { label: "Biller", value: selectedProvider.name },
+      { label: "Smartcard Number", value: decoderNumber },
+      { label: "Account Name", value: customerName || "N/A" },
+      { label: "Package", value: selectedPlan.name },
+      { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.id.toUpperCase()})` },
+    ];
+
+
     if (transactionResult === "success") {
+      const successDetails = [
+        { label: "Token", value: transactionToken }, // Using Token label for transaction ref here, adjust if needed
+        ...commonDetails
+      ];
+
+      if (quoteData && quoteData.transactionFee > 0) {
+        successDetails.push({ label: "Transaction Fee", value: `₦${quoteData.transactionFee}` });
+      }
+
+      const cashback = getCashback();
+      if (cashback > 0) {
+        successDetails.push({ label: "Bonus Earned", value: `₦${cashback.toFixed(2)} Cashback` });
+      }
+
+      successDetails.push({ label: "Transaction Date", value: getTransactionDate() });
+
       return (
         <PaymentSuccess
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          token={transactionToken}
-          biller={selectedProvider.name}
-          meterNumber={decoderNumber}
-          customerName={customerName || "N/A"}
-          meterType={paymentOption}
-          serviceAddress="10 rd, 20 Sanusi Estate Baruwa Lagos"
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
-          bonusEarned={`₦${getCashback().toFixed(2)} Cashback`}
-          transactionDate={getTransactionDate()}
+          details={successDetails}
           onAddToBeneficiary={handleAddToBeneficiary}
           onContinue={handleContinue}
         />
       );
     } else if (transactionResult === "failure") {
+      const failureDetails = [
+        { label: "Failure Reason", value: failureReason || "Service provider down" },
+        ...commonDetails,
+        { label: "Transaction Date", value: getTransactionDate() }
+      ];
+
       return (
         <PaymentFailure
           title="TV Subscription Failed"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason={failureReason || "Service provider down"}
-          biller={selectedProvider.name}
-          meterNumber={decoderNumber}
-          customerName={customerName || "N/A"}
-          meterType={paymentOption}
-          serviceAddress="10 rd, 20 Sanusi Estate Baruwa Lagos"
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
-          transactionDate={getTransactionDate()}
+          details={failureDetails}
           onContinue={handleContinue}
         />
       );

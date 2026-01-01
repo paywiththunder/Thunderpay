@@ -2,30 +2,40 @@
 import React from "react";
 import { HiCheckCircle, HiOutlineInformationCircle } from "react-icons/hi2";
 
+interface DetailItem {
+  label: string;
+  value: string;
+}
+
 interface PaymentSuccessProps {
   title?: string;
   amount: string; // e.g., "0.0060 SOL"
   amountEquivalent: string; // e.g., "≈ ₦20,000.00"
-  token: string;
-  biller: string;
+  // Legacy props (optional)
+  token?: string;
+  biller?: string;
   billerLabel?: string;
-  meterNumber: string;
+  meterNumber?: string;
   meterNumberLabel?: string;
-  customerName: string;
+  customerName?: string;
   customerNameLabel?: string;
-  meterType: string;
+  meterType?: string;
   meterTypeLabel?: string;
-  serviceAddress: string;
+  serviceAddress?: string;
   unitsPurchased?: string;
-  paymentMethod: string;
-  bonusEarned: string;
-  transactionDate: string;
+  paymentMethod?: string;
+  bonusEarned?: string;
+  transactionDate?: string;
+
+  // Dynamic details
+  details?: DetailItem[];
+
   onAddToBeneficiary: () => void;
   onContinue: () => void;
 }
 
 export default function PaymentSuccess({
-  title = "Electricity Bill Paid Successfully",
+  title = "Transaction Successful",
   amount,
   amountEquivalent,
   token,
@@ -42,6 +52,7 @@ export default function PaymentSuccess({
   paymentMethod,
   bonusEarned,
   transactionDate,
+  details,
   onAddToBeneficiary,
   onContinue,
 }: PaymentSuccessProps) {
@@ -76,18 +87,26 @@ export default function PaymentSuccess({
 
           {/* Transaction Details */}
           <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col gap-3 mb-4">
-            <DetailRow label="Token" value={token} />
-            <DetailRow label={billerLabel} value={biller} />
-            <DetailRow label={meterNumberLabel} value={meterNumber} />
-            <DetailRow label={customerNameLabel} value={customerName} />
-            <DetailRow label={meterTypeLabel} value={meterType} />
-            <DetailRow label="Service Address" value={serviceAddress} />
-            {unitsPurchased && (
-              <DetailRow label="Units Purchased" value={unitsPurchased} />
+            {details ? (
+              // Dynamic rendering
+              details.map((item, index) => (
+                <DetailRow key={index} label={item.label} value={item.value} />
+              ))
+            ) : (
+              // Legacy rendering
+              <>
+                {token && <DetailRow label="Token" value={token} />}
+                {biller && <DetailRow label={billerLabel} value={biller} />}
+                {meterNumber && <DetailRow label={meterNumberLabel} value={meterNumber} />}
+                {customerName && <DetailRow label={customerNameLabel} value={customerName} />}
+                {meterType && <DetailRow label={meterTypeLabel} value={meterType} />}
+                {serviceAddress && <DetailRow label="Service Address" value={serviceAddress} />}
+                {unitsPurchased && <DetailRow label="Units Purchased" value={unitsPurchased} />}
+                {paymentMethod && <DetailRow label="Payment Method" value={paymentMethod} />}
+                {bonusEarned && <DetailRow label="Bonus Earned" value={bonusEarned} />}
+                {transactionDate && <DetailRow label="Transaction Date" value={transactionDate} />}
+              </>
             )}
-            <DetailRow label="Payment Method" value={paymentMethod} />
-            <DetailRow label="Bonus Earned" value={bonusEarned} />
-            <DetailRow label="Transaction Date" value={transactionDate} />
           </div>
 
           {/* Action Buttons */}
@@ -121,4 +140,3 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-

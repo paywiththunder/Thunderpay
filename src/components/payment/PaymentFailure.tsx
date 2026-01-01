@@ -2,22 +2,33 @@
 import React from "react";
 import { HiXMark, HiOutlineInformationCircle } from "react-icons/hi2";
 
+interface DetailItem {
+  label: string;
+  value: string;
+}
+
 interface PaymentFailureProps {
   title?: string;
   amount: string; // e.g., "0.0060 SOL"
   amountEquivalent: string; // e.g., "≈ ₦20,000.00"
-  failureReason: string;
-  biller: string;
+
+  // Legacy props
+  failureReason?: string;
+  biller?: string;
   billerLabel?: string;
-  meterNumber: string;
+  meterNumber?: string;
   meterNumberLabel?: string;
-  customerName: string;
+  customerName?: string;
   customerNameLabel?: string;
-  meterType: string;
+  meterType?: string;
   meterTypeLabel?: string;
-  serviceAddress: string;
-  paymentMethod: string;
-  transactionDate: string;
+  serviceAddress?: string;
+  paymentMethod?: string;
+  transactionDate?: string;
+
+  // Dynamic details
+  details?: DetailItem[];
+
   onContinue: () => void;
 }
 
@@ -37,6 +48,7 @@ export default function PaymentFailure({
   serviceAddress,
   paymentMethod,
   transactionDate,
+  details,
   onContinue,
 }: PaymentFailureProps) {
   return (
@@ -70,14 +82,24 @@ export default function PaymentFailure({
 
           {/* Transaction Details */}
           <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col gap-3 mb-4">
-            <DetailRow label="Failure Reason" value={failureReason} />
-            <DetailRow label={billerLabel} value={biller} />
-            <DetailRow label={meterNumberLabel} value={meterNumber} />
-            <DetailRow label={customerNameLabel} value={customerName} />
-            <DetailRow label={meterTypeLabel} value={meterType} />
-            <DetailRow label="Service Address" value={serviceAddress} />
-            <DetailRow label="Payment Method" value={paymentMethod} />
-            <DetailRow label="Transaction Date" value={transactionDate} />
+            {details ? (
+              // Dynamic rendering
+              details.map((item, index) => (
+                <DetailRow key={index} label={item.label} value={item.value} />
+              ))
+            ) : (
+              // Legacy rendering
+              <>
+                {failureReason && <DetailRow label="Failure Reason" value={failureReason} />}
+                {biller && <DetailRow label={billerLabel} value={biller} />}
+                {meterNumber && <DetailRow label={meterNumberLabel} value={meterNumber} />}
+                {customerName && <DetailRow label={customerNameLabel} value={customerName} />}
+                {meterType && <DetailRow label={meterTypeLabel} value={meterType} />}
+                {serviceAddress && <DetailRow label="Service Address" value={serviceAddress} />}
+                {paymentMethod && <DetailRow label="Payment Method" value={paymentMethod} />}
+                {transactionDate && <DetailRow label="Transaction Date" value={transactionDate} />}
+              </>
+            )}
           </div>
 
           {/* Action Button */}
@@ -103,4 +125,3 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-

@@ -71,6 +71,7 @@ export default function TVPage() {
   const [failureReason, setFailureReason] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [pinError, setPinError] = useState("");
+  const [quoteData, setQuoteData] = useState<any>(null);
 
   const [availablePlans, setAvailablePlans] = useState<TVPlan[]>(FALLBACK_PLANS);
   const [isPlansLoading, setIsPlansLoading] = useState(false);
@@ -234,6 +235,7 @@ export default function TVPage() {
         if (response.success && response.data) {
           const quoteData = response.data;
           localStorage.setItem("currentTvQuote", JSON.stringify(quoteData));
+          setQuoteData(quoteData);
           setStep("confirmation");
         } else {
           setFailureReason(response.description || "Failed to generate quote");
@@ -413,24 +415,36 @@ export default function TVPage() {
   }
 
   if (step === "confirmation" && selectedPaymentMethod && selectedPlan) {
+    const details = [
+      { label: "Biller", value: selectedProvider.name },
+      { label: "Smartcard Number", value: decoderNumber },
+      { label: "Account Name", value: customerName || "N/A" },
+      { label: "Package", value: selectedPlan.name },
+      { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+    ];
+
+    if (quoteData && quoteData.transactionFee > 0) {
+      details.push({ label: "Transaction Fee", value: `₦${quoteData.transactionFee}` });
+    }
+
+    const cashback = getCashback();
+    if (cashback > 0) {
+      details.push({ label: "Bonus to Earn", value: `₦${cashback.toFixed(2)} Cashback` });
+    }
+
+    let displayAmount = calculatePaymentAmount();
+    if (quoteData?.deductionAmount && selectedPaymentMethod.type !== "fiat") {
+      displayAmount = `${Number(quoteData.deductionAmount).toFixed(6)} ${quoteData.deductionCurrency}`;
+    }
+
     return (
       <Confirmation
         onBack={() => setStep("payment")}
         onPay={() => setStep("enterPin")}
         amount={selectedPlan.price}
-        paymentAmount={calculatePaymentAmount()}
-        paymentMethod={
-          selectedPaymentMethod.type === "fiat"
-            ? "Fiat"
-            : `Crypto (${selectedPaymentMethod.name})`
-        }
-        biller={selectedProvider.name}
-        meterNumber={decoderNumber}
-        customerName={customerName || "N/A"}
-        meterType={paymentOption}
-        serviceAddress="10 rd, 20 Sanusi Estate Baruwa Lagos"
-        cashback={getCashback()}
+        paymentAmount={displayAmount}
         availableBalance={getAvailableBalance()}
+        details={details}
       />
     );
   }

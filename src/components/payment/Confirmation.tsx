@@ -2,19 +2,27 @@
 import React, { useState } from "react";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 
+interface QuoteDetails {
+  label: string;
+  value: string;
+}
+
 interface ConfirmationProps {
   onBack: () => void;
   onPay: () => void; // This will trigger PIN entry
   amount: number;
   paymentAmount: string; // e.g., "0.0060 SOL"
-  paymentMethod: string; // e.g., "Crypto (Solana)"
-  biller: string;
-  meterNumber: string;
-  customerName: string;
-  meterType: string;
-  serviceAddress: string;
-  cashback: number;
+  // Legacy props (optional for backward compatibility)
+  paymentMethod?: string;
+  biller?: string;
+  meterNumber?: string;
+  customerName?: string;
+  meterType?: string;
+  serviceAddress?: string;
+  cashback?: number;
   availableBalance: string;
+  // New dynamic props
+  details?: QuoteDetails[];
 }
 
 export default function Confirmation({
@@ -30,6 +38,7 @@ export default function Confirmation({
   serviceAddress,
   cashback,
   availableBalance,
+  details,
 }: ConfirmationProps) {
   const [useCashback, setUseCashback] = useState(false);
   const cashbackBalance = 500;
@@ -57,17 +66,25 @@ export default function Confirmation({
         {/* Payment Details */}
         <div className="flex flex-col gap-4">
           <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col gap-3">
-            <DetailRow label="Biller" value={biller} />
-            <DetailRow label="Meter Number" value={meterNumber} />
-            <DetailRow label="Customer Name" value={customerName} />
-            <DetailRow label="Meter Type" value={meterType} />
-            <DetailRow label="Service Address" value={serviceAddress} />
-            <DetailRow label="Payment Method" value={paymentMethod} />
-            <DetailRow label="Bonus to Earn" value={`₦${cashback.toFixed(2)} Cashback`} />
+            {details ? (
+              details.map((item, index) => (
+                <DetailRow key={index} label={item.label} value={item.value} />
+              ))
+            ) : (
+              <>
+                {biller && <DetailRow label="Biller" value={biller} />}
+                {meterNumber && <DetailRow label="Meter Number" value={meterNumber} />}
+                {customerName && <DetailRow label="Customer Name" value={customerName} />}
+                {meterType && <DetailRow label="Meter Type" value={meterType} />}
+                {serviceAddress && <DetailRow label="Service Address" value={serviceAddress} />}
+                {paymentMethod && <DetailRow label="Payment Method" value={paymentMethod} />}
+                {cashback !== undefined && <DetailRow label="Bonus to Earn" value={`₦${cashback.toFixed(2)} Cashback`} />}
+              </>
+            )}
           </div>
 
           {/* Use Cashback Toggle */}
-          <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between">
+          {/* <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-white font-medium">
                 Use Cashback (₦{cashbackBalance.toLocaleString()}.00)
@@ -80,17 +97,15 @@ export default function Confirmation({
             </div>
             <button
               onClick={() => setUseCashback(!useCashback)}
-              className={`relative w-12 h-6 rounded-full transition-colors ${
-                useCashback ? "bg-blue-500" : "bg-gray-600"
-              }`}
+              className={`relative w-12 h-6 rounded-full transition-colors ${useCashback ? "bg-blue-500" : "bg-gray-600"
+                }`}
             >
               <span
-                className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                  useCashback ? "translate-x-6" : "translate-x-0"
-                }`}
+                className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${useCashback ? "translate-x-6" : "translate-x-0"
+                  }`}
               />
             </button>
-          </div>
+          </div> */}
 
           {/* Available Balance */}
           <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4">
@@ -120,4 +135,3 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-

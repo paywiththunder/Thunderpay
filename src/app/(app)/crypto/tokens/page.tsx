@@ -4,25 +4,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import { HiOutlineSearch } from "react-icons/hi";
-import { FaBitcoin, FaEthereum, FaWallet } from "react-icons/fa";
-import { SiTether, SiSolana } from "react-icons/si";
 import { getCurrencies } from "@/services/wallet";
+import { getAssetConfig } from "@/utils/cryptoUtils";
 
-// Helper for icons
-const getAssetConfig = (symbol: string) => {
-    switch (symbol.toUpperCase()) {
-        case "USDT":
-            return { icon: <SiTether className="text-white w-4 h-4" />, bg: "bg-green-500", name: "Tether" };
-        case "BTC":
-            return { icon: <FaBitcoin className="text-white w-4 h-4" />, bg: "bg-orange-500", name: "Bitcoin" };
-        case "ETH":
-            return { icon: <FaEthereum className="text-gray-800 w-4 h-4" />, bg: "bg-gray-200", name: "Ethereum" };
-        case "SOL":
-            return { icon: <SiSolana className="text-white w-4 h-4" />, bg: "bg-purple-500", name: "Solana" };
-        default:
-            return { icon: <FaWallet className="text-white w-4 h-4" />, bg: "bg-gray-700", name: symbol };
-    }
-};
+
 
 interface Currency {
     currencyId: number;
@@ -107,7 +92,7 @@ export default function TokensPage() {
                                 >
                                     <div className="flex items-center gap-4">
                                         <div className={`w-8 h-8 rounded-full ${config.bg} flex items-center justify-center`}>
-                                            {config.icon}
+                                            <config.Icon className={`w-4 h-4 ${config.name === "Ethereum" ? "text-gray-800" : "text-white"}`} />
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-white font-medium">{currency.name}</span>

@@ -9,9 +9,11 @@ import {
     GiPayMoney,
     GiBanknote,
 } from "react-icons/gi";
-import { MdCurrencyExchange } from "react-icons/md";
+import { MdCurrencyExchange, MdAdd } from "react-icons/md";
+import { IoClose } from "react-icons/io5";
 import Image from "next/image";
 import NoTransaction from "../../../public/walletimg.png";
+import WalletForm from "../payment/WalletForm";
 import { FaBitcoin, FaEthereum, FaWallet } from "react-icons/fa";
 import { SiTether, SiSolana } from "react-icons/si";
 import AppHeader from "./AppHeader";
@@ -39,31 +41,28 @@ export default function CryptoPage() {
     const [wallets, setWallets] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [totalAssets, setTotalAssets] = useState(0);
+    const [isAddWalletOpen, setIsAddWalletOpen] = useState(false);
+
+    const fetchWallets = async () => {
+        try {
+            const response = await getWallets();
+            const walletList = Array.isArray(response) ? response : response.data || [];
+            setWallets(walletList);
+
+            // Calculate total assets
+            const total = walletList.reduce((acc: number, wallet: any) => {
+                return acc + (wallet.availableBalance ?? wallet.totalBalance ?? 0);
+            }, 0);
+            setTotalAssets(total);
+
+        } catch (error) {
+            console.error("Failed to fetch wallets:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchWallets = async () => {
-            try {
-                const response = await getWallets();
-                const walletList = Array.isArray(response) ? response : response.data || [];
-                setWallets(walletList);
-
-                // Calculate total assets
-                // Note: Since the API doesn't provide USD values or exchange rates in this response,
-                // and we can't accurately sum different currencies (e.g. BTC + USDT),
-                // determining the true FIAT value would require an external price feed.
-                // For now, we are basing it on the available balances returned (which are 0 in the snippet).
-                const total = walletList.reduce((acc: number, wallet: any) => {
-                    return acc + (wallet.availableBalance ?? wallet.totalBalance ?? 0);
-                }, 0);
-                setTotalAssets(total);
-
-            } catch (error) {
-                console.error("Failed to fetch wallets:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchWallets();
     }, []);
 
@@ -107,9 +106,15 @@ export default function CryptoPage() {
 
             {/* Tokens Section */}
             <div className="rounded-2xl border border-white/10 bg-[#161616]/50 overflow-hidden">
-                <div className="flex border-b border-white/10">
+                <div className="flex border-b border-white/10 items-center pr-2">
                     <button className="flex-1 py-3 text-sm text-center font-medium text-white border-r border-white/10 bg-white/5">My Tokens</button>
                     <Link href="/crypto/tokens" className="flex-1 py-3 text-sm text-center font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors">Tokens</Link>
+                    <button
+                        onClick={() => setIsAddWalletOpen(true)}
+                        className="ml-2 w-7 h-7 flex items-center justify-center rounded-full bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white transition-colors border border-blue-500/30"
+                    >
+                        <MdAdd className="w-5 h-5" />
+                    </button>
                 </div>
 
                 <div className="flex flex-col">
@@ -170,6 +175,27 @@ export default function CryptoPage() {
                     <p className="text-gray-500 font-[600] text-[2rem] -mt-18 mb-16">No Transaction Yet</p>
                 </div>
             </div>
+            {/* Add Wallet Modal */}
+            {isAddWalletOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-[#111] w-full max-w-md rounded-2xl border border-white/10 p-6 relative shadow-2xl animate-in zoom-in-95 duration-200">
+                        <button
+                            onClick={() => setIsAddWalletOpen(false)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+                        >
+                            <IoClose className="w-6 h-6" />
+                        </button>
+
+                        <h2 className="text-xl font-bold mb-6">Add New Wallet</h2>
+
+                        <WalletForm onSuccess={() => {
+                            setIsAddWalletOpen(false);
+                            setLoading(true);
+                            fetchWallets();
+                        }} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

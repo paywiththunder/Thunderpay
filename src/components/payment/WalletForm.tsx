@@ -28,7 +28,11 @@ interface Currency {
     networks: Network[];
 }
 
-export default function WalletForm() {
+interface WalletFormProps {
+    onSuccess?: () => void;
+}
+
+export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
     const [currencies, setCurrencies] = useState<Currency[]>([]);
     const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
     const [selectedNetwork, setSelectedNetwork] = useState<Network | null>(null);
@@ -88,7 +92,11 @@ export default function WalletForm() {
             if (res.success) {
                 setSuccess(true);
                 setTimeout(() => {
-                    router.push("/crypto/receive");
+                    if (onSuccess) {
+                        onSuccess();
+                    } else {
+                        router.push("/crypto/receive");
+                    }
                 }, 2000);
             } else {
                 setError(res.description || "Failed to create wallet");

@@ -90,7 +90,7 @@ const menuItems: MenuItem[] = [
     icon: HiOutlineArrowRightOnRectangle,
     label: "Sign out",
     isSignOut: true,
-    link: "/auth/logout",
+    link: "/sign-out",
   },
 ];
 

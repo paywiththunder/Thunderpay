@@ -330,10 +330,12 @@ function ActionButton({
 
 function TokenItem({ id, icon, name, symbol, amount, value }: { id: string, icon: React.ReactNode, name: string, symbol: string, amount: string, value: string }) {
     return (
-        <Link
-            href={`/crypto/tokens/${id}`}
-            className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5 last:border-0"
-        >
+        // TODO: Re-enable token detail route later
+        // <Link
+        //     href={`/crypto/tokens/${id}`}
+        //     className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5 last:border-0"
+        // >
+        <div className="flex items-center justify-between p-4 border-b border-white/5 last:border-0">
             <div className="flex items-center gap-3">
                 {icon}
                 <div className="flex flex-col">
@@ -345,6 +347,7 @@ function TokenItem({ id, icon, name, symbol, amount, value }: { id: string, icon
                 <span className="font-medium text-sm">{amount}</span>
                 <span className="text-xs text-gray-500">{value}</span>
             </div>
-        </Link>
+        </div>
+        // </Link>
     )
 }

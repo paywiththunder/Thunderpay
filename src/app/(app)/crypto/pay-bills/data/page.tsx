@@ -83,6 +83,7 @@ export default function DataPage() {
   const [availablePlans, setAvailablePlans] = useState<DataPlan[]>(FALLBACK_PLANS);
   const [isPlansLoading, setIsPlansLoading] = useState(false);
   const [transactionDetails, setTransactionDetails] = useState<any>(null);
+  const [quote, setQuote] = useState<any>(null);
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -233,8 +234,8 @@ export default function DataPage() {
           const quoteData = response.data;
           localStorage.setItem("currentDataQuote", JSON.stringify(quoteData));
 
-          // Also update local state for UI display if needed (e.g. deduction amount)
-          // For now, proceeding to Confirmation
+          // Store quote in state for display
+          setQuote(quoteData);
           setStep("confirmation");
         } else {
           setFailureReason(response.description || "Failed to generate quote");
@@ -256,10 +257,16 @@ export default function DataPage() {
     if (!selectedPaymentMethod || !selectedPlan) return "0";
     const amountNum = selectedPlan.price;
 
+    // Use quote data if available
+    if (quote) {
+      return `${quote.deductionAmount.toFixed(6)} ${quote.deductionCurrency.toUpperCase()}`;
+    }
+
     if (selectedPaymentMethod.type === "fiat") {
       return `₦${amountNum.toLocaleString()}.00`;
     }
 
+    // Fallback mock conversion rates for crypto
     const rates: { [key: string]: number } = {
       usdt: 1.0,
       bitcoin: 0.000023,
@@ -269,6 +276,10 @@ export default function DataPage() {
 
     const rate = rates[selectedPaymentMethod.id] || 1;
     const cryptoAmount = amountNum / (rate * 1500);
+
+    if (selectedPaymentMethod.currencyCode) {
+      return `${cryptoAmount.toFixed(6)} ${selectedPaymentMethod.currencyCode}`;
+    }
 
     if (selectedPaymentMethod.id === "usdt") {
       return `${cryptoAmount.toFixed(4)} USDT`;

@@ -172,11 +172,16 @@ export default function ElectricityPage() {
     if (!selectedPaymentMethod || !amount) return "0";
     const amountNum = parseFloat(amount);
 
+    // Use quote data if available
+    if (quoteData) {
+      return `${quoteData.deductionAmount.toFixed(6)} ${quoteData.deductionCurrency.toUpperCase()}`;
+    }
+
     if (selectedPaymentMethod.type === "fiat") {
       return `₦${amountNum.toLocaleString()}.00`;
     }
 
-    // Mock conversion rates for crypto
+    // Fallback mock conversion rates for crypto
     const rates: { [key: string]: number } = {
       usdt: 1.0, // 1 USDT = $1
       bitcoin: 0.000023, // Approximate rate
@@ -186,6 +191,10 @@ export default function ElectricityPage() {
 
     const rate = rates[selectedPaymentMethod.id] || 1;
     const cryptoAmount = amountNum / (rate * 1500); // Assuming 1 USD = 1500 NGN
+
+    if (selectedPaymentMethod.currencyCode) {
+      return `${cryptoAmount.toFixed(6)} ${selectedPaymentMethod.currencyCode}`;
+    }
 
     if (selectedPaymentMethod.id === "usdt") {
       return `${cryptoAmount.toFixed(4)} USDT`;

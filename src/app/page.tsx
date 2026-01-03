@@ -24,7 +24,7 @@ export default function Home() {
     <div className="h-screen bg-black text-white flex flex-col items-center justify-between py-10 px-6 relative overflow-x-hidden md:py-16 md:px-8">
       {/* Main illustration */}
       <div className="flex flex-col items-center z-10">
-        <div className="w-full md:w-64 md:h-64 relative">
+        <div className="w-2/3 md:w-64 md:h-64 relative">
           {/* {currentIndex === 1 && (
             <Image
               alt="Phone"
@@ -59,9 +59,8 @@ export default function Home() {
           {images.map((_, idx) => (
             <span
               key={idx}
-              className={`w-4 h-2 rounded-full ${
-                idx === currentIndex ? "bg-white w-6" : "bg-gray-500"
-              }`}
+              className={`w-4 h-2 rounded-full ${idx === currentIndex ? "bg-white w-6" : "bg-gray-500"
+                }`}
             />
           ))}
         </div>

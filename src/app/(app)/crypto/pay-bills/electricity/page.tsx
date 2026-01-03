@@ -64,6 +64,7 @@ export default function ElectricityPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [quoteReference, setQuoteReference] = useState("");
   const [quoteData, setQuoteData] = useState<any>(null);
+  const [transactionDetails, setTransactionDetails] = useState<any>(null);
 
   // Real meter verification
   useEffect(() => {
@@ -257,6 +258,7 @@ export default function ElectricityPage() {
 
       if (response.success && response.data) {
         setTransactionToken(response.data.transactionReference);
+        setTransactionDetails(response.data);
         setTransactionResult("success");
         setStep("result");
       } else {
@@ -331,17 +333,15 @@ export default function ElectricityPage() {
         onPay={() => setStep("enterPin")}
         amount={parseFloat(amount) || 0}
         paymentAmount={calculatePaymentAmount()}
-        paymentMethod={
-          selectedPaymentMethod.type === "fiat"
-            ? "Fiat"
-            : `Crypto (${selectedPaymentMethod.name})`
-        }
-        biller={selectedProvider.name}
-        meterNumber={meterNumber}
-        customerName={customerName || "N/A"}
-        meterType={paymentType === "prepaid" ? "Prepaid" : "Postpaid"}
-        serviceAddress="10 rd, 20 Sanusi Estate Baruwa Lagos"
-        cashback={getCashback()}
+        details={[
+          { label: "Provider", value: selectedProvider.name },
+          { label: "Meter Number", value: meterNumber },
+          { label: "Customer Name", value: customerName || "N/A" },
+          { label: "Meter Type", value: paymentType === "prepaid" ? "Prepaid" : "Postpaid" },
+          { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
+          { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+          { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+        ]}
         availableBalance={getAvailableBalance()}
       />
     );
@@ -365,17 +365,27 @@ export default function ElectricityPage() {
     const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
 
     if (transactionResult === "success") {
+      const metadata = transactionDetails?.metadata || {};
+
+      // Parse token if needed (remove "Token : " prefix)
+      let tokenDisplay = metadata.token || "";
+      if (tokenDisplay.toLowerCase().startsWith("token : ")) {
+        tokenDisplay = tokenDisplay.substring(8);
+      } else if (tokenDisplay.toLowerCase().startsWith("token: ")) {
+        tokenDisplay = tokenDisplay.substring(7);
+      }
+
       return (
         <PaymentSuccess
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          token={transactionToken}
+          token={tokenDisplay || transactionToken}
           biller={selectedProvider.name}
           meterNumber={meterNumber}
-          customerName={customerName || "N/A"}
+          customerName={metadata.customerName || customerName || "N/A"}
           meterType={paymentType === "prepaid" ? "Prepaid" : "Postpaid"}
-          serviceAddress="10 rd, 20 Sanusi Estate Baruwa Lagos"
-          unitsPurchased="22.3 kWh"
+          serviceAddress={metadata.customerAddress || "10 rd, 20 Sanusi Estate Baruwa Lagos"}
+          unitsPurchased={metadata.unit || "N/A"}
           paymentMethod={
             selectedPaymentMethod.type === "fiat"
               ? "Fiat"

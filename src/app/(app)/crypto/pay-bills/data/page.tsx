@@ -82,6 +82,7 @@ export default function DataPage() {
 
   const [availablePlans, setAvailablePlans] = useState<DataPlan[]>(FALLBACK_PLANS);
   const [isPlansLoading, setIsPlansLoading] = useState(false);
+  const [transactionDetails, setTransactionDetails] = useState<any>(null);
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -345,6 +346,7 @@ export default function DataPage() {
 
       if (response.success && response.data) {
         setTransactionToken(response.data.transactionReference);
+        setTransactionDetails(response.data);
         setTransactionResult("success");
         setStep("result");
       } else {
@@ -434,17 +436,15 @@ export default function DataPage() {
         onPay={() => setStep("enterPin")}
         amount={selectedPlan.price}
         paymentAmount={calculatePaymentAmount()}
-        paymentMethod={
-          selectedPaymentMethod.type === "fiat"
-            ? "Fiat"
-            : `Crypto (${selectedPaymentMethod.name})`
-        }
-        biller={selectedNetwork.name}
-        meterNumber={phoneNumber}
-        customerName={phoneNumber}
-        meterType="Data"
-        serviceAddress=""
-        cashback={getCashback()}
+        details={[
+          { label: "Network", value: selectedNetwork.name },
+          { label: "Phone Number", value: phoneNumber },
+          { label: "Data Plan", value: selectedPlan.data },
+          { label: "Duration", value: selectedPlan.duration },
+          { label: "Amount", value: `₦${selectedPlan.price.toLocaleString()}.00` },
+          { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+          { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+        ]}
         availableBalance={getAvailableBalance()}
       />
     );
@@ -467,16 +467,24 @@ export default function DataPage() {
     const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
 
     if (transactionResult === "success") {
+      const metadata = transactionDetails?.metadata || {};
+
       return (
         <PaymentSuccess
+          title="Data Purchase Successful"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
           token={transactionToken}
           biller={selectedNetwork.name}
+          billerLabel="Network"
           meterNumber={phoneNumber}
-          customerName={phoneNumber}
-          meterType="Data"
-          serviceAddress=""
+          meterNumberLabel="Phone Number"
+          customerName={metadata.customerName || phoneNumber}
+          customerNameLabel="Recipient"
+          meterType={selectedPlan.data}
+          meterTypeLabel="Data Plan"
+          serviceAddress={metadata.customerAddress || ""}
+          unitsPurchased={metadata.unit || selectedPlan.data}
           paymentMethod={
             selectedPaymentMethod.type === "fiat"
               ? "Fiat"

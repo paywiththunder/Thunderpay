@@ -70,6 +70,13 @@ export interface BillExecutionResponse {
         status: string;
         createdAt: string;
         completedAt: string;
+        metadata?: {
+            customerAddress?: string;
+            unit?: string;
+            customerName?: string;
+            token?: string;
+            [key: string]: any;
+        };
     } | null;
     errors: any;
 }
@@ -291,8 +298,9 @@ export interface ElectricityVerificationResponse {
     description: string;
     data: {
         verified: boolean;
-        name: string;
-        address?: string;
+        name: string | null;
+        address?: string | null;
+        error?: string;
     } | null;
 }
 

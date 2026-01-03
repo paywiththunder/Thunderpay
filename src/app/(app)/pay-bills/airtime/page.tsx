@@ -342,17 +342,13 @@ export default function AirtimePage() {
         onPay={() => setStep("enterPin")}
         amount={parseFloat(amount) || 0}
         paymentAmount={calculatePaymentAmount()}
-        paymentMethod={
-          selectedPaymentMethod.type === "fiat"
-            ? "Fiat"
-            : `Crypto (${selectedPaymentMethod.name})`
-        }
-        biller={selectedNetwork.name}
-        meterNumber={phoneNumber}
-        customerName={phoneNumber}
-        meterType="Airtime"
-        serviceAddress=""
-        cashback={getCashback()}
+        details={[
+          { label: "Network", value: selectedNetwork.name },
+          { label: "Phone Number", value: phoneNumber },
+          { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
+          { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+          { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+        ]}
         availableBalance={getAvailableBalance()}
       />
     );

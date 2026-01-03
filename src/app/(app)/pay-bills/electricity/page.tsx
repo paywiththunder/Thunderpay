@@ -10,7 +10,7 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
-import { getElectricityQuote, ElectricityQuotePayload, executeBillPayment } from "@/services/bills";
+import { getElectricityQuote, ElectricityQuotePayload, executeBillPayment, verifyElectricity, ElectricityVerificationPayload } from "@/services/bills";
 
 interface ElectricityProvider {
   id: string;
@@ -64,21 +64,59 @@ export default function ElectricityPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [quoteReference, setQuoteReference] = useState("");
   const [quoteData, setQuoteData] = useState<any>(null);
+  const [verificationError, setVerificationError] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [transactionDetails, setTransactionDetails] = useState<any>(null);
 
   // Mock meter verification - in real app, this would be an API call
+  // Real meter verification
   useEffect(() => {
-    if (meterNumber.length >= 10) {
-      // Simulate API call delay
-      const timer = setTimeout(() => {
-        setMeterVerified(true);
-        setCustomerName("Newton Afobaje Arowolo");
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      setMeterVerified(false);
-      setCustomerName("");
-    }
-  }, [meterNumber]);
+    const verifyMeter = async () => {
+      if (meterNumber.length >= 10 && selectedProvider) {
+        setIsVerifying(true);
+        setVerificationError("");
+        setMeterVerified(false);
+        setCustomerName("");
+
+        try {
+          const payload: ElectricityVerificationPayload = {
+            serviceId: selectedProvider.serviceId,
+            billersCode: meterNumber,
+            type: paymentType,
+          };
+
+          const response = await verifyElectricity(payload);
+
+          if (response.success && response.data?.verified) {
+            setMeterVerified(true);
+            setCustomerName(response.data.name || "Customer");
+            setVerificationError("");
+          } else {
+            setMeterVerified(false);
+            setCustomerName("");
+            setVerificationError(response.data?.error || "Invalid meter details");
+          }
+        } catch (error: any) {
+          console.error("Verification Error:", error);
+          setMeterVerified(false);
+          setCustomerName("");
+          setVerificationError(error.message || "Failed to verify meter");
+        } finally {
+          setIsVerifying(false);
+        }
+      } else {
+        setMeterVerified(false);
+        setCustomerName("");
+        setVerificationError("");
+      }
+    };
+
+    const debounceTimer = setTimeout(() => {
+      verifyMeter();
+    }, 1000); // 1 second debounce
+
+    return () => clearTimeout(debounceTimer);
+  }, [meterNumber, selectedProvider, paymentType]);
 
   const handleAmountSelect = (selectedAmount: number) => {
     setAmount(selectedAmount.toString());
@@ -225,6 +263,7 @@ export default function ElectricityPage() {
 
       if (response.success && response.data) {
         setTransactionToken(response.data.transactionReference);
+        setTransactionDetails(response.data);
         setTransactionResult("success");
         setStep("result");
       } else {
@@ -299,17 +338,15 @@ export default function ElectricityPage() {
         onPay={() => setStep("enterPin")}
         amount={parseFloat(amount) || 0}
         paymentAmount={calculatePaymentAmount()}
-        paymentMethod={
-          selectedPaymentMethod.type === "fiat"
-            ? "Fiat"
-            : `Crypto (${selectedPaymentMethod.name})`
-        }
-        biller={selectedProvider.name}
-        meterNumber={meterNumber}
-        customerName={customerName || "N/A"}
-        meterType={paymentType === "prepaid" ? "Prepaid" : "Postpaid"}
-        serviceAddress="10 rd, 20 Sanusi Estate Baruwa Lagos"
-        cashback={getCashback()}
+        details={[
+          { label: "Provider", value: selectedProvider.name },
+          { label: "Meter Number", value: meterNumber },
+          { label: "Customer Name", value: customerName || "N/A" },
+          { label: "Meter Type", value: paymentType === "prepaid" ? "Prepaid" : "Postpaid" },
+          { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
+          { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+          { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+        ]}
         availableBalance={getAvailableBalance()}
       />
     );
@@ -333,17 +370,27 @@ export default function ElectricityPage() {
     const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
 
     if (transactionResult === "success") {
+      const metadata = transactionDetails?.metadata || {};
+
+      // Parse token if needed (remove "Token : " prefix)
+      let tokenDisplay = metadata.token || "";
+      if (tokenDisplay.toLowerCase().startsWith("token : ")) {
+        tokenDisplay = tokenDisplay.substring(8);
+      } else if (tokenDisplay.toLowerCase().startsWith("token: ")) {
+        tokenDisplay = tokenDisplay.substring(7);
+      }
+
       return (
         <PaymentSuccess
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          token={transactionToken}
+          token={tokenDisplay || transactionToken} // Prioritize metadata token (recharge token), fallback to txn ref
           biller={selectedProvider.name}
           meterNumber={meterNumber}
-          customerName={customerName || "N/A"}
+          customerName={metadata.customerName || customerName || "N/A"}
           meterType={paymentType === "prepaid" ? "Prepaid" : "Postpaid"}
-          serviceAddress="10 rd, 20 Sanusi Estate Baruwa Lagos"
-          unitsPurchased="22.3 kWh"
+          serviceAddress={metadata.customerAddress || "10 rd, 20 Sanusi Estate Baruwa Lagos"}
+          unitsPurchased={metadata.unit || "N/A"}
           paymentMethod={
             selectedPaymentMethod.type === "fiat"
               ? "Fiat"
@@ -504,7 +551,13 @@ export default function ElectricityPage() {
         </div>
 
         {/* Meter Verification Card */}
-        {meterVerified && customerName && (
+        {isVerifying && (
+          <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-center">
+            <span className="text-gray-400 text-sm">Verifying meter...</span>
+          </div>
+        )}
+
+        {!isVerifying && meterVerified && customerName && (
           <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
@@ -518,6 +571,12 @@ export default function ElectricityPage() {
               </div>
             </div>
             <HiCheckCircle className="w-6 h-6 text-green-500 flex-shrink-0" />
+          </div>
+        )}
+
+        {!isVerifying && verificationError && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-start gap-3">
+            <div className="flex-1 text-red-500 text-sm">{verificationError}</div>
           </div>
         )}
 

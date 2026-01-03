@@ -77,6 +77,7 @@ export default function AirtimePage() {
   const [quote, setQuote] = useState<AirtimeQuoteResponse | null>(null);
   const [isQuoteLoading, setIsQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState("");
+  const [transactionDetails, setTransactionDetails] = useState<any>(null);
 
   // Mock phone verification
   useEffect(() => {
@@ -255,6 +256,7 @@ export default function AirtimePage() {
 
       if (response.success && response.data) {
         setTransactionToken(response.data.transactionReference);
+        setTransactionDetails(response.data);
         setTransactionResult("success");
         setStep("result");
       } else {
@@ -342,17 +344,13 @@ export default function AirtimePage() {
         onPay={() => setStep("enterPin")}
         amount={parseFloat(amount) || 0}
         paymentAmount={calculatePaymentAmount()}
-        paymentMethod={
-          selectedPaymentMethod.type === "fiat"
-            ? "Fiat"
-            : `Crypto (${selectedPaymentMethod.name})`
-        }
-        biller={selectedNetwork.name}
-        meterNumber={phoneNumber}
-        customerName={phoneNumber}
-        meterType="Airtime"
-        serviceAddress=""
-        cashback={getCashback()}
+        details={[
+          { label: "Network", value: selectedNetwork.name },
+          { label: "Phone Number", value: phoneNumber },
+          { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
+          { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+          { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+        ]}
         availableBalance={getAvailableBalance()}
       />
     );
@@ -374,16 +372,23 @@ export default function AirtimePage() {
     const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
 
     if (transactionResult === "success") {
+      const metadata = transactionDetails?.metadata || {};
+
       return (
         <PaymentSuccess
+          title="Airtime Purchase Successful"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
           token={transactionToken}
           biller={selectedNetwork.name}
+          billerLabel="Network"
           meterNumber={phoneNumber}
-          customerName={phoneNumber}
-          meterType="Airtime"
-          serviceAddress=""
+          meterNumberLabel="Phone Number"
+          customerName={metadata.customerName || phoneNumber}
+          customerNameLabel="Recipient"
+          meterType={`₦${parseFloat(amount).toLocaleString()}.00`}
+          meterTypeLabel="Amount"
+          serviceAddress={metadata.customerAddress || ""}
           paymentMethod={
             selectedPaymentMethod.type === "fiat"
               ? "Fiat"

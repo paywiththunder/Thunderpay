@@ -84,6 +84,7 @@ export const getWalletActivity = async (walletId: number) => {
                 "Content-Type": "application/json",
             },
         });
+        console.log(response.data);
         return response.data;
     } catch (error: any) {
         // Return null or empty representation on error to prevent failing all requests

@@ -75,6 +75,7 @@ export default function TVPage() {
 
   const [availablePlans, setAvailablePlans] = useState<TVPlan[]>(FALLBACK_PLANS);
   const [isPlansLoading, setIsPlansLoading] = useState(false);
+  const [transactionDetails, setTransactionDetails] = useState<any>(null);
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -344,6 +345,7 @@ export default function TVPage() {
 
       if (response.success && response.data) {
         setTransactionToken(response.data.transactionReference);
+        setTransactionDetails(response.data);
         setTransactionResult("success");
         setStep("result");
       } else {
@@ -479,9 +481,16 @@ export default function TVPage() {
 
 
     if (transactionResult === "success") {
+      const metadata = transactionDetails?.metadata || {};
+
       const successDetails = [
-        { label: "Token", value: transactionToken }, // Using Token label for transaction ref here, adjust if needed
-        ...commonDetails
+        { label: "Transaction Reference", value: transactionToken },
+        { label: "Provider", value: selectedProvider.name },
+        { label: "Smartcard Number", value: decoderNumber },
+        { label: "Account Name", value: metadata.customerName || customerName || "N/A" },
+        { label: "Package", value: selectedPlan.name },
+        { label: "Duration", value: `${quantity} ${quantity > 1 ? "Months" : "Month"}` },
+        { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.id.toUpperCase()})` },
       ];
 
       if (quoteData && quoteData.transactionFee > 0) {
@@ -497,6 +506,7 @@ export default function TVPage() {
 
       return (
         <PaymentSuccess
+          title="TV Subscription Successful"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
           details={successDetails}

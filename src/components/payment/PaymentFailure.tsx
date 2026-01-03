@@ -52,7 +52,7 @@ export default function PaymentFailure({
   onContinue,
 }: PaymentFailureProps) {
   return (
-    <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6">
+    <div className="flex flex-col w-full flex-1 bg-black min-h-full mb-16 py-6">
       <div className="flex flex-col items-center justify-center flex-1 px-4 pb-6">
         {/* Failure Icon */}
         <div className="w-20 h-20 bg-red-500 rounded-2xl flex items-center justify-center mb-6">

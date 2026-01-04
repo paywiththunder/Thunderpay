@@ -59,8 +59,7 @@ export default function SignupForm() {
         throw new Error("Signup failed");
       }
 
-      // ✅ Save OTP + user info to localStorage
-      localStorage.setItem("signupOtp", data.otp);
+      // ✅ Save user info to localStorage
       localStorage.setItem("signupEmail", data.email);
       localStorage.setItem("signupUserId", data.id.toString());
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, KeyboardEvent, useEffect } from "react";
+import { useState, useRef, KeyboardEvent } from "react";
 import Link from "next/link";
 import axios from "axios";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
@@ -13,16 +13,6 @@ export default function MailVerification() {
   const [error, setError] = useState("");
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
-  /* --------------------------------------------------
-   Auto-fill OTP from localStorage (DEV UX)
-  -------------------------------------------------- */
-  useEffect(() => {
-    const savedOtp = localStorage.getItem("signupOtp");
-
-    if (savedOtp && savedOtp.length === 6) {
-      setCodes(savedOtp.split(""));
-    }
-  }, []);
 
   const handleChange = (index: number, value: string) => {
     if (value.length > 1) return;
@@ -93,7 +83,6 @@ export default function MailVerification() {
       /* --------------------------------------------------
        CLEAN UP (IMPORTANT)
       -------------------------------------------------- */
-      localStorage.removeItem("signupOtp");
       // localStorage.removeItem("signupEmail");
 
       console.log("Verification successful:", data);

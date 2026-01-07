@@ -38,6 +38,7 @@ const getAssetConfig = (symbol: string) => {
 
 export default function SendPage() {
   const router = useRouter();
+  /*
   const [assets, setAssets] = useState<CryptoAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -103,7 +104,6 @@ export default function SendPage() {
       </header>
 
       <div className="flex flex-col gap-6 px-4">
-        {/* Search Bar */}
         <div className="relative">
           <HiMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
@@ -115,7 +115,6 @@ export default function SendPage() {
           />
         </div>
 
-        {/* Asset List */}
         <div className="flex flex-col gap-3 overflow-y-auto pb-6">
           {loading ? (
             <div className="flex items-center justify-center py-10">
@@ -151,6 +150,25 @@ export default function SendPage() {
             ))
           )}
         </div>
+      </div>
+    </div>
+  );
+  */
+
+  return (
+    <div className="flex flex-col w-full flex-1 bg-black mt-24 min-h-full py-6 items-center justify-center">
+      <header className="absolute top-0 w-full flex items-center justify-center px-4 py-6">
+        <button
+          onClick={() => router.back()}
+          className="absolute left-4 p-3 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] text-[1.2rem] border border-white/20"
+        >
+          <MdOutlineKeyboardDoubleArrowLeft className="text-white" />
+        </button>
+        <h1 className="text-2xl font-bold text-white">Send</h1>
+      </header>
+      <div className="text-gray-400 text-center px-4">
+        <p className="text-lg mb-2">Feature Unavailable</p>
+        <p className="text-sm">We are currently experiencing issues with the Send functionality. Please try again later.</p>
       </div>
     </div>
   );

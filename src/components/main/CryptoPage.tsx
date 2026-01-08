@@ -28,7 +28,7 @@ import { SiTether, SiSolana } from "react-icons/si";
 import AppHeader from "./AppHeader";
 import Right from '../../../public/right.png'
 import Left from '../../../public/left.png'
-import { getWallets } from "@/services/wallet";
+import { getWallets, getWalletsUsd } from "@/services/wallet";
 
 // Helper to match icons (reused logic from ReceivePage)
 const getAssetConfig = (symbol: string) => {
@@ -71,19 +71,21 @@ export default function CryptoPage() {
     const fetchWallets = async () => {
         try {
             const [walletsResponse, transactionsResponse] = await Promise.all([
-                getWallets(),
+                getWalletsUsd(),
                 getRecentTransactions()
             ]);
 
             // Handle Wallets
-            const walletList = Array.isArray(walletsResponse) ? walletsResponse : walletsResponse.data || [];
-            setWallets(walletList);
-
-            // Calculate total assets
-            const total = walletList.reduce((acc: number, wallet: any) => {
-                return acc + (wallet.availableBalance ?? wallet.totalBalance ?? 0);
-            }, 0);
-            setTotalAssets(total);
+            // New structure: { data: { totalAssetsUsd: number, wallets: [] } }
+            if (walletsResponse?.success && walletsResponse?.data) {
+                setWallets(walletsResponse.data.wallets || []);
+                setTotalAssets(walletsResponse.data.totalAssetsUsd || 0);
+            } else {
+                // Fallback or error handling if needed
+                console.warn("Unexpected wallet response format", walletsResponse);
+                setWallets([]);
+                setTotalAssets(0);
+            }
 
             // Handle Transactions
             if (transactionsResponse.success) {
@@ -215,6 +217,14 @@ export default function CryptoPage() {
                             const rawBalance = wallet.availableBalance ?? wallet.totalBalance ?? 0;
                             const balance = Number(rawBalance).toLocaleString('en-US', { maximumFractionDigits: 8 });
 
+                            // Format USD equivalent
+                            const usdValue = wallet.usdEquivalent
+                                ? Number(wallet.usdEquivalent).toLocaleString('en-US', {
+                                    style: 'currency',
+                                    currency: 'USD'
+                                })
+                                : "$0.00";
+
                             return (
                                 <TokenItem
                                     key={wallet.walletId || index}
@@ -223,8 +233,7 @@ export default function CryptoPage() {
                                     name={currency?.name || config.name}
                                     symbol={symbol}
                                     amount={`${balance} ${symbol}`}
-                                    // Placeholder for value since API doesn't provide fiat value yet
-                                    value="---"
+                                    value={usdValue}
                                 />
                             );
                         })

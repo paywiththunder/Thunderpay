@@ -56,6 +56,24 @@ export const getWallets = async () => {
     }
 };
 
+export const getWalletsUsd = async () => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const response = await axios.get(`${API_URL}/usd`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        });
+        console.log("USD Wallets Response:", response.data);
+        return response.data;
+    } catch (error: any) {
+        throw error.response?.data || error.message;
+    }
+};
+
 export const getCurrencies = async () => {
     const token = getAuthToken();
     if (!token) throw new Error("No auth token found");

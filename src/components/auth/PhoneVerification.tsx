@@ -129,7 +129,7 @@ export default function MailVerification() {
         </p>
 
         {/* OTP Inputs */}
-        <div className="flex gap-4 mb-4">
+        <div className="flex items-center gap-3 md:gap-4 mb-4 w-full">
           {codes.map((code, i) => (
             <input
               key={i}
@@ -144,7 +144,7 @@ export default function MailVerification() {
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               onPaste={handlePaste}
-              className="w-14 h-16 text-center text-2xl font-medium rounded-lg border border-[#2B2F33] bg-[#0f1112] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="md:w-14 w-12 md:h-16 h-12 text-center text-2xl font-medium rounded-lg border border-[#2B2F33] bg-[#0f1112] focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           ))}
         </div>

@@ -110,7 +110,7 @@ export default function TokenDetailPage({ params }: { params: Promise<{ symbol: 
                 <div className="flex gap-4 w-full justify-center mb-12">
                     <ActionButton icon={GiPayMoney} label="Send" href="/crypto/send" />
                     <ActionButton icon={GiReceiveMoney} label="Receive" href="/crypto/receive" />
-                    <ActionButton icon={HiOutlineRefresh} label="Convert" href="/convert" />
+                    <ActionButton icon={HiOutlineRefresh} label="Convert" href="/crypto/convert" />
                 </div>
 
                 {/* Price Card */}

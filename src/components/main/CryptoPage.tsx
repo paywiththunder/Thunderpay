@@ -164,7 +164,7 @@ export default function CryptoPage() {
                 <ActionButton icon={GiPayMoney} label="Pay Bills" href="/crypto/pay-bills" />
                 <ActionButton icon={GiBanknote} label="Send" href="/crypto/send" />
                 <ActionButton icon={GiReceiveMoney} label="Receive" href="/crypto/receive" />
-                <ActionButton icon={MdCurrencyExchange} label="Convert" href="/convert" />
+                <ActionButton icon={MdCurrencyExchange} label="Convert" href="/crypto/convert" />
             </div>
 
             {/* Banner */}

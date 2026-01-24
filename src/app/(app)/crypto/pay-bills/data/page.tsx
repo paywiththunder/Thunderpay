@@ -10,7 +10,8 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
-import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse, getDataPlans, DataPlan as ApiDataPlan, getDataQuote, DataQuotePayload } from "@/services/bills";
+import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse, getDataPlans, DataPlan as ApiDataPlan, getDataQuote, DataQuotePayload, BillExecutionPayload } from "@/services/bills";
+import { useQuery, useMutation } from "@tanstack/react-query";
 
 interface NetworkProvider {
   id: string;
@@ -77,54 +78,130 @@ export default function DataPage() {
     useState<TransactionResult>(null);
   const [failureReason, setFailureReason] = useState("");
   const [transactionToken, setTransactionToken] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
   const [pinError, setPinError] = useState("");
 
   const [availablePlans, setAvailablePlans] = useState<DataPlan[]>(FALLBACK_PLANS);
-  const [isPlansLoading, setIsPlansLoading] = useState(false);
   const [transactionDetails, setTransactionDetails] = useState<any>(null);
   const [quote, setQuote] = useState<any>(null);
 
-  useEffect(() => {
-    const fetchPlans = async () => {
-      setIsPlansLoading(true);
-      try {
-        const response = await getDataPlans(selectedNetwork.id);
-        if (response.success && response.data) {
-          // Map API plans to UI structure
-          const mappedPlans: DataPlan[] = response.data.map((p: ApiDataPlan) => {
-            // Extract duration from name if possible, else "N/A"
-            // Example name: "N100 100MB - 24 hrs"
-            const nameParts = p.name.split('-');
-            const duration = nameParts.length > 1 ? nameParts[1].trim() : "N/A";
+  // Query for Data Plans
+  const { isFetching: isPlansLoading } = useQuery({
+    queryKey: ['dataPlans', selectedNetwork.id],
+    queryFn: () => getDataPlans(selectedNetwork.id),
+    select: (data) => {
+      if (data.success && data.data) {
+        return data.data.map((p: ApiDataPlan) => {
+          const nameParts = p.name.split('-');
+          const duration = nameParts.length > 1 ? nameParts[1].trim() : "N/A";
+          const dataMatch = p.name.match(/(\d+(\.\d+)?(MB|GB))/i);
+          const dataAmount = dataMatch ? dataMatch[0] : p.name;
 
-            // Extract data amount if possible
-            // Often in the name like "100MB"
-            // Simple heuristic: Looks for digits followed by MB/GB
-            const dataMatch = p.name.match(/(\d+(\.\d+)?(MB|GB))/i);
-            const dataAmount = dataMatch ? dataMatch[0] : p.name;
-
-            return {
-              id: p.variation_code,
-              data: dataAmount,
-              price: parseFloat(p.variation_amount),
-              duration: duration,
-              cashback: 0 // API doesn't seem to return cashback yet
-            };
-          });
-          setAvailablePlans(mappedPlans);
-        }
-      } catch (error) {
-        console.error("Failed to fetch data plans", error);
-        // Fallback to empty or keep previous?
-        setAvailablePlans([]);
-      } finally {
-        setIsPlansLoading(false);
+          return {
+            id: p.variation_code,
+            data: dataAmount,
+            price: parseFloat(p.variation_amount),
+            duration: duration,
+            cashback: 0
+          } as DataPlan;
+        });
       }
-    };
+      return FALLBACK_PLANS;
+    }
+  });
 
-    fetchPlans();
-  }, [selectedNetwork]);
+  // Use useEffect to sync query result to state if needed, or derived state directly
+  // However, since we have filtering logic on availablePlans, let's just use the query data directly in filtering if possible.
+  // But strictly refactoring existing pattern:
+  const { data: queryPlans } = useQuery({
+    queryKey: ['dataPlans', selectedNetwork.id],
+    queryFn: () => getDataPlans(selectedNetwork.id),
+    staleTime: 1000 * 60 * 30, // 30 mins
+  });
+
+  useEffect(() => {
+    if (queryPlans && queryPlans.success && queryPlans.data) {
+      const mappedPlans = queryPlans.data.map((p: ApiDataPlan) => {
+        const nameParts = p.name.split('-');
+        const duration = nameParts.length > 1 ? nameParts[1].trim() : "N/A";
+        const dataMatch = p.name.match(/(\d+(\.\d+)?(MB|GB))/i);
+        const dataAmount = dataMatch ? dataMatch[0] : p.name;
+
+        return {
+          id: p.variation_code,
+          data: dataAmount,
+          price: parseFloat(p.variation_amount),
+          duration: duration,
+          cashback: 0
+        };
+      });
+      setAvailablePlans(mappedPlans);
+    } else {
+      // Keep fallback if error or empty
+      // setAvailablePlans(FALLBACK_PLANS); 
+    }
+  }, [queryPlans]);
+
+  // Mutation for Data Quote
+  const quoteMutation = useMutation({
+    mutationFn: (payload: DataQuotePayload) => getDataQuote(payload),
+    onSuccess: (response) => {
+      if (response.success && response.data) {
+        const quoteData = response.data;
+        localStorage.setItem("currentDataQuote", JSON.stringify(quoteData));
+        setQuote(quoteData);
+        setStep("confirmation");
+      } else {
+        setFailureReason(response.description || "Failed to generate quote");
+        setTransactionResult("failure");
+        setStep("result");
+      }
+    },
+    onError: (error: any) => {
+      console.error("Quote Error", error);
+      setFailureReason(error?.description || error?.message || "Failed to generate quote");
+      setTransactionResult("failure");
+      setStep("result");
+    }
+  });
+
+  // Mutation for Payment Execution
+  const paymentMutation = useMutation({
+    mutationFn: (payload: BillExecutionPayload) => executeBillPayment(payload),
+    onSuccess: (response) => {
+      const res = response as BillExecutionResponse;
+      if (res.success && res.data) {
+        setTransactionToken(res.data.transactionReference);
+        setTransactionDetails(res.data);
+        setTransactionResult("success");
+        setStep("result");
+      } else {
+        const reason = res.description || "Payment failed";
+        if (reason.toLowerCase().includes("pin")) {
+          setPinError(reason);
+        } else {
+          setFailureReason(reason);
+          setTransactionResult("failure");
+          setStep("result");
+        }
+      }
+    },
+    onError: (error: any) => {
+      console.error("Payment Error:", error);
+      let reason = "An unexpected error occurred";
+      if (typeof error === "string") reason = error;
+      else if (typeof error === "object") reason = error.description || error.message || reason;
+
+      if (reason.toLowerCase().includes("pin")) {
+        setPinError(reason);
+      } else {
+        setFailureReason(reason);
+        setTransactionResult("failure");
+        setStep("result");
+      }
+    }
+  });
+
+  const isProcessing = quoteMutation.isPending || paymentMutation.isPending;
 
   useEffect(() => {
     if (phoneNumber.length >= 10) {
@@ -210,46 +287,23 @@ export default function DataPage() {
     }
   };
 
-  const handlePaymentMethodSelect = async (method: PaymentOption) => {
+  const handlePaymentMethodSelect = (method: PaymentOption) => {
     setSelectedPaymentMethod(method);
 
     // Fetch Data Quote
     if (selectedPlan && phoneNumber) {
-      setIsProcessing(true); // Reuse or add new loading state for quote
-      try {
-        const payload: DataQuotePayload = {
-          phone: phoneNumber,
-          billersCode: phoneNumber,
-          variationCode: selectedPlan.id,
-          purchaseAmount: selectedPlan.price,
-          sourceCurrencyTicker: method.currency || "NGN", // Default if fiat
-          walletId: method.id,
-          baseCostCurrency: "NGN",
-          serviceId: selectedNetwork.id.toUpperCase() // e.g., AIRTEL, MTN
-        };
+      const payload: DataQuotePayload = {
+        phone: phoneNumber,
+        billersCode: phoneNumber,
+        variationCode: selectedPlan.id,
+        purchaseAmount: selectedPlan.price,
+        sourceCurrencyTicker: method.currency || "NGN", // Default if fiat
+        walletId: method.walletId || method.id,
+        baseCostCurrency: "NGN",
+        serviceId: selectedNetwork.id.toUpperCase() // e.g., AIRTEL, MTN
+      };
 
-        const response = await getDataQuote(payload);
-        if (response.success && response.data) {
-          // Store quote in state/localStorage to use in EnterPin step
-          const quoteData = response.data;
-          localStorage.setItem("currentDataQuote", JSON.stringify(quoteData));
-
-          // Store quote in state for display
-          setQuote(quoteData);
-          setStep("confirmation");
-        } else {
-          setFailureReason(response.description || "Failed to generate quote");
-          setTransactionResult("failure");
-          setStep("result");
-        }
-      } catch (error: any) {
-        console.error("Quote Error", error);
-        setFailureReason(error?.description || error?.message || "Failed to generate quote");
-        setTransactionResult("failure");
-        setStep("result");
-      } finally {
-        setIsProcessing(false);
-      }
+      quoteMutation.mutate(payload);
     }
   };
 
@@ -328,71 +382,31 @@ export default function DataPage() {
       .padStart(2, "0")} ${ampm}`;
   };
 
-  const handlePinComplete = async (pin: string) => {
-    setIsProcessing(true);
+  const handlePinComplete = (pin: string) => {
     setPinError(""); // Reset previous errors
 
-    try {
-      // Retrieve quote for Data
-      const storedQuote = localStorage.getItem("currentDataQuote");
-      let quoteReference = "";
+    // Retrieve quote for Data
+    const storedQuote = localStorage.getItem("currentDataQuote");
+    let quoteReference = "";
 
-      if (storedQuote) {
-        const parsed = JSON.parse(storedQuote);
-        quoteReference = parsed.quoteReference;
-      }
-
-      if (!quoteReference) {
-        throw new Error("Session expired or invalid quote. Please try again.");
-      }
-
-      const payload = {
-        quoteReference: quoteReference,
-        pin: pin
-      };
-
-      console.log("PIN to execute:", pin, "Parsed:", payload.pin);
-
-      const response = (await executeBillPayment(payload)) as BillExecutionResponse;
-
-      if (response.success && response.data) {
-        setTransactionToken(response.data.transactionReference);
-        setTransactionDetails(response.data);
-        setTransactionResult("success");
-        setStep("result");
-      } else {
-        const reason = response.description || "Payment failed";
-        // Heuristic: If error mentions PIN, stay on this step
-        if (reason.toLowerCase().includes("pin")) {
-          setPinError(reason);
-        } else {
-          setFailureReason(reason);
-          setTransactionResult("failure");
-          setStep("result");
-        }
-      }
-
-    } catch (error: any) {
-      console.error("Payment Error:", error);
-      let reason = "An unexpected error occurred";
-
-      if (typeof error === "string") {
-        reason = error;
-      } else if (typeof error === "object") {
-        reason = error.description || error.message || reason;
-      }
-
-      if (reason.toLowerCase().includes("pin")) {
-        setPinError(reason);
-      } else {
-        setFailureReason(reason);
-        setTransactionResult("failure");
-        setStep("result");
-      }
-    } finally {
-      setIsProcessing(false);
-      localStorage.removeItem("currentDataQuote"); // Clean up quote after use
+    if (storedQuote) {
+      const parsed = JSON.parse(storedQuote);
+      quoteReference = parsed.quoteReference;
     }
+
+    if (!quoteReference) {
+      setFailureReason("Session expired or invalid quote. Please try again.");
+      setTransactionResult("failure");
+      setStep("result");
+      return;
+    }
+
+    const payload: BillExecutionPayload = {
+      quoteReference: quoteReference,
+      pin: parseInt(pin, 10) // or string if your API expects string, interface says string | number
+    };
+
+    paymentMutation.mutate(payload);
   };
 
   const handleAddToBeneficiary = () => {

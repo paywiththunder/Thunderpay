@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import {
   HiChevronLeft,
@@ -17,29 +17,18 @@ interface InfoCard {
   iconType?: "copy" | "chevron";
 }
 
+import { useQuery } from "@tanstack/react-query";
+
 export default function ProfileDetailsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const response = await getUserProfile();
-        if (response.success) {
-          setUser(response.data);
-        } else {
-          toast.error("Failed to load profile data");
-        }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data: userResponse, isLoading: loading } = useQuery({
+    queryKey: ['userProfile'],
+    queryFn: getUserProfile,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
-    fetchProfile();
-  }, []);
+  const user = userResponse?.success ? userResponse.data : null;
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);

@@ -17,8 +17,10 @@ import {
   executeBillPayment,
   BillExecutionResponse,
   DataPlan as ApiTvPlan,
-  verifyTv
+  verifyTv,
+  BillExecutionPayload
 } from "@/services/bills";
+import { useQuery, useMutation } from "@tanstack/react-query";
 
 interface CableTVProvider {
   id: string;
@@ -69,56 +71,109 @@ export default function TVPage() {
     useState<TransactionResult>(null);
   const [transactionToken, setTransactionToken] = useState("");
   const [failureReason, setFailureReason] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
   const [pinError, setPinError] = useState("");
   const [quoteData, setQuoteData] = useState<any>(null);
 
   const [availablePlans, setAvailablePlans] = useState<TVPlan[]>(FALLBACK_PLANS);
-  const [isPlansLoading, setIsPlansLoading] = useState(false);
   const [transactionDetails, setTransactionDetails] = useState<any>(null);
 
+  // Query for TV Plans
+  const { data: queryPlans, isFetching: isPlansLoading } = useQuery({
+    queryKey: ['tvPlans', selectedProvider.id],
+    queryFn: () => getTvPlans(selectedProvider.id),
+    staleTime: 1000 * 60 * 30, // 30 mins
+  });
+
   useEffect(() => {
-    const fetchPlans = async () => {
-      setIsPlansLoading(true);
-      try {
-        const response = await getTvPlans(selectedProvider.id);
-        if (response.success && response.data) {
-          // Map API plans to UI structure
-          const mappedPlans: TVPlan[] = response.data.map((p: ApiTvPlan) => {
-            // Extract duration from name if possible
-            // Example name: "DStv Yanga - 1 Month" or "N100 100MB - 24 hrs"
-            // Usually TV plans have clear names.
-            let duration = "1 Month"; // Default
-            if (p.name.toLowerCase().includes("3 month") || p.name.toLowerCase().includes("quarter")) {
-              duration = "3 Months";
-            } else if (p.name.toLowerCase().includes("month")) {
-              duration = "1 Month"; // Simplified check
-            } else if (p.name.toLowerCase().includes("year") || p.name.toLowerCase().includes("annual")) {
-              duration = "1 Year";
-            } else if (p.name.toLowerCase().includes("day")) {
-              duration = "1 Day";
-            }
-
-            return {
-              id: p.variation_code,
-              name: p.name,
-              price: parseFloat(p.variation_amount),
-              duration: duration,
-              cashback: 0
-            };
-          });
-          setAvailablePlans(mappedPlans);
+    if (queryPlans && queryPlans.success && queryPlans.data) {
+      const mappedPlans = queryPlans.data.map((p: ApiTvPlan) => {
+        let duration = "1 Month"; // Default
+        if (p.name.toLowerCase().includes("3 month") || p.name.toLowerCase().includes("quarter")) {
+          duration = "3 Months";
+        } else if (p.name.toLowerCase().includes("month")) {
+          duration = "1 Month";
+        } else if (p.name.toLowerCase().includes("year") || p.name.toLowerCase().includes("annual")) {
+          duration = "1 Year";
+        } else if (p.name.toLowerCase().includes("day")) {
+          duration = "1 Day";
         }
-      } catch (error) {
-        console.error("Failed to fetch tv plans", error);
-        setAvailablePlans([]);
-      } finally {
-        setIsPlansLoading(false);
-      }
-    };
 
-    fetchPlans();
-  }, [selectedProvider]);
+        return {
+          id: p.variation_code,
+          name: p.name,
+          price: parseFloat(p.variation_amount),
+          duration: duration,
+          cashback: 0
+        };
+      });
+      setAvailablePlans(mappedPlans);
+    } else {
+      // Handle empty or error if needed
+      // setAvailablePlans([]);
+    }
+  }, [queryPlans]);
+
+  // Mutation for Getting Quote
+  const quoteMutation = useMutation({
+    mutationFn: (payload: TvQuotePayload) => getTvQuote(payload),
+    onSuccess: (response) => {
+      if (response.success && response.data) {
+        const data = response.data;
+        localStorage.setItem("currentTvQuote", JSON.stringify(data));
+        setQuoteData(data);
+        setStep("confirmation");
+      } else {
+        setFailureReason(response.description || "Failed to generate quote");
+        setTransactionResult("failure");
+        setStep("result");
+      }
+    },
+    onError: (error: any) => {
+      console.error("Quote Error", error);
+      setFailureReason(error?.description || error?.message || "Failed to generate quote");
+      setTransactionResult("failure");
+      setStep("result");
+    }
+  });
+
+  // Mutation for executing payment
+  const paymentMutation = useMutation({
+    mutationFn: (payload: BillExecutionPayload) => executeBillPayment(payload),
+    onSuccess: (response) => {
+      const res = response as BillExecutionResponse;
+      if (res.success && res.data) {
+        setTransactionToken(res.data.transactionReference);
+        setTransactionDetails(res.data);
+        setTransactionResult("success");
+        setStep("result");
+      } else {
+        const reason = res.description || "Payment failed";
+        if (reason.toLowerCase().includes("pin")) {
+          setPinError(reason);
+        } else {
+          setFailureReason(reason);
+          setTransactionResult("failure");
+          setStep("result");
+        }
+      }
+    },
+    onError: (error: any) => {
+      console.error("Payment Error:", error);
+      let reason = "An unexpected error occurred";
+      if (typeof error === "string") reason = error;
+      else if (typeof error === "object") reason = error.description || error.message || reason;
+
+      if (reason.toLowerCase().includes("pin")) {
+        setPinError(reason);
+      } else {
+        setFailureReason(reason);
+        setTransactionResult("failure");
+        setStep("result");
+      }
+    }
+  });
+
+  const isProcessing = quoteMutation.isPending || paymentMutation.isPending;
 
   // TV Verification
   useEffect(() => {
@@ -203,54 +258,33 @@ export default function TVPage() {
     }
   };
 
-  const handlePaymentMethodSelect = async (method: PaymentOption) => {
+  const handlePaymentMethodSelect = (method: PaymentOption) => {
     setSelectedPaymentMethod(method);
 
     // Fetch TV Quote
     if (selectedPlan && decoderNumber) {
-      setIsProcessing(true);
-      try {
-        const serviceId = selectedProvider.id.toUpperCase();
-        let subscription_type: "change" | "renew" | null = null;
+      const serviceId = selectedProvider.id.toUpperCase();
+      let subscription_type: "change" | "renew" | null = null;
 
-        // Only DSTV and GOTV require subscription_type
-        if (["DSTV", "GOTV"].includes(serviceId)) {
-          subscription_type = "change";
-        }
-
-        const payload: TvQuotePayload = {
-          serviceId: serviceId,
-          billersCode: decoderNumber,
-          variationCode: selectedPlan.id,
-          purchaseAmount: selectedPlan.price,
-          phone: phoneNumber,
-          quantity: quantity,
-          sourceCurrencyTicker: method.currency ?? "NGN",
-          walletId: isNaN(Number(method.id)) ? method.id : Number(method.id),
-          baseCostCurrency: "NGN",
-          subscription_type: subscription_type
-        };
-
-        const response = await getTvQuote(payload);
-        console.log("TV Quote Response", response);
-        if (response.success && response.data) {
-          const quoteData = response.data;
-          localStorage.setItem("currentTvQuote", JSON.stringify(quoteData));
-          setQuoteData(quoteData);
-          setStep("confirmation");
-        } else {
-          setFailureReason(response.description || "Failed to generate quote");
-          setTransactionResult("failure");
-          setStep("result");
-        }
-      } catch (error: any) {
-        console.error("Quote Error", error);
-        setFailureReason(error?.description || error?.message || "Failed to generate quote");
-        setTransactionResult("failure");
-        setStep("result");
-      } finally {
-        setIsProcessing(false);
+      // Only DSTV and GOTV require subscription_type
+      if (["DSTV", "GOTV"].includes(serviceId)) {
+        subscription_type = "change";
       }
+
+      const payload: TvQuotePayload = {
+        serviceId: serviceId,
+        billersCode: decoderNumber,
+        variationCode: selectedPlan.id,
+        purchaseAmount: selectedPlan.price,
+        phone: phoneNumber,
+        quantity: quantity,
+        sourceCurrencyTicker: method.currency ?? "NGN",
+        walletId: isNaN(Number(method.id)) ? method.id : Number(method.id),
+        baseCostCurrency: "NGN",
+        subscription_type: subscription_type
+      };
+
+      quoteMutation.mutate(payload);
     }
   };
 
@@ -319,62 +353,30 @@ export default function TVPage() {
       .padStart(2, "0")} ${ampm}`;
   };
 
-  const handlePinComplete = async (pin: string) => {
-    setIsProcessing(true);
+  const handlePinComplete = (pin: string) => {
     setPinError("");
 
-    try {
-      const storedQuote = localStorage.getItem("currentTvQuote");
-      let quoteReference = "";
+    const storedQuote = localStorage.getItem("currentTvQuote");
+    let quoteReference = "";
 
-      if (storedQuote) {
-        const parsed = JSON.parse(storedQuote);
-        quoteReference = parsed.quoteReference;
-      }
-
-      if (!quoteReference) {
-        throw new Error("Session expired or invalid quote. Please try again.");
-      }
-
-      const payload = {
-        quoteReference: quoteReference,
-        pin: pin // Sending as string
-      };
-
-      const response = (await executeBillPayment(payload)) as BillExecutionResponse;
-
-      if (response.success && response.data) {
-        setTransactionToken(response.data.transactionReference);
-        setTransactionDetails(response.data);
-        setTransactionResult("success");
-        setStep("result");
-      } else {
-        const reason = response.description || "Payment failed";
-        if (reason.toLowerCase().includes("pin")) {
-          setPinError(reason);
-        } else {
-          setFailureReason(reason);
-          setTransactionResult("failure");
-          setStep("result");
-        }
-      }
-    } catch (error: any) {
-      console.error("Payment Error:", error);
-      let reason = "An unexpected error occurred";
-      if (typeof error === "string") reason = error;
-      else if (typeof error === "object") reason = error.description || error.message || reason;
-
-      if (reason.toLowerCase().includes("pin")) {
-        setPinError(reason);
-      } else {
-        setFailureReason(reason);
-        setTransactionResult("failure");
-        setStep("result");
-      }
-    } finally {
-      setIsProcessing(false);
-      localStorage.removeItem("currentTvQuote");
+    if (storedQuote) {
+      const parsed = JSON.parse(storedQuote);
+      quoteReference = parsed.quoteReference;
     }
+
+    if (!quoteReference) {
+      setFailureReason("Session expired or invalid quote. Please try again.");
+      setTransactionResult("failure");
+      setStep("result");
+      return;
+    }
+
+    const payload: BillExecutionPayload = {
+      quoteReference: quoteReference,
+      pin: pin // Sending as string unless API needs int, checked elsewhere it handles string
+    };
+
+    paymentMutation.mutate(payload);
   };
 
   const handleAddToBeneficiary = () => {

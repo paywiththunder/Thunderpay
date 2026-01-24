@@ -11,16 +11,24 @@ export default function SecureAccount() {
 
   const rules = [
     {
-      text: "Your password must be at least 8 characters long",
+      text: "At least 8 characters long",
       ok: pw.length >= 8,
     },
     {
-      text: "Include at least one number to make your password more secure",
+      text: "At least one lowercase letter",
+      ok: /[a-z]/.test(pw),
+    },
+    {
+      text: "At least one uppercase letter",
+      ok: /[A-Z]/.test(pw),
+    },
+    {
+      text: "At least one number",
       ok: /\d/.test(pw),
     },
     {
-      text: "Include at least one uppercase letter for added security",
-      ok: /[A-Z]/.test(pw),
+      text: "At least one special character",
+      ok: /[!@#$%^&*(),.?":{}|<>]/.test(pw),
     },
   ];
 
@@ -99,11 +107,10 @@ export default function SecureAccount() {
         <div className="mt-8">
           <button
             disabled={!(rules.every((r) => r.ok) && pw === pw2)}
-            className={`w-full py-3 rounded-full ${
-              rules.every((r) => r.ok) && pw === pw2
-                ? "bg-[#0ea5a0]"
-                : "bg-[#1f2224]/60"
-            } text-black font-semibold`}
+            className={`w-full py-3 rounded-full ${rules.every((r) => r.ok) && pw === pw2
+              ? "bg-[#0ea5a0]"
+              : "bg-[#1f2224]/60"
+              } text-black font-semibold`}
           >
             Continue
           </button>

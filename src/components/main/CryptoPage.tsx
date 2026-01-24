@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import {
     HiOutlineEye,
@@ -28,7 +28,7 @@ import { SiTether, SiSolana } from "react-icons/si";
 import AppHeader from "./AppHeader";
 import Right from '../../../public/right.png'
 import Left from '../../../public/left.png'
-import { getWallets, getWalletsUsd } from "@/services/wallet";
+import { getWalletsUsd } from "@/services/wallet";
 
 // Helper to match icons (reused logic from ReceivePage)
 const getAssetConfig = (symbol: string) => {
@@ -60,48 +60,43 @@ interface Transaction {
     createdAt: string;
 }
 
+import { useQuery } from "@tanstack/react-query";
+
 export default function CryptoPage() {
     const router = useRouter();
-    const [wallets, setWallets] = useState<any[]>([]);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [totalAssets, setTotalAssets] = useState(0);
     const [isAddWalletOpen, setIsAddWalletOpen] = useState(false);
 
-    const fetchWallets = async () => {
-        try {
-            const [walletsResponse, transactionsResponse] = await Promise.all([
-                getWalletsUsd(),
-                getRecentTransactions()
-            ]);
+    // Query for Wallets
+    const {
+        data: walletsResponse,
+        isLoading: walletsLoading,
+        refetch: refetchWallets
+    } = useQuery({
+        queryKey: ['walletsUsd'],
+        queryFn: getWalletsUsd,
+    });
 
-            // Handle Wallets
-            // New structure: { data: { totalAssetsUsd: number, wallets: [] } }
-            if (walletsResponse?.success && walletsResponse?.data) {
-                setWallets(walletsResponse.data.wallets || []);
-                setTotalAssets(walletsResponse.data.totalAssetsUsd || 0);
-            } else {
-                // Fallback or error handling if needed
-                console.warn("Unexpected wallet response format", walletsResponse);
-                setWallets([]);
-                setTotalAssets(0);
-            }
+    // Query for Recent Transactions
+    const {
+        data: transactionsResponse,
+        isLoading: transactionsLoading
+    } = useQuery({
+        queryKey: ['recentTransactions'],
+        queryFn: getRecentTransactions,
+    });
 
-            // Handle Transactions
-            if (transactionsResponse.success) {
-                setTransactions(transactionsResponse.data.items);
-            }
+    const loading = walletsLoading || transactionsLoading;
 
-        } catch (error) {
-            console.error("Failed to fetch data:", error);
-        } finally {
-            setLoading(false);
-        }
+    // Derived states
+    const wallets = walletsResponse?.success && walletsResponse?.data?.wallets ? walletsResponse.data.wallets : [];
+    const totalAssets = walletsResponse?.success && walletsResponse?.data?.totalAssetsUsd ? walletsResponse.data.totalAssetsUsd : 0;
+    const transactions = transactionsResponse?.success ? transactionsResponse.data.items : [];
+
+    const fetchWallets = () => {
+        refetchWallets();
+        // Transactions might update too, so we could invalidate queries or refetch both.
+        // For now, adhering to existing logic which was re-calling fetchWallets.
     };
-
-    useEffect(() => {
-        fetchWallets();
-    }, []);
 
     const getIcon = (source: string) => {
         switch (source.toLowerCase()) {
@@ -258,7 +253,7 @@ export default function CryptoPage() {
                     </div>
                 ) : (
                     <div className="flex flex-col gap-3">
-                        {transactions.map((tx) => {
+                        {transactions.map((tx: Transaction) => {
                             const Icon = getIcon(tx.source);
                             const isNegative = ["send", "withdrawal", "bill", "electricity", "card"].includes(tx.source.toLowerCase());
                             return (
@@ -307,7 +302,6 @@ export default function CryptoPage() {
 
                         <WalletForm onSuccess={() => {
                             setIsAddWalletOpen(false);
-                            setLoading(true);
                             fetchWallets();
                         }} />
                     </div>

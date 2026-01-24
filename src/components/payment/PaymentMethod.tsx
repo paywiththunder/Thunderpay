@@ -3,6 +3,7 @@ import React from "react";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import { HiCheckCircle } from "react-icons/hi2";
 import { getWallets } from "@/services/wallet";
+import { useQuery } from "@tanstack/react-query";
 
 export interface PaymentOption {
   id: string;
@@ -50,60 +51,43 @@ export default function PaymentMethod({
   onSelect,
   amount,
 }: PaymentMethodProps) {
-  const [wallets, setWallets] = React.useState<PaymentOption[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState("");
+  const { data: walletsResponse, isLoading: loading, error: queryError } = useQuery({
+    queryKey: ['wallets'],
+    queryFn: getWallets,
+    staleTime: 1000 * 60 * 5, // 5 minutes cache
+  });
 
-  React.useEffect(() => {
-    const fetchWallets = async () => {
-      try {
-        const response = await getWallets();
-        console.log("Fetched wallets:", response);
+  const wallets = React.useMemo(() => {
+    if (!walletsResponse) return [];
 
-        // Assuming response.data is the array of wallets, or response itself is the array
-        // Adjust based on actual API shape using the logs
-        const walletList = Array.isArray(response) ? response : response.data || [];
+    // Handle both array response and { data: [] } response patterns
+    const walletList = Array.isArray(walletsResponse) ? walletsResponse : walletsResponse.data || [];
 
-        const mappedWallets: PaymentOption[] = walletList.map((wallet: any) => {
-          console.log("Raw wallet item:", wallet);
-          const currency = wallet.currency;
-          const currencyCode = currency?.code || currency?.ticker || "UNKNOWN";
-          const styling = getIconForCurrency(currencyCode);
+    return walletList.map((wallet: any) => {
+      const currency = wallet.currency;
+      const currencyCode = currency?.code || currency?.ticker || "UNKNOWN";
+      const styling = getIconForCurrency(currencyCode);
 
-          // Fix: use availableBalance or totalBalance instead of just balance
-          const rawBalance = wallet.availableBalance ?? wallet.totalBalance ?? 0;
-          const formattedBalance = Number(rawBalance).toLocaleString("en-US", { maximumFractionDigits: 8 });
+      const rawBalance = wallet.availableBalance ?? wallet.totalBalance ?? 0;
+      const formattedBalance = Number(rawBalance).toLocaleString("en-US", { maximumFractionDigits: 8 });
 
-          return {
-            id: wallet.walletId?.toString() || "",
-            name: currency?.name || currencyCode,
-            icon: styling.icon,
-            iconBg: styling.bg,
-            // Use correct balance field
-            balance: formattedBalance,
-            cryptoAmount: `${formattedBalance} ${currencyCode}`,
-            value: "---",
-            type: "crypto",
-            currencyCode: currencyCode,
-            currency: currencyCode,
-            walletId: wallet.walletId,
-          };
-        });
+      return {
+        id: wallet.walletId?.toString() || "",
+        name: currency?.name || currencyCode,
+        icon: styling.icon,
+        iconBg: styling.bg,
+        balance: formattedBalance,
+        cryptoAmount: `${formattedBalance} ${currencyCode}`,
+        value: "---",
+        type: "crypto",
+        currencyCode: currencyCode,
+        currency: currencyCode,
+        walletId: wallet.walletId,
+      };
+    });
+  }, [walletsResponse]);
 
-        // Add static Naira if needed, or if backend doesn't return it
-        // mappedWallets.unshift({ ...naira... }) 
-
-        setWallets(mappedWallets);
-      } catch (err) {
-        console.error("Failed to fetch wallets:", err);
-        setError("Failed to load wallets");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchWallets();
-  }, []);
+  const error = queryError ? "Failed to load wallets" : "";
 
   return (
     <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6">
@@ -126,7 +110,7 @@ export default function PaymentMethod({
         ) : error ? (
           <div className="text-red-500 text-center py-4">{error}</div>
         ) : (
-          wallets.map((option) => (
+          wallets.map((option: PaymentOption) => (
             <button
               key={option.id}
               onClick={() => onSelect(option)}
@@ -165,4 +149,3 @@ export default function PaymentMethod({
     </div>
   );
 }
-

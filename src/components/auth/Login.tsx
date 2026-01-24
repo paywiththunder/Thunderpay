@@ -232,6 +232,20 @@ export default function Login() {
   const handleLogin = async () => {
     if (!email || !password) return;
 
+    // Password Enforcement Rules
+    const hasLowercase = /[a-z]/.test(password);
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasDigit = /\d/.test(password);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    const hasMinLength = password.length >= 8;
+
+    if (!hasMinLength || !hasLowercase || !hasUppercase || !hasDigit || !hasSpecial) {
+      setError(
+        "Password must contain at least one lowercase, one uppercase, one special character, one digit and be at least 8 characters long."
+      );
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -248,7 +262,6 @@ export default function Login() {
           },
         }
       );
-      console.log(res)
 
       const { success, data, description } = res.data;
 
@@ -259,8 +272,6 @@ export default function Login() {
       // ✅ Store token
       localStorage.setItem("authToken", data.token);
       const isContinueSignup = data.hasCompletedSignup
-
-      console.log("Login successful:", data);
 
       // 👉 redirect
       if (!isContinueSignup) {

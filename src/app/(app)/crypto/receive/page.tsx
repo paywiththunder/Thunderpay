@@ -34,50 +34,43 @@ const getAssetConfig = (symbol: string) => {
   }
 };
 
+import { useQuery } from "@tanstack/react-query";
+
 export default function ReceivePage() {
   const router = useRouter();
-  const [assets, setAssets] = useState<CryptoAsset[]>([]);
-  const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchWallets = async () => {
-      try {
-        const response = await getWallets();
-        const walletList = Array.isArray(response) ? response : response.data || [];
+  const { data: walletsResponse, isLoading: loading } = useQuery({
+    queryKey: ['wallets'],
+    queryFn: getWallets,
+    staleTime: 1000 * 60 * 5,
+  });
 
-        const mappedAssets: CryptoAsset[] = walletList.map((wallet: any) => {
-          const currency = wallet.currency;
-          const symbol = currency?.code || currency?.ticker || "UNKNOWN";
-          const config = getAssetConfig(symbol);
-          const rawBalance = wallet.availableBalance ?? wallet.totalBalance ?? 0;
-          const balance = Number(rawBalance).toLocaleString('en-US', { maximumFractionDigits: 8 });
+  const assets = React.useMemo(() => {
+    if (!walletsResponse) return [];
+    const walletList = Array.isArray(walletsResponse) ? walletsResponse : walletsResponse.data || [];
 
-          // Extract active address
-          const activeAddress = wallet.addresses?.find((a: any) => a.isActive)?.address || wallet.addresses?.[0]?.address || "";
+    return walletList.map((wallet: any) => {
+      const currency = wallet.currency;
+      const symbol = currency?.code || currency?.ticker || "UNKNOWN";
+      const config = getAssetConfig(symbol);
+      const rawBalance = wallet.availableBalance ?? wallet.totalBalance ?? 0;
+      const balance = Number(rawBalance).toLocaleString('en-US', { maximumFractionDigits: 8 });
 
-          return {
-            id: wallet.walletId?.toString() || Math.random().toString(),
-            symbol: symbol,
-            name: currency?.name || config.name,
-            balance: `${balance} ${symbol}`,
-            address: activeAddress,
-            fiatValue: "---",
-            icon: config.icon,
-            color: config.color,
-          };
-        });
+      const activeAddress = wallet.addresses?.find((a: any) => a.isActive)?.address || wallet.addresses?.[0]?.address || "";
 
-        setAssets(mappedAssets);
-      } catch (error) {
-        console.error("Failed to fetch wallets:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchWallets();
-  }, []);
+      return {
+        id: wallet.walletId?.toString() || Math.random().toString(),
+        symbol: symbol,
+        name: currency?.name || config.name,
+        balance: `${balance} ${symbol}`,
+        address: activeAddress,
+        fiatValue: "---",
+        icon: config.icon,
+        color: config.color,
+      };
+    });
+  }, [walletsResponse]);
 
   const handleCopy = (address: string, id: string) => {
     if (!address) return;
@@ -121,7 +114,7 @@ export default function ReceivePage() {
             </Link>
           </div>
         ) : (
-          assets.map((asset) => (
+          assets.map((asset: CryptoAsset) => (
             <div
               key={asset.id}
               className="bg-[#1C1C1E] rounded-2xl p-4 flex items-center justify-between border border-white/5"

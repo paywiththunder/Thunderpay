@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import { HiChevronRight, HiChevronDown, HiCheckCircle } from "react-icons/hi2";
@@ -10,7 +10,13 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
-import { getElectricityQuote, ElectricityQuotePayload, executeBillPayment } from "@/services/bills";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import {
+  getElectricityQuote,
+  ElectricityQuotePayload,
+  executeBillPayment,
+  verifyElectricity
+} from "@/services/bills";
 
 interface ElectricityProvider {
   id: string;
@@ -55,63 +61,109 @@ export default function ElectricityPage() {
   const [phone, setPhone] = useState("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentOption | null>(null);
-  const [meterVerified, setMeterVerified] = useState(false);
-  const [customerName, setCustomerName] = useState("");
-  const [transactionResult, setTransactionResult] =
-    useState<TransactionResult>(null);
-  const [failureReason, setFailureReason] = useState("");
-  const [transactionToken, setTransactionToken] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [debouncedMeterNumber, setDebouncedMeterNumber] = useState(meterNumber);
+
+  // State that might still be needed if not fully derived from mutations (transitioning between steps)
   const [quoteReference, setQuoteReference] = useState("");
   const [quoteData, setQuoteData] = useState<any>(null);
   const [transactionDetails, setTransactionDetails] = useState<any>(null);
+  const [transactionToken, setTransactionToken] = useState("");
+  const [failureReason, setFailureReason] = useState("");
+  const [transactionResult, setTransactionResult] = useState<TransactionResult>(null);
 
-  // Real meter verification
+  // Debounce meter number
   useEffect(() => {
-    const verifyMeter = async () => {
-      if (meterNumber.length >= 10 && selectedProvider) {
-        setMeterVerified(false); // Reset while verifying
-        setCustomerName("");
-
-        try {
-          // Import verifyElectricity dynamically to avoid circular dependencies if any, 
-          // or just assume it's available since I added it to module imports below
-          const { verifyElectricity } = await import("@/services/bills");
-
-          const response = await verifyElectricity({
-            serviceId: selectedProvider.serviceId,
-            billersCode: meterNumber,
-            type: paymentType
-          });
-
-          if (response.success && response.data.verified) {
-            setMeterVerified(true);
-            setCustomerName(response.data.name);
-            console.log("Customer name:", response.data.name);
-            setFailureReason("");
-          } else {
-            console.log("Verification failed or not verified:", response);
-            setMeterVerified(false);
-            setCustomerName("");
-            // Optional: show toast or error message
-          }
-        } catch (error) {
-          console.error("Verification error:", error);
-          setMeterVerified(false);
-          setCustomerName("");
-        }
-      } else {
-        setMeterVerified(false);
-        setCustomerName("");
-      }
-    };
-
     const timer = setTimeout(() => {
-      verifyMeter();
-    }, 1000); // 1s debounce
-
+      setDebouncedMeterNumber(meterNumber);
+    }, 1000);
     return () => clearTimeout(timer);
-  }, [meterNumber, selectedProvider, paymentType]);
+  }, [meterNumber]);
+
+  // Query for Meter Verification
+  const {
+    data: verificationResponse,
+    isFetching: isVerifying,
+    error: verificationErrorObj
+  } = useQuery({
+    queryKey: ['verifyElectricity', selectedProvider?.serviceId, debouncedMeterNumber, paymentType],
+    queryFn: () => verifyElectricity({
+      serviceId: selectedProvider.serviceId,
+      billersCode: debouncedMeterNumber,
+      type: paymentType
+    }),
+    enabled: !!debouncedMeterNumber && debouncedMeterNumber.length >= 11 && !!selectedProvider,
+    retry: false,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
+  // Derived Verification State
+  const isDebouncing = meterNumber !== debouncedMeterNumber;
+  const verificationData = verificationResponse?.data;
+  const meterVerified = !isDebouncing && !isVerifying && verificationResponse?.success && verificationData?.verified;
+  const customerName = meterVerified ? verificationData?.name || "" : "";
+
+  // Error handling for verification
+  const verificationError = useMemo(() => {
+    if (isDebouncing || isVerifying) return "";
+    if (verificationErrorObj) return (verificationErrorObj as any).message || "Verification failed";
+    if (verificationResponse && !verificationResponse.success) return verificationResponse.description || "Verification failed";
+    if (verificationResponse?.success && !verificationData?.verified) return verificationData?.error || "Verification failed";
+    return "";
+  }, [isDebouncing, isVerifying, verificationErrorObj, verificationResponse, verificationData]);
+
+
+  // Mutation for Getting Quote
+  const quoteMutation = useMutation({
+    mutationFn: (payload: ElectricityQuotePayload) => getElectricityQuote(payload),
+    onSuccess: (response) => {
+      if (response.success && response.data) {
+        setQuoteReference(response.data.quoteReference);
+        setQuoteData(response.data);
+        setStep("confirmation");
+      } else {
+        throw new Error(response.description || "Failed to get quote");
+      }
+    },
+    onError: (error: any) => {
+      console.error("Quote Error:", error);
+      let reason = "Failed to get quote";
+      if (typeof error === "string") reason = error;
+      else if (typeof error === "object") reason = error.description || error.message || reason;
+
+      setFailureReason(reason);
+      setTransactionResult("failure");
+      setStep("result");
+    }
+  });
+
+  // Mutation for Executing Payment
+  const paymentMutation = useMutation({
+    mutationFn: (data: { quoteReference: string, pin: string }) => executeBillPayment(data),
+    onSuccess: (response) => {
+      if (response.success && response.data) {
+        setTransactionToken(response.data.transactionReference);
+        setTransactionDetails(response.data);
+        setTransactionResult("success");
+        setStep("result");
+      } else {
+        throw new Error(response.description || "Payment failed");
+      }
+    },
+    onError: (error: any) => {
+      console.error("Payment Error:", error);
+      let reason = "An unexpected error occurred";
+      if (typeof error === "string") reason = error;
+      else if (typeof error === "object") reason = error.description || error.message || reason;
+
+      setFailureReason(reason);
+      setTransactionResult("failure");
+      setStep("result");
+    }
+  });
+
+  const isProcessing = quoteMutation.isPending || paymentMutation.isPending;
+
+
 
   const handleAmountSelect = (selectedAmount: number) => {
     setAmount(selectedAmount.toString());
@@ -124,48 +176,22 @@ export default function ElectricityPage() {
     }
   };
 
-  const handlePaymentMethodSelect = async (paymentMethod: PaymentOption) => {
+  const handlePaymentMethodSelect = (paymentMethod: PaymentOption) => {
     setSelectedPaymentMethod(paymentMethod);
-    setIsProcessing(true);
 
-    try {
-      // Fetch quote before proceeding to confirmation
-      const payload: ElectricityQuotePayload = {
-        serviceId: selectedProvider.serviceId,
-        billersCode: meterNumber,
-        type: paymentType,
-        purchaseAmount: parseFloat(amount),
-        phone: phone,
-        sourceCurrencyTicker: paymentMethod.currencyCode || "ngn",
-        walletId: paymentMethod.walletId || 100,
-        baseCostCurrency: "ngn"
-      };
+    // Fetch quote before proceeding to confirmation
+    const payload: ElectricityQuotePayload = {
+      serviceId: selectedProvider.serviceId,
+      billersCode: meterNumber,
+      type: paymentType,
+      purchaseAmount: parseFloat(amount),
+      phone: phone,
+      sourceCurrencyTicker: paymentMethod.currencyCode || "ngn",
+      walletId: paymentMethod.walletId || 100,
+      baseCostCurrency: "ngn"
+    };
 
-      const response = await getElectricityQuote(payload);
-
-      if (response.success && response.data) {
-        setQuoteReference(response.data.quoteReference);
-        setQuoteData(response.data);
-        setStep("confirmation");
-      } else {
-        throw new Error(response.description || "Failed to get quote");
-      }
-    } catch (error: any) {
-      console.error("Quote Error:", error);
-      let reason = "Failed to get quote";
-
-      if (typeof error === "string") {
-        reason = error;
-      } else if (typeof error === "object") {
-        reason = error.description || error.message || reason;
-      }
-
-      setFailureReason(reason);
-      setTransactionResult("failure");
-      setStep("result");
-    } finally {
-      setIsProcessing(false);
-    }
+    quoteMutation.mutate(payload);
   };
 
   const calculatePaymentAmount = (): string => {
@@ -256,39 +282,12 @@ export default function ElectricityPage() {
       .padStart(2, "0")} ${ampm}`;
   };
 
-  const handlePinComplete = async (pin: string) => {
-    setIsProcessing(true);
-    try {
-      // Execute bill payment with quote reference
-      const response = await executeBillPayment({
-        quoteReference: quoteReference,
-        pin: pin
-      });
-
-      if (response.success && response.data) {
-        setTransactionToken(response.data.transactionReference);
-        setTransactionDetails(response.data);
-        setTransactionResult("success");
-        setStep("result");
-      } else {
-        throw new Error(response.description || "Payment failed");
-      }
-    } catch (error: any) {
-      console.error("Payment Error:", error);
-      let reason = "An unexpected error occurred";
-
-      if (typeof error === "string") {
-        reason = error;
-      } else if (typeof error === "object") {
-        reason = error.description || error.message || reason;
-      }
-
-      setFailureReason(reason);
-      setTransactionResult("failure");
-      setStep("result");
-    } finally {
-      setIsProcessing(false);
-    }
+  const handlePinComplete = (pin: string) => {
+    // Execute bill payment with quote reference
+    paymentMutation.mutate({
+      quoteReference: quoteReference,
+      pin: pin
+    });
   };
 
   const handleAddToBeneficiary = () => {
@@ -532,8 +531,14 @@ export default function ElectricityPage() {
             value={meterNumber}
             onChange={(e) => setMeterNumber(e.target.value)}
             placeholder="e.g 00000000000"
-            className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
+            className={`w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border ${verificationError ? "border-red-500" : "border-white/20"} text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm`}
           />
+          {meterNumber.length > 0 && meterNumber.length < 11 && (
+            <p className="text-yellow-500 text-xs px-1">Complete meter number</p>
+          )}
+          {verificationError && (
+            <p className="text-red-500 text-xs px-1">{verificationError}</p>
+          )}
           <div className="flex justify-end">
             <button className="text-blue-500 text-sm font-medium flex items-center gap-1 hover:text-blue-400 transition-colors">
               See Beneficiaries

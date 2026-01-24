@@ -1,13 +1,12 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import { HiOutlineSearch } from "react-icons/hi";
 import { getCurrencies } from "@/services/wallet";
 import { getAssetConfig } from "@/utils/cryptoUtils";
-
-
+import { useQuery } from "@tanstack/react-query";
 
 interface Currency {
     currencyId: number;
@@ -21,25 +20,18 @@ interface Currency {
 export default function TokensPage() {
     const router = useRouter();
     const [search, setSearch] = useState("");
-    const [currencies, setCurrencies] = useState<Currency[]>([]);
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchCurrencies = async () => {
-            try {
-                const response = await getCurrencies();
-                // Check if response is array or part of data object
-                const list = Array.isArray(response) ? response : response.data || [];
-                setCurrencies(list);
-            } catch (error) {
-                console.error("Failed to fetch currencies", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+    const { data: currenciesData, isLoading: loading } = useQuery({
+        queryKey: ['currencies'],
+        queryFn: getCurrencies,
+        staleTime: 1000 * 60 * 60, // 1 hour
+    });
 
-        fetchCurrencies();
-    }, []);
+    const currencies: Currency[] = React.useMemo(() => {
+        if (!currenciesData) return [];
+        // Check if response is array or part of data object
+        return Array.isArray(currenciesData) ? currenciesData : currenciesData.data || [];
+    }, [currenciesData]);
 
     const filteredCurrencies = currencies.filter(c =>
         c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -101,7 +93,6 @@ export default function TokensPage() {
                                     </div>
                                     <div className="flex flex-col items-end">
                                         <span className="text-white font-medium">---</span>
-                                        {/* <span className={`text-xs ${token.isPositive ? 'text-green-500' : 'text-red-500'}`}>{token.change}</span> */}
                                     </div>
                                 </Link>
                             );

@@ -26,53 +26,67 @@ interface Transaction {
     createdAt: string;
 }
 
+import { useQuery } from "@tanstack/react-query";
+
 export default function ActivityPage() {
     const router = useRouter();
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchTransactions = async () => {
-            try {
-                // 1. Fetch all wallets first
-                const walletsResponse = await getWallets();
-                const wallets = Array.isArray(walletsResponse) ? walletsResponse : walletsResponse.data || [];
+    const fetchAllActivities = async () => {
+        // 1. Fetch all wallets
+        const walletsResponse = await getWallets();
+        const wallets = Array.isArray(walletsResponse) ? walletsResponse : walletsResponse.data || [];
 
-                if (wallets.length === 0) {
-                    setTransactions([]);
-                    setLoading(false);
-                    return;
-                }
+        if (wallets.length === 0) return [];
 
-                // 2. Fetch activity for each wallet in parallel
-                const validWallets = wallets.filter((w: any) => w.walletId);
-                const activityPromises = validWallets.map((wallet: any) => getWalletActivity(wallet.walletId));
+        // 2. Fetch activity for each wallet in parallel
+        const validWallets = wallets.filter((w: any) => w.walletId);
+        const activityPromises = validWallets.map((wallet: any) => getWalletActivity(wallet.walletId));
 
-                const responses = await Promise.all(activityPromises);
+        const responses = await Promise.all(activityPromises);
 
-                // 3. Aggregate all transactions
-                let allTransactions: Transaction[] = [];
-                responses.forEach((res) => {
-                    if (res && res.success && res.data && Array.isArray(res.data.items)) {
-                        allTransactions = [...allTransactions, ...res.data.items];
-                    }
-                });
-
-                // 4. Sort by date (newest first)
-                allTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-                setTransactions(allTransactions);
-
-            } catch (error) {
-                console.error("Error fetching wallet activities:", error);
-                toast.error("Failed to load activity");
-            } finally {
-                setLoading(false);
+        // 3. Aggregate all transactions
+        let allTransactions: Transaction[] = [];
+        responses.forEach((res) => {
+            if (res && res.success && res.data && Array.isArray(res.data.items)) {
+                allTransactions = [...allTransactions, ...res.data.items];
             }
-        };
+        });
 
-        fetchTransactions();
-    }, []);
+        // 4. Sort by date (newest first)
+        allTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        return allTransactions;
+    };
+
+    const { data: transactions = [], isLoading: loading } = useQuery({
+        queryKey: ['allActivities'],
+        queryFn: fetchAllActivities,
+        staleTime: 1000 * 60, // 1 minute
+    });
+
+    const getStatusColor = (status: string) => {
+        switch (status.toLowerCase()) {
+            case "completed":
+            case "success":
+                return "text-green-500";
+            case "pending":
+            case "processing":
+                return "text-yellow-500";
+            case "failed":
+            case "cancelled":
+                return "text-red-500";
+            default:
+                return "text-gray-400";
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex flex-col w-full flex-1 bg-black py-6 items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            </div>
+        );
+    }
 
     const groupTransactionsByDate = (txs: Transaction[]) => {
         const groups: { [key: string]: Transaction[] } = {};
@@ -110,30 +124,6 @@ export default function ActivityPage() {
                 return HiOutlineInbox;
         }
     };
-
-    const getStatusColor = (status: string) => {
-        switch (status.toLowerCase()) {
-            case "completed":
-            case "success":
-                return "text-green-500";
-            case "pending":
-            case "processing":
-                return "text-yellow-500";
-            case "failed":
-            case "cancelled":
-                return "text-red-500";
-            default:
-                return "text-gray-400";
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className="flex flex-col w-full flex-1 bg-black py-6 items-center justify-center min-h-screen">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-            </div>
-        );
-    }
 
     const groupedTransactions = groupTransactionsByDate(transactions);
     const dateKeys = Object.keys(groupedTransactions);

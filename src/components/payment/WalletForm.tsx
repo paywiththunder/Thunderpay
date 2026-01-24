@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { ChevronDown, Loader2, Wallet } from "lucide-react";
 import { createWallet, getCurrencies } from "@/services/wallet";
 import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface Network {
     id: number;
@@ -33,43 +34,33 @@ interface WalletFormProps {
 }
 
 export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
-    const [currencies, setCurrencies] = useState<Currency[]>([]);
     const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
     const [selectedNetwork, setSelectedNetwork] = useState<Network | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [initialLoading, setInitialLoading] = useState(true);
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState(false);
+    const [createdWallet, setCreatedWallet] = useState<boolean>(false);
+    const [creationError, setCreationError] = useState("");
+
     const router = useRouter();
+    const queryClient = useQueryClient();
 
+    // Fetch Currencies with useQuery
+    const { data: currenciesData, isLoading: initialLoading } = useQuery({
+        queryKey: ['currencies'],
+        queryFn: getCurrencies,
+        staleTime: 1000 * 60 * 60, // 1 hour
+    });
+
+    const currencies = currenciesData?.success ? currenciesData.data : [];
+
+    // Effect to set defaults once loaded
     React.useEffect(() => {
-        const fetchCurrencies = async () => {
-            try {
-                const res = await getCurrencies();
-                if (res.success && res.data) {
-                    setCurrencies(res.data);
-                    // Select first currency by default if available
-                    if (res.data.length > 0) {
-                        const firstCurrency = res.data[0];
-                        setSelectedCurrency(firstCurrency);
-                        // Select first network if available
-                        if (firstCurrency.networks && firstCurrency.networks.length > 0) {
-                            setSelectedNetwork(firstCurrency.networks[0]);
-                        }
-                    }
-                } else {
-                    setError("Failed to fetch currencies");
-                }
-            } catch (err) {
-                setError("Failed to load currencies");
-                console.error(err);
-            } finally {
-                setInitialLoading(false);
+        if (currencies.length > 0 && !selectedCurrency) {
+            const firstCurrency = currencies[0];
+            setSelectedCurrency(firstCurrency);
+            if (firstCurrency.networks && firstCurrency.networks.length > 0) {
+                setSelectedNetwork(firstCurrency.networks[0]);
             }
-        };
-
-        fetchCurrencies();
-    }, []);
+        }
+    }, [currencies, selectedCurrency]);
 
     const handleCurrencyChange = (currency: Currency) => {
         setSelectedCurrency(currency);
@@ -80,17 +71,19 @@ export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
         }
     };
 
-    const handleSubmit = async () => {
-        if (!selectedCurrency || !selectedNetwork) return;
+    // Mutation for Wallet Creation
+    const createWalletMutation = useMutation({
+        mutationFn: async () => {
+            if (!selectedCurrency || !selectedNetwork) throw new Error("Invalid selection");
+            return await createWallet(selectedCurrency.currencyId, selectedNetwork.chainCode);
+        },
+        onSuccess: (data) => {
+            if (data.success) {
+                setCreatedWallet(true);
+                // Invalidate wallets query to refresh list in parent components
+                queryClient.invalidateQueries({ queryKey: ['wallets'] });
+                queryClient.invalidateQueries({ queryKey: ['walletsUsd'] });
 
-        setLoading(true);
-        setError("");
-        setSuccess(false);
-
-        try {
-            const res = await createWallet(selectedCurrency.currencyId, selectedNetwork.chainCode);
-            if (res.success) {
-                setSuccess(true);
                 setTimeout(() => {
                     if (onSuccess) {
                         onSuccess();
@@ -99,13 +92,17 @@ export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
                     }
                 }, 2000);
             } else {
-                setError(res.description || "Failed to create wallet");
+                setCreationError(data.description || "Failed to create wallet");
             }
-        } catch (err: any) {
-            setError(err?.description || "An error occurred");
-        } finally {
-            setLoading(false);
+        },
+        onError: (error: any) => {
+            setCreationError(error?.description || "An error occurred");
         }
+    });
+
+    const handleSubmit = () => {
+        setCreationError("");
+        createWalletMutation.mutate();
     };
 
     if (initialLoading) {
@@ -116,7 +113,7 @@ export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
         );
     }
 
-    if (success && selectedCurrency) {
+    if (createdWallet && selectedCurrency) {
         return (
             <div className="flex flex-col items-center justify-center py-10 text-center animate-in fade-in zoom-in duration-300">
                 <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mb-4">
@@ -136,11 +133,11 @@ export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
                 <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block">
                     Select Currency
                 </label>
-                {!currencies.length ? (
+                {!currencies || currencies.length === 0 ? (
                     <p className="text-gray-400 text-sm">No currencies available.</p>
                 ) : (
                     <div className="grid grid-cols-2 gap-3">
-                        {currencies.map((currency) => (
+                        {currencies.map((currency: Currency) => (
                             <button
                                 key={currency.currencyId}
                                 onClick={() => handleCurrencyChange(currency)}
@@ -180,7 +177,7 @@ export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
                         Select Network
                     </label>
                     <div className="flex gap-3 flex-wrap">
-                        {selectedCurrency.networks.map((network) => (
+                        {selectedCurrency.networks.map((network: Network) => (
                             <button
                                 key={network.id}
                                 onClick={() => setSelectedNetwork(network)}
@@ -196,18 +193,18 @@ export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
                 </div>
             )}
 
-            {error && (
+            {creationError && (
                 <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
-                    {error}
+                    {creationError}
                 </div>
             )}
 
             <button
                 onClick={handleSubmit}
-                disabled={loading || !selectedCurrency || !selectedNetwork}
+                disabled={createWalletMutation.isPending || !selectedCurrency || !selectedNetwork}
                 className="w-full py-4 rounded-full font-bold text-lg transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]"
             >
-                {loading ? (
+                {createWalletMutation.isPending ? (
                     <div className="flex items-center justify-center gap-2">
                         <Loader2 className="w-5 h-5 animate-spin" />
                         <span>Creating Wallet...</span>

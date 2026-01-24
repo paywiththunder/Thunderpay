@@ -481,18 +481,13 @@ export default function TVPage() {
       { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.id.toUpperCase()})` },
     ];
 
-
     if (transactionResult === "success") {
       const metadata = transactionDetails?.metadata || {};
 
       const successDetails = [
         { label: "Transaction Reference", value: transactionToken },
-        { label: "Provider", value: selectedProvider.name },
-        { label: "Smartcard Number", value: decoderNumber },
-        { label: "Account Name", value: metadata.customerName || customerName || "N/A" },
-        { label: "Package", value: selectedPlan.name },
+        ...commonDetails,
         { label: "Duration", value: `${quantity} ${quantity > 1 ? "Months" : "Month"}` },
-        { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.id.toUpperCase()})` },
       ];
 
       if (quoteData && quoteData.transactionFee > 0) {

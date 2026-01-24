@@ -372,53 +372,45 @@ export default function AirtimePage() {
     const amountNum = parseFloat(amount) || 0;
     const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
 
+    const commonDetails = [
+      { label: "Network", value: selectedNetwork.name },
+      { label: "Phone Number", value: phoneNumber },
+      { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
+      { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+    ];
+
     if (transactionResult === "success") {
       const metadata = transactionDetails?.metadata || {};
+      const successDetails = [
+        ...commonDetails,
+        { label: "Transaction Reference", value: transactionToken },
+        { label: "Bonus Earned", value: `₦${getCashback().toFixed(2)} Cashback` },
+        { label: "Transaction Date", value: getTransactionDate() },
+      ];
 
       return (
         <PaymentSuccess
           title="Airtime Purchase Successful"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          token={transactionToken}
-          biller={selectedNetwork.name}
-          billerLabel="Network"
-          meterNumber={phoneNumber}
-          meterNumberLabel="Phone Number"
-          customerName={metadata.customerName || phoneNumber}
-          customerNameLabel="Recipient"
-          meterType={`₦${parseFloat(amount).toLocaleString()}.00`}
-          meterTypeLabel="Amount"
-          serviceAddress={metadata.customerAddress || ""}
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
-          bonusEarned={`₦${getCashback().toFixed(2)} Cashback`}
-          transactionDate={getTransactionDate()}
+          details={successDetails}
           onAddToBeneficiary={handleAddToBeneficiary}
           onContinue={handleContinue}
         />
       );
     } else if (transactionResult === "failure") {
+      const failureDetails = [
+        { label: "Failure Reason", value: failureReason || "Service provider down" },
+        ...commonDetails,
+        { label: "Transaction Date", value: getTransactionDate() }
+      ];
+
       return (
         <PaymentFailure
           title="Airtime Purchase Failed"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason={failureReason || "Service provider down"}
-          biller={selectedNetwork.name}
-          meterNumber={phoneNumber}
-          customerName={phoneNumber}
-          meterType="Airtime"
-          serviceAddress=""
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
-          transactionDate={getTransactionDate()}
+          details={failureDetails}
           onContinue={handleContinue}
         />
       );

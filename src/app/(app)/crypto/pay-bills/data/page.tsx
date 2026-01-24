@@ -491,54 +491,46 @@ export default function DataPage() {
     const amountNum = selectedPlan.price;
     const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
 
+    const commonDetails = [
+      { label: "Network", value: selectedNetwork.name },
+      { label: "Phone Number", value: phoneNumber },
+      { label: "Data Plan", value: selectedPlan.data },
+      { label: "Duration", value: selectedPlan.duration },
+      { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+    ];
+
     if (transactionResult === "success") {
       const metadata = transactionDetails?.metadata || {};
+      const successDetails = [
+        ...commonDetails,
+        { label: "Transaction Reference", value: transactionToken },
+        { label: "Bonus Earned", value: `₦${getCashback().toFixed(2)} Cashback` },
+        { label: "Transaction Date", value: getTransactionDate() },
+      ];
 
       return (
         <PaymentSuccess
           title="Data Purchase Successful"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          token={transactionToken}
-          biller={selectedNetwork.name}
-          billerLabel="Network"
-          meterNumber={phoneNumber}
-          meterNumberLabel="Phone Number"
-          customerName={metadata.customerName || phoneNumber}
-          customerNameLabel="Recipient"
-          meterType={selectedPlan.data}
-          meterTypeLabel="Data Plan"
-          serviceAddress={metadata.customerAddress || ""}
-          unitsPurchased={metadata.unit || selectedPlan.data}
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
-          bonusEarned={`₦${getCashback().toFixed(2)} Cashback`}
-          transactionDate={getTransactionDate()}
+          details={successDetails}
           onAddToBeneficiary={handleAddToBeneficiary}
           onContinue={handleContinue}
         />
       );
     } else if (transactionResult === "failure") {
+      const failureDetails = [
+        { label: "Failure Reason", value: failureReason || "Service provider down" },
+        ...commonDetails,
+        { label: "Transaction Date", value: getTransactionDate() }
+      ];
+
       return (
         <PaymentFailure
           title="Data Purchase Failed"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason={failureReason}
-          biller={selectedNetwork.name}
-          meterNumber={phoneNumber}
-          customerName={phoneNumber}
-          meterType="Data"
-          serviceAddress=""
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
-          transactionDate={getTransactionDate()}
+          details={failureDetails}
           onContinue={handleContinue}
         />
       );

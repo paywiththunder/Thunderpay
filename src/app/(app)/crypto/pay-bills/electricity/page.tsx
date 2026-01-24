@@ -372,6 +372,14 @@ export default function ElectricityPage() {
     const amountNum = parseFloat(amount) || 0;
     const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
 
+    const commonDetails = [
+      { label: "Provider", value: selectedProvider.name },
+      { label: "Meter Number", value: meterNumber },
+      { label: "Customer Name", value: transactionDetails?.metadata?.customerName || customerName || "N/A" },
+      { label: "Meter Type", value: paymentType === "prepaid" ? "Prepaid" : "Postpaid" },
+      { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+    ];
+
     if (transactionResult === "success") {
       const metadata = transactionDetails?.metadata || {};
 
@@ -382,47 +390,45 @@ export default function ElectricityPage() {
       } else if (tokenDisplay.toLowerCase().startsWith("token: ")) {
         tokenDisplay = tokenDisplay.substring(7);
       }
+      // Fallback to transactionToken if metadata token is missing
+      if (!tokenDisplay) tokenDisplay = transactionToken;
+
+      const successDetails = [
+        ...commonDetails,
+        { label: "Token", value: tokenDisplay },
+        { label: "Units Purchased", value: metadata.unit || "N/A" },
+        { label: "Bonus Earned", value: `₦${getCashback().toFixed(2)} Cashback` },
+        { label: "Transaction Date", value: getTransactionDate() },
+      ];
+
+      // Add address only if real data exists
+      if (metadata.customerAddress) {
+        successDetails.splice(3, 0, { label: "Service Address", value: metadata.customerAddress });
+      }
 
       return (
         <PaymentSuccess
+          title="Electricity Purchase Successful"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          token={tokenDisplay || transactionToken}
-          biller={selectedProvider.name}
-          meterNumber={meterNumber}
-          customerName={metadata.customerName || customerName || "N/A"}
-          meterType={paymentType === "prepaid" ? "Prepaid" : "Postpaid"}
-          serviceAddress={metadata.customerAddress || "10 rd, 20 Sanusi Estate Baruwa Lagos"}
-          unitsPurchased={metadata.unit || "N/A"}
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
-          bonusEarned={`₦${getCashback().toFixed(2)} Cashback`}
-          transactionDate={getTransactionDate()}
+          details={successDetails}
           onAddToBeneficiary={handleAddToBeneficiary}
           onContinue={handleContinue}
         />
       );
     } else if (transactionResult === "failure") {
+      const failureDetails = [
+        { label: "Failure Reason", value: failureReason || "Service provider down" },
+        ...commonDetails,
+        { label: "Transaction Date", value: getTransactionDate() }
+      ];
+
       return (
         <PaymentFailure
           title="Electricity Purchase Failed"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason={failureReason || "Service provider down"}
-          biller={selectedProvider.name}
-          meterNumber={meterNumber}
-          customerName={customerName || "N/A"}
-          meterType={paymentType === "prepaid" ? "Prepaid" : "Postpaid"}
-          serviceAddress="10 rd, 20 Sanusi Estate Baruwa Lagos"
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
-          transactionDate={getTransactionDate()}
+          details={failureDetails}
           onContinue={handleContinue}
         />
       );

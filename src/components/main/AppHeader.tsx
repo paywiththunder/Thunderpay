@@ -41,7 +41,7 @@ export default function AppHeader() {
 
             {/* Tabs */}
             <div className="flex gap-6 text-sm font-semibold">
-                <Link
+                {/* <Link
                     href="/home"
                     className={`${isActive("/home")
                             ? "text-white border-b-2 border-[#3B82F6] pb-1"
@@ -49,17 +49,17 @@ export default function AppHeader() {
                         }`}
                 >
                     Cash
-                </Link>
+                </Link> */}
                 <Link
                     href="/crypto"
                     className={`${isActive("/crypto")
-                            ? "text-white border-b-2 border-[#3B82F6] pb-1"
-                            : "text-gray-400 hover:text-white transition-colors"
+                        ? "text-white border-b-2 border-[#3B82F6] pb-1"
+                        : "text-gray-400 hover:text-white transition-colors"
                         }`}
                 >
                     Crypto
                 </Link>
-                <Link
+                {/* <Link
                     href="/international"
                     className={`${isActive("/international")
                             ? "text-white border-b-2 border-[#3B82F6] pb-1"
@@ -67,7 +67,7 @@ export default function AppHeader() {
                         }`}
                 >
                     International
-                </Link>
+                </Link> */}
             </div>
         </div>
     );

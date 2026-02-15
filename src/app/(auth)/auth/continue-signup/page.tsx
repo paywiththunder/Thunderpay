@@ -50,7 +50,7 @@ export default function ContinueSignup() {
 
       console.log("Signup continued successfully:", res.data);
 
-      router.push("/crypto");
+      router.push("/home");
       localStorage.setItem("firstName", data.firstName);
       localStorage.setItem("lastName", data.lastName);
       localStorage.setItem("dob", data.dob);
@@ -64,7 +64,7 @@ export default function ContinueSignup() {
         "Something went wrong";
 
       if (errorMessage.includes('Already completed signup, please proceed to login')) {
-        router.push("/auth/login");
+        router.push("/home");
       }
 
       setError(errorMessage);

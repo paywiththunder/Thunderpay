@@ -11,13 +11,6 @@ export default function Home() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const router = useRouter();
 
-  // Redirect to /crypto if already logged in
-  useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    if (token) {
-      router.push("/crypto");
-    }
-  }, [router]);
 
   // Automatically change image every 3 seconds
   useEffect(() => {
@@ -26,7 +19,7 @@ export default function Home() {
     }, 3000); // 3000ms = 3 seconds
 
     return () => clearInterval(interval); // cleanup
-  }, [images.length]);
+  }, []);
 
   return (
     <div className="h-screen bg-black text-white flex flex-col items-center justify-between py-10 px-6 relative overflow-x-hidden md:py-16 md:px-8">

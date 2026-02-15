@@ -277,7 +277,7 @@ export default function Login() {
       if (!isContinueSignup) {
         router.push("/auth/continue-signup");
       } else {
-        router.push("/crypto");
+        router.push("/home");
       }
     } catch (err: any) {
       setError(

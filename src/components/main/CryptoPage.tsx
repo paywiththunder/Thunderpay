@@ -66,6 +66,18 @@ export default function CryptoPage() {
     const router = useRouter();
     const [isAddWalletOpen, setIsAddWalletOpen] = useState(false);
 
+    // Lock body scroll when modal is open
+    React.useEffect(() => {
+        if (isAddWalletOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [isAddWalletOpen]);
+
     // Query for Wallets
     const {
         data: walletsResponse,
@@ -290,20 +302,26 @@ export default function CryptoPage() {
             {/* Add Wallet Modal */}
             {isAddWalletOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-[#111] w-full max-w-md rounded-2xl border border-white/10 p-6 relative shadow-2xl animate-in zoom-in-95 duration-200">
-                        <button
-                            onClick={() => setIsAddWalletOpen(false)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
-                        >
-                            <IoClose className="w-6 h-6" />
-                        </button>
+                    <div className="bg-[#111] w-full max-w-md rounded-3xl border border-white/10 relative shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden">
+                        {/* Fixed Header with Close Button */}
+                        <div className="p-8 pb-0 relative">
+                            <button
+                                onClick={() => setIsAddWalletOpen(false)}
+                                className="absolute top-8 right-8 text-gray-400 hover:text-white transition-all hover:rotate-90 p-1.5 rounded-full hover:bg-white/10 border border-transparent hover:border-white/10 z-20"
+                                aria-label="Close modal"
+                            >
+                                <IoClose className="w-6 h-6" />
+                            </button>
+                            <h2 className="text-xl font-bold">Add New Wallet</h2>
+                        </div>
 
-                        <h2 className="text-xl font-bold mb-6">Add New Wallet</h2>
-
-                        <WalletForm onSuccess={() => {
-                            setIsAddWalletOpen(false);
-                            fetchWallets();
-                        }} />
+                        {/* Scrollable Content Area */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 pt-6 min-h-[350px]">
+                            <WalletForm onSuccess={() => {
+                                setIsAddWalletOpen(false);
+                                fetchWallets();
+                            }} />
+                        </div>
                     </div>
                 </div>
             )}

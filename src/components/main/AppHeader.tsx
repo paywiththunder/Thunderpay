@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,16 +8,28 @@ import {
     HiOutlineBell,
 } from "react-icons/hi2";
 
+import { getUserProfile } from "@/services/user";
+import { useQuery } from "@tanstack/react-query";
+
 export default function AppHeader() {
-    const [firstName, setFirstName] = useState("");
     const pathname = usePathname();
 
-    useEffect(() => {
-        const savedName = localStorage.getItem("firstName");
-        if (savedName) {
-            setFirstName(savedName);
+    const { data: userProfile } = useQuery({
+        queryKey: ['userProfile'],
+        queryFn: getUserProfile,
+        staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    });
+
+    const fName = userProfile?.success && userProfile?.data ? userProfile.data.firstName || "" : "";
+    const lName = userProfile?.success && userProfile?.data ? userProfile.data.lastName || "" : "";
+
+    let displayName = "";
+    if (fName) {
+        displayName = fName;
+        if (lName) {
+            displayName += ` ${lName.charAt(0).toUpperCase()}.`;
         }
-    }, []);
+    }
 
     const isActive = (path: string) => pathname === path;
 
@@ -30,7 +42,9 @@ export default function AppHeader() {
                         {/* Placeholder for avatar */}
                         <div className="w-full h-full bg-gradient-to-br from-gray-400 to-gray-600"></div>
                     </div>
-                    <h1 className="font-semibold text-lg">Hi {firstName}</h1>
+                    <h1 className="font-semibold text-lg">
+                        Hi {displayName ? displayName : "User"}
+                    </h1>
                 </div>
                 <div className="flex gap-4 text-white">
                     <HiOutlineQrCode className="w-6 h-6" />

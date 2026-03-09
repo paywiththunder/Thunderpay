@@ -15,6 +15,8 @@ export const createWallet = async (currencyId: number, network: string) => {
     console.log(token);
     if (!token) throw new Error("No auth token found");
 
+    console.log("Creating wallet with payload:", { currencyId, network });
+
     try {
         const response = await axios.post(
             API_URL,
@@ -29,7 +31,6 @@ export const createWallet = async (currencyId: number, network: string) => {
                 },
             }
         );
-        console.log("Payload sent:", { currencyId, network });
         console.log(response);
         return response.data;
     } catch (error: any) {

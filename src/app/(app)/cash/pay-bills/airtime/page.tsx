@@ -1,0 +1,505 @@
+"use client";
+import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
+import { HiChevronRight, HiChevronDown, HiCheckCircle } from "react-icons/hi2";
+import PaymentMethod, {
+    PaymentOption,
+} from "@/components/payment/PaymentMethod";
+import Confirmation from "@/components/payment/Confirmation";
+import EnterPin from "@/components/payment/EnterPin";
+import PaymentSuccess from "@/components/payment/PaymentSuccess";
+import PaymentFailure from "@/components/payment/PaymentFailure";
+import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse, AirtimeQuotePayload, BillExecutionPayload } from "@/services/bills";
+import { getCashbackBalance } from "@/services/cashback";
+import { useMutation, useQuery } from "@tanstack/react-query";
+
+interface NetworkProvider {
+    id: string;
+    name: string;
+    logo: string;
+}
+
+interface RecentNumber {
+    id: string;
+    number: string;
+    network: string;
+}
+
+const networkProviders: NetworkProvider[] = [
+    { id: "mtn", name: "MTN", logo: "M" },
+    { id: "airtel", name: "Airtel", logo: "A" },
+    { id: "glo", name: "GLO", logo: "G" },
+    { id: "9mobile", name: "9mobile", logo: "9" },
+    { id: "glo_sme", name: "GLO SME", logo: "G" },
+    { id: "etisalat", name: "ETISALAT", logo: "E" },
+    { id: "foreign_airtime", name: "FOREIGN AIRTIME", logo: "F" },
+    { id: "smile", name: "SMILE", logo: "S" },
+    { id: "spectranet", name: "SPECTRANET", logo: "S" },
+];
+
+const amountOptions = [
+    { amount: 1000, cashback: 10 },
+    { amount: 2000, cashback: 20 },
+    { amount: 3000, cashback: 30 },
+    { amount: 5000, cashback: 50 },
+    { amount: 10000, cashback: 100 },
+    { amount: 20000, cashback: 200 },
+];
+
+const recentNumbers: RecentNumber[] = [
+    { id: "1", number: "09020933533", network: "MTN" },
+    { id: "2", number: "09024853533", network: "Airtel" },
+];
+
+type Step = "form" | "payment" | "confirmation" | "enterPin" | "result";
+type TransactionResult = "success" | "failure" | null;
+
+export default function CashAirtimePage() {
+    const router = useRouter();
+    const networkDropdownRef = useRef<HTMLDivElement>(null);
+    const recentsDropdownRef = useRef<HTMLDivElement>(null);
+    const [step, setStep] = useState<Step>("form");
+    const [selectedNetwork, setSelectedNetwork] = useState<NetworkProvider>(
+        networkProviders[0]
+    );
+    const [isNetworkDropdownOpen, setIsNetworkDropdownOpen] = useState(false);
+    const [isRecentsDropdownOpen, setIsRecentsDropdownOpen] = useState(false);
+    const [phoneNumber, setPhoneNumber] = useState("");
+    const [amount, setAmount] = useState("");
+    const [selectedPaymentMethod, setSelectedPaymentMethod] =
+        useState<PaymentOption | null>(null);
+    const [phoneVerified, setPhoneVerified] = useState(false);
+    const [transactionResult, setTransactionResult] =
+        useState<TransactionResult>(null);
+    const [failureReason, setFailureReason] = useState("");
+    const [transactionToken, setTransactionToken] = useState("");
+    const [quote, setQuote] = useState<AirtimeQuoteResponse | null>(null);
+    const [quoteError, setQuoteError] = useState("");
+    const [transactionDetails, setTransactionDetails] = useState<any>(null);
+
+    // Fetch Bolt Balance (Cashback)
+    const { data: cashbackData } = useQuery({
+        queryKey: ["cashbackBalance"],
+        queryFn: () => getCashbackBalance(3), // Assuming 3 is the currencyId for NGN/Cash
+    });
+
+    const boltBalance = cashbackData?.data?.availableBolts || 0;
+
+    // Mutation for Getting Quote
+    const quoteMutation = useMutation({
+        mutationFn: (payload: AirtimeQuotePayload) => getAirtimeQuote(payload),
+        onSuccess: (data) => {
+            const quoteData = data.data || data;
+            setQuote(quoteData);
+            localStorage.setItem("currentAirtimeQuote", JSON.stringify(quoteData));
+            setStep("confirmation");
+        },
+        onError: (error: any) => {
+            console.error(error);
+            setQuoteError(error?.description || "Failed to get quote");
+        }
+    });
+
+    // Mutation for Executing Payment
+    const paymentMutation = useMutation({
+        mutationFn: (payload: BillExecutionPayload) => executeBillPayment(payload),
+        onSuccess: (data) => {
+            const response = data as BillExecutionResponse;
+            if (response.success && response.data) {
+                setTransactionToken(response.data.transactionReference);
+                setTransactionDetails(response.data);
+                setTransactionResult("success");
+                setStep("result");
+            } else {
+                setFailureReason(response.description || "Payment failed");
+                setTransactionResult("failure");
+                setStep("result");
+            }
+        },
+        onError: (error: any) => {
+            console.error("Payment Error:", error);
+            let reason = "An unexpected error occurred";
+            if (typeof error === "string") reason = error;
+            else if (typeof error === "object") reason = error.description || error.message || reason;
+
+            setFailureReason(reason);
+            setTransactionResult("failure");
+            setStep("result");
+        }
+    });
+
+    const isQuoteLoading = quoteMutation.isPending;
+    const isProcessing = paymentMutation.isPending;
+
+    // Mock phone verification
+    useEffect(() => {
+        if (phoneNumber.length >= 10) {
+            const timer = setTimeout(() => {
+                setPhoneVerified(true);
+            }, 500);
+            return () => clearTimeout(timer);
+        } else {
+            setPhoneVerified(false);
+        }
+    }, [phoneNumber]);
+
+    const handleAmountSelect = (selectedAmount: number) => {
+        setAmount(selectedAmount.toString());
+    };
+
+    const handleRecentSelect = (recent: RecentNumber) => {
+        setPhoneNumber(recent.number);
+        const network = networkProviders.find((n) =>
+            n.name.toLowerCase() === recent.network.toLowerCase()
+        );
+        if (network) {
+            setSelectedNetwork(network);
+        }
+        setIsRecentsDropdownOpen(false);
+        setPhoneVerified(true);
+    };
+
+    const handlePayClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        if (phoneNumber && amount) {
+            setStep("payment");
+        }
+    };
+
+    const handlePaymentMethodSelect = (paymentMethod: PaymentOption) => {
+        setSelectedPaymentMethod(paymentMethod);
+        setQuoteError("");
+        setQuote(null);
+
+        if (paymentMethod.currencyCode) {
+            const payload: AirtimeQuotePayload = {
+                phone: phoneNumber,
+                purchaseAmount: parseFloat(amount),
+                sourceCurrencyTicker: paymentMethod.currencyCode.toLowerCase(),
+                walletId: paymentMethod.walletId || paymentMethod.id,
+                baseCostCurrency: "ngn",
+                serviceId: selectedNetwork.id.toUpperCase()
+            };
+            quoteMutation.mutate(payload);
+        } else {
+            setStep("confirmation");
+        }
+    };
+
+    const calculatePaymentAmount = (): string => {
+        if (!selectedPaymentMethod || !amount) return "0";
+        const amountNum = parseFloat(amount);
+
+        if (quote) {
+            return `${quote.deductionAmount.toFixed(6)} ${quote.deductionCurrency.toUpperCase()}`;
+        }
+
+        if (selectedPaymentMethod.type === "fiat") {
+            return `₦${amountNum.toLocaleString()}.00`;
+        }
+
+        return `₦${amountNum.toLocaleString()}.00`;
+    };
+
+    const getCashback = (): number => {
+        const amountNum = parseFloat(amount);
+        const option = amountOptions.find((opt) => opt.amount === amountNum);
+        return option?.cashback || 0;
+    };
+
+    const getAvailableBalance = (): string => {
+        if (!selectedPaymentMethod) return "₦0.00";
+        if (selectedPaymentMethod.balance) return selectedPaymentMethod.balance;
+        return selectedPaymentMethod.value;
+    };
+
+    const getTransactionDate = (): string => {
+        const now = new Date();
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const month = months[now.getMonth()];
+        const day = now.getDate();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const ampm = hours >= 12 ? "PM" : "AM";
+        const displayHours = hours % 12 || 12;
+        return `${month} ${day}, ${now.getFullYear()} ${displayHours}:${minutes.toString().padStart(2, "0")} ${ampm}`;
+    };
+
+    const handlePinComplete = (pin: string) => {
+        let currentQuote = quote;
+        if (!currentQuote) {
+            const stored = localStorage.getItem("currentAirtimeQuote");
+            if (stored) {
+                currentQuote = JSON.parse(stored);
+            }
+        }
+
+        if (!currentQuote?.quoteReference) {
+            setFailureReason("No valid quote found. Please try again.");
+            setTransactionResult("failure");
+            setStep("result");
+            return;
+        }
+
+        const payload: BillExecutionPayload = {
+            quoteReference: currentQuote.quoteReference,
+            pin: parseInt(pin, 10)
+        };
+
+        paymentMutation.mutate(payload);
+    };
+
+    const handleAddToBeneficiary = () => {
+        console.log("Add to beneficiary");
+    };
+
+    const handleContinue = () => {
+        setStep("form");
+        setTransactionResult(null);
+        setTransactionToken("");
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (networkDropdownRef.current && !networkDropdownRef.current.contains(event.target as Node)) {
+                setIsNetworkDropdownOpen(false);
+            }
+            if (recentsDropdownRef.current && !recentsDropdownRef.current.contains(event.target as Node)) {
+                setIsRecentsDropdownOpen(false);
+            }
+        };
+        if (isNetworkDropdownOpen || isRecentsDropdownOpen) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [isNetworkDropdownOpen, isRecentsDropdownOpen]);
+
+    if (step === "payment") {
+        return (
+            <>
+                {isQuoteLoading && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
+                        <div className="bg-[#161616] p-4 rounded-xl border border-white/10 flex flex-col items-center gap-2">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                            <span className="text-white text-sm">Getting Quote...</span>
+                        </div>
+                    </div>
+                )}
+                <PaymentMethod
+                    onBack={() => setStep("form")}
+                    onSelect={handlePaymentMethodSelect}
+                    amount={parseFloat(amount) || 0}
+                />
+            </>
+        );
+    }
+
+    if (step === "confirmation" && selectedPaymentMethod) {
+        return (
+            <Confirmation
+                onBack={() => setStep("payment")}
+                onPay={() => setStep("enterPin")}
+                amount={parseFloat(amount) || 0}
+                paymentAmount={calculatePaymentAmount()}
+                details={[
+                    { label: "Network", value: selectedNetwork.name },
+                    { label: "Phone Number", value: phoneNumber },
+                    { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
+                    { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+                    { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+                ]}
+                availableBalance={getAvailableBalance()}
+                boltBalance={boltBalance}
+            />
+        );
+    }
+
+    if (step === "enterPin") {
+        return (
+            <EnterPin
+                onBack={() => setStep("confirmation")}
+                onComplete={handlePinComplete}
+                isLoading={isProcessing}
+            />
+        );
+    }
+
+    if (step === "result" && selectedPaymentMethod) {
+        const paymentAmount = calculatePaymentAmount();
+        const amountNum = parseFloat(amount) || 0;
+        const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
+
+        const commonDetails = [
+            { label: "Network", value: selectedNetwork.name },
+            { label: "Phone Number", value: phoneNumber },
+            { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
+            { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+        ];
+
+        if (transactionResult === "success") {
+            const successDetails = [
+                ...commonDetails,
+                { label: "Transaction Reference", value: transactionToken },
+                { label: "Bonus Earned", value: `₦${getCashback().toFixed(2)} Cashback` },
+                { label: "Transaction Date", value: getTransactionDate() },
+            ];
+
+            return (
+                <PaymentSuccess
+                    title="Airtime Purchase Successful"
+                    amount={paymentAmount}
+                    amountEquivalent={amountEquivalent}
+                    details={successDetails}
+                    onAddToBeneficiary={handleAddToBeneficiary}
+                    onContinue={handleContinue}
+                />
+            );
+        } else if (transactionResult === "failure") {
+            const failureDetails = [
+                { label: "Failure Reason", value: failureReason || "Service provider down" },
+                ...commonDetails,
+                { label: "Transaction Date", value: getTransactionDate() }
+            ];
+
+            return (
+                <PaymentFailure
+                    title="Airtime Purchase Failed"
+                    amount={paymentAmount}
+                    amountEquivalent={amountEquivalent}
+                    details={failureDetails}
+                    onContinue={handleContinue}
+                />
+            );
+        }
+    }
+
+    return (
+        <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6">
+            <header className="relative flex items-center justify-center px-4 py-6">
+                <button
+                    onClick={() => router.back()}
+                    className="absolute left-4 p-3 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] text-[1.2rem] border border-white/20"
+                >
+                    <MdOutlineKeyboardDoubleArrowLeft className="text-white" />
+                </button>
+                <h1 className="text-2xl font-bold text-white">Airtime</h1>
+            </header>
+
+            <div className="flex flex-col gap-6 px-4 overflow-y-auto pb-6">
+                <div className="flex flex-col gap-2">
+                    <label className="text-white text-sm font-medium">Select Network</label>
+                    <div className="relative" ref={networkDropdownRef}>
+                        <button
+                            onClick={() => setIsNetworkDropdownOpen(!isNetworkDropdownOpen)}
+                            className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center flex-shrink-0">
+                                    <span className="text-white text-xs font-bold">{selectedNetwork.logo}</span>
+                                </div>
+                                <span className="text-white font-medium">{selectedNetwork.name}</span>
+                            </div>
+                            {isNetworkDropdownOpen ? <HiChevronDown className="w-5 h-5 text-white" /> : <HiChevronRight className="w-5 h-5 text-white" />}
+                        </button>
+                        {isNetworkDropdownOpen && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl shadow-lg z-10 max-h-60 overflow-y-auto">
+                                {networkProviders.map((provider) => (
+                                    <button
+                                        key={provider.id}
+                                        onClick={() => { setSelectedNetwork(provider); setIsNetworkDropdownOpen(false); }}
+                                        className="w-full p-4 flex items-center gap-3 hover:bg-gray-800/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
+                                    >
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-white text-xs font-bold">{provider.logo}</span>
+                                        </div>
+                                        <span className="text-white font-medium">{provider.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                    <label className="text-white text-sm font-medium">Phone Number</label>
+                    <div className="relative" ref={recentsDropdownRef}>
+                        <input
+                            type="text"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value)}
+                            placeholder="e.g 00000000000"
+                            className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
+                        />
+                        {phoneVerified && phoneNumber && (
+                            <div className="mt-2 bg-blue-500 rounded-2xl p-3 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-white font-medium">{phoneNumber}</span>
+                                    <span className="text-white/80 text-sm">{selectedNetwork.name}</span>
+                                </div>
+                                <HiCheckCircle className="w-5 h-5 text-white" />
+                            </div>
+                        )}
+                        <div className="flex justify-end mt-2">
+                            <button
+                                onClick={() => setIsRecentsDropdownOpen(!isRecentsDropdownOpen)}
+                                className="text-blue-500 text-sm font-medium flex items-center gap-1 hover:text-blue-400 transition-colors"
+                            >
+                                See Recents
+                                {isRecentsDropdownOpen ? <HiChevronDown className="w-4 h-4" /> : <HiChevronRight className="w-4 h-4" />}
+                            </button>
+                        </div>
+                        {isRecentsDropdownOpen && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl shadow-lg z-10">
+                                {recentNumbers.map((recent) => (
+                                    <button
+                                        key={recent.id}
+                                        onClick={() => handleRecentSelect(recent)}
+                                        className="w-full p-4 flex items-center justify-between hover:bg-gray-800/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
+                                    >
+                                        <span className="text-white font-medium">{recent.number}</span>
+                                        <span className="text-gray-400 text-sm">{recent.network}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                    <label className="text-white text-sm font-medium">Select Amount</label>
+                    <input
+                        type="text"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="enter amount"
+                        className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm mb-2"
+                    />
+                    {amount && parseFloat(amount) < 100 && <p className="text-red-500 text-xs text-right px-1">Minimum amount is ₦100</p>}
+                    <div className="grid grid-cols-3 gap-3">
+                        {amountOptions.map((option) => (
+                            <button
+                                key={option.amount}
+                                onClick={() => handleAmountSelect(option.amount)}
+                                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString() ? "ring-2 ring-blue-500 border-blue-500" : ""}`}
+                            >
+                                <span className="text-white font-bold text-base">₦{option.amount.toLocaleString()}</span>
+                                <span className="text-gray-400 text-xs mt-1">₦{option.cashback} Cashback</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <button
+                    onClick={handlePayClick}
+                    disabled={!phoneNumber || !amount || !phoneVerified || parseFloat(amount) < 100}
+                    className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!phoneNumber || !amount || !phoneVerified || parseFloat(amount) < 100 ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed" : ""}`}
+                >
+                    Pay
+                </button>
+            </div>
+        </div>
+    );
+}

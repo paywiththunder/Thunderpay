@@ -1,9 +1,11 @@
 'use client'
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   HiOutlineEye,
+  HiOutlineEyeSlash,
   HiOutlineDocumentDuplicate,
+  HiMiniBolt,
 } from "react-icons/hi2";
 import {
   GiReceiveMoney,
@@ -15,9 +17,31 @@ import Wlcomemessages from "./Wlcomemessages";
 import Image from "next/image";
 import NoTransaction from "../../../public/walletimg.png";
 import AppHeader from "./AppHeader";
+import { getCashbackBalance } from "@/services/cashback";
+import { getWallets } from "@/services/wallet";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "react-hot-toast";
+import { useBalanceVisibility } from "@/hooks/useBalanceVisibility";
 
 export default function HomePage() {
-  const isComingSoon = true; // Simple toggle for later use
+  const { showBalance, toggleBalance } = useBalanceVisibility();
+  const isComingSoon = false; // Simple toggle for later use
+
+  // Fetch Bolts Balance
+  const { data: cashbackResponse } = useQuery({
+    queryKey: ['cashbackBalance', 3],
+    queryFn: () => getCashbackBalance(3),
+  });
+  const boltsBalance = cashbackResponse?.success ? cashbackResponse.data.availableBolts : null;
+
+  // Fetch Fiat Wallet
+  const { data: walletsResponse } = useQuery({
+    queryKey: ['wallets'],
+    queryFn: getWallets,
+  });
+  const fiatWallet = walletsResponse?.success && walletsResponse?.data
+    ? walletsResponse.data.find((w: any) => w.walletType === "FIAT")
+    : null;
 
   return (
     <div className="flex flex-col gap-3 w-full">
@@ -27,19 +51,44 @@ export default function HomePage() {
         {/* Content with optional blur */}
         <div className={`flex flex-col gap-3 transition-all duration-500 ${isComingSoon ? "blur-[2px] pointer-events-none opacity-60" : ""}`}>
           {/* Total Assets Card */}
-          <div className="assets p-4 rounded-2xl flex flex-col gap-3 relative overflow-hidden">
-            {/* Background swirls decorative elements */}
-            <div>
-              <div className="flex items-center gap-2 text-blue-100 text-sm">
-                <span>Total assets</span>
-                <HiOutlineEye />
+          <div className="assets p-4 rounded-2xl flex flex-col gap-3 relative overflow-hidden group">
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="flex items-center gap-2 text-blue-100 text-sm">
+                  <span>Total assets</span>
+                  <button onClick={toggleBalance} className="focus:outline-none transition-transform active:scale-90">
+                    {showBalance ? <HiOutlineEye className="w-5 h-5" /> : <HiOutlineEyeSlash className="w-5 h-5" />}
+                  </button>
+                </div>
+                <h2 className="text-3xl font-bold mt-1">
+                  {showBalance ? `₦${fiatWallet ? Number(fiatWallet.availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}` : "****"}
+                </h2>
               </div>
-              <h2 className="text-3xl font-bold mt-1">₦0.00</h2>
+
+              {/* Bolts Badge */}
+              <Link href="/rewards" className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 hover:bg-white/20 transition-all active:scale-95 shadow-lg group">
+                <HiMiniBolt className="text-yellow-400 w-4 h-4 group-hover:animate-bounce" />
+                <span className="text-white text-xs font-bold">{boltsBalance !== null ? boltsBalance : "..."} Bolts</span>
+              </Link>
             </div>
-            <div className="flex items-center gap-2 text-sm text-blue-100 bg-white/10 w-fit px-3 py-1 rounded-full">
-              <span>Account Number: 9068233532</span>
-              <HiOutlineDocumentDuplicate className="cursor-pointer" />
+
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 text-sm text-blue-100 bg-white/10 w-fit px-3 py-1 rounded-full">
+                <span>Account Number: {fiatWallet?.accountNumbers?.[0]?.accountNumber || '...'}</span>
+                <HiOutlineDocumentDuplicate className="cursor-pointer" onClick={() => {
+                  if (fiatWallet?.accountNumbers?.[0]?.accountNumber) {
+                    navigator.clipboard.writeText(fiatWallet.accountNumbers[0].accountNumber);
+                    toast.success("Account number copied!");
+                  }
+                }} />
+              </div>
+              {fiatWallet?.accountNumbers?.[0]?.bankName && (
+                <span className="text-xs text-blue-200 ml-2 font-medium">{fiatWallet.accountNumbers[0].bankName}</span>
+              )}
             </div>
+
+            {/* Background Decoration */}
+            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
           </div>
 
           {/* Action Buttons Grid */}

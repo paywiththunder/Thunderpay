@@ -75,6 +75,10 @@ export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
     const createWalletMutation = useMutation({
         mutationFn: async () => {
             if (!selectedCurrency || !selectedNetwork) throw new Error("Invalid selection");
+            console.log("Creating wallet with payload:", {
+                currencyId: selectedCurrency.currencyId,
+                network: selectedNetwork.chainCode
+            });
             return await createWallet(selectedCurrency.currencyId, selectedNetwork.chainCode);
         },
         onSuccess: (data) => {
@@ -202,7 +206,7 @@ export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
             <button
                 onClick={handleSubmit}
                 disabled={createWalletMutation.isPending || !selectedCurrency || !selectedNetwork}
-                className="w-full py-4 rounded-full font-bold text-lg transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]"
+                className="mb-16 w-full py-4 rounded-full font-bold text-lg transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]"
             >
                 {createWalletMutation.isPending ? (
                     <div className="flex items-center justify-center gap-2">

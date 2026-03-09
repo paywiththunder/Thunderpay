@@ -10,7 +10,9 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
-import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse } from "@/services/bills";
+import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse, AirtimeQuotePayload, BillExecutionPayload } from "@/services/bills";
+import { getCashbackBalance } from "@/services/cashback";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 interface NetworkProvider {
   id: string;
@@ -72,11 +74,63 @@ export default function AirtimePage() {
     useState<TransactionResult>(null);
   const [failureReason, setFailureReason] = useState("");
   const [transactionToken, setTransactionToken] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-
   const [quote, setQuote] = useState<AirtimeQuoteResponse | null>(null);
-  const [isQuoteLoading, setIsQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState("");
+  const [transactionDetails, setTransactionDetails] = useState<any>(null);
+
+  // Fetch Bolt Balance (Cashback)
+  const { data: cashbackData } = useQuery({
+    queryKey: ["cashbackBalance"],
+    queryFn: () => getCashbackBalance(3),
+  });
+
+  const boltBalance = cashbackData?.data?.availableBolts || 0;
+
+  // Mutation for Getting Quote
+  const quoteMutation = useMutation({
+    mutationFn: (payload: AirtimeQuotePayload) => getAirtimeQuote(payload),
+    onSuccess: (data) => {
+      const quoteData = data.data || data;
+      setQuote(quoteData);
+      localStorage.setItem("currentAirtimeQuote", JSON.stringify(quoteData));
+      setStep("confirmation");
+    },
+    onError: (error: any) => {
+      console.error(error);
+      setQuoteError(error?.description || "Failed to get quote");
+    }
+  });
+
+  // Mutation for Executing Payment
+  const paymentMutation = useMutation({
+    mutationFn: (payload: BillExecutionPayload) => executeBillPayment(payload),
+    onSuccess: (data) => {
+      const response = data as BillExecutionResponse;
+      if (response.success && response.data) {
+        setTransactionToken(response.data.transactionReference);
+        setTransactionDetails(response.data);
+        setTransactionResult("success");
+        setStep("result");
+      } else {
+        setFailureReason(response.description || "Payment failed");
+        setTransactionResult("failure");
+        setStep("result");
+      }
+    },
+    onError: (error: any) => {
+      console.error("Payment Error:", error);
+      let reason = "An unexpected error occurred";
+      if (typeof error === "string") reason = error;
+      else if (typeof error === "object") reason = error.description || error.message || reason;
+
+      setFailureReason(reason);
+      setTransactionResult("failure");
+      setStep("result");
+    }
+  });
+
+  const isQuoteLoading = quoteMutation.isPending;
+  const isProcessing = paymentMutation.isPending;
 
   // Mock phone verification
   useEffect(() => {
@@ -113,44 +167,22 @@ export default function AirtimePage() {
     }
   };
 
-  const handlePaymentMethodSelect = async (paymentMethod: PaymentOption) => {
+  const handlePaymentMethodSelect = (paymentMethod: PaymentOption) => {
     setSelectedPaymentMethod(paymentMethod);
     setQuoteError("");
     setQuote(null);
 
-    // If it's fiat, we might strictly not need a quote or maybe we do for fees? 
-    // Assuming we do for consistency or specifically when it's crypto.
-    // The user example had "sourceCurrencyTicker": "trx", implying crypto.
-
     if (paymentMethod.currencyCode) {
-      setIsQuoteLoading(true);
-      try {
-        const payload = {
-          phone: phoneNumber,
-          purchaseAmount: parseFloat(amount),
-          sourceCurrencyTicker: paymentMethod.currencyCode.toLowerCase(),
-          walletId: paymentMethod.id, // ID from the wallet list
-          baseCostCurrency: "ngn", // Assuming base is NGN for airtime
-          serviceId: selectedNetwork.id.toUpperCase() // e.g., MTN
-        };
-
-        console.log("Fetching quote with:", payload);
-        const response = await getAirtimeQuote(payload);
-        const quoteData = response.data || response;
-        setQuote(quoteData);
-        localStorage.setItem("currentAirtimeQuote", JSON.stringify(quoteData));
-        setStep("confirmation");
-      } catch (err: any) {
-        console.error(err);
-        setQuoteError(err?.description || "Failed to get quote");
-        // Optionally still go to confirmation but show error, or stay on payment?
-        // For now, let's stay and show error (alert or simple log)
-        alert(err?.description || "Failed to get quote");
-      } finally {
-        setIsQuoteLoading(false);
-      }
+      const payload: AirtimeQuotePayload = {
+        phone: phoneNumber,
+        purchaseAmount: parseFloat(amount),
+        sourceCurrencyTicker: paymentMethod.currencyCode.toLowerCase(),
+        walletId: paymentMethod.walletId || paymentMethod.id,
+        baseCostCurrency: "ngn",
+        serviceId: selectedNetwork.id.toUpperCase()
+      };
+      quoteMutation.mutate(payload);
     } else {
-      // Fallback for fiat or if no currency code (legacy hardcoded items)
       setStep("confirmation");
     }
   };
@@ -165,30 +197,6 @@ export default function AirtimePage() {
 
     if (selectedPaymentMethod.type === "fiat") {
       return `₦${amountNum.toLocaleString()}.00`;
-    }
-
-    const rates: { [key: string]: number } = {
-      usdt: 1.0,
-      bitcoin: 0.000023,
-      ethereum: 0.00042,
-      solana: 0.006,
-    };
-
-    const rate = rates[selectedPaymentMethod.id] || 1;
-    const cryptoAmount = amountNum / (rate * 1500);
-
-    if (selectedPaymentMethod.currencyCode) {
-      return `${cryptoAmount.toFixed(6)} ${selectedPaymentMethod.currencyCode}`;
-    }
-
-    if (selectedPaymentMethod.id === "usdt") {
-      return `${cryptoAmount.toFixed(4)} USDT`;
-    } else if (selectedPaymentMethod.id === "bitcoin") {
-      return `${cryptoAmount.toFixed(8)} BTC`;
-    } else if (selectedPaymentMethod.id === "ethereum") {
-      return `${cryptoAmount.toFixed(6)} ETH`;
-    } else if (selectedPaymentMethod.id === "solana") {
-      return `${cryptoAmount.toFixed(4)} SOL`;
     }
 
     return `₦${amountNum.toLocaleString()}.00`;
@@ -206,78 +214,40 @@ export default function AirtimePage() {
     return selectedPaymentMethod.value;
   };
 
-  const generateTransactionToken = (): string => {
-    const segments = Array.from({ length: 5 }, () =>
-      Math.floor(1000 + Math.random() * 9000).toString()
-    );
-    return segments.join("-");
-  };
-
   const getTransactionDate = (): string => {
     const now = new Date();
-    const months = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ];
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const month = months[now.getMonth()];
     const day = now.getDate();
     const hours = now.getHours();
     const minutes = now.getMinutes();
     const ampm = hours >= 12 ? "PM" : "AM";
     const displayHours = hours % 12 || 12;
-    return `${month} ${day}, Oct ${displayHours}:${minutes
-      .toString()
-      .padStart(2, "0")} ${ampm}`;
+    return `${month} ${day}, ${now.getFullYear()} ${displayHours}:${minutes.toString().padStart(2, "0")} ${ampm}`;
   };
 
-  const handlePinComplete = async (pin: string) => {
-    setIsProcessing(true);
-    try {
-      // Retrieve quote from state first, fallback to localStorage if needed
-      let currentQuote = quote;
-      if (!currentQuote) {
-        const stored = localStorage.getItem("currentAirtimeQuote");
-        if (stored) {
-          currentQuote = JSON.parse(stored);
-        }
+  const handlePinComplete = (pin: string) => {
+    let currentQuote = quote;
+    if (!currentQuote) {
+      const stored = localStorage.getItem("currentAirtimeQuote");
+      if (stored) {
+        currentQuote = JSON.parse(stored);
       }
+    }
 
-      if (!currentQuote?.quoteReference) {
-        throw new Error("No valid quote found. Please try again.");
-      }
-
-      const payload = {
-        quoteReference: currentQuote.quoteReference,
-        pin: parseInt(pin, 10)
-      };
-
-      const response = (await executeBillPayment(payload)) as BillExecutionResponse;
-
-      if (response.success && response.data) {
-        setTransactionToken(response.data.transactionReference);
-        setTransactionResult("success");
-        setStep("result");
-      } else {
-        setFailureReason(response.description || "Payment failed");
-        setTransactionResult("failure");
-        setStep("result");
-      }
-    } catch (error: any) {
-      console.error("Payment Error:", error);
-      let reason = "An unexpected error occurred";
-
-      if (typeof error === "string") {
-        reason = error;
-      } else if (typeof error === "object") {
-        reason = error.description || error.message || reason;
-      }
-
-      setFailureReason(reason);
+    if (!currentQuote?.quoteReference) {
+      setFailureReason("No valid quote found. Please try again.");
       setTransactionResult("failure");
       setStep("result");
-    } finally {
-      setIsProcessing(false);
+      return;
     }
+
+    const payload: BillExecutionPayload = {
+      quoteReference: currentQuote.quoteReference,
+      pin: parseInt(pin, 10)
+    };
+
+    paymentMutation.mutate(payload);
   };
 
   const handleAddToBeneficiary = () => {
@@ -292,24 +262,16 @@ export default function AirtimePage() {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        networkDropdownRef.current &&
-        !networkDropdownRef.current.contains(event.target as Node)
-      ) {
+      if (networkDropdownRef.current && !networkDropdownRef.current.contains(event.target as Node)) {
         setIsNetworkDropdownOpen(false);
       }
-      if (
-        recentsDropdownRef.current &&
-        !recentsDropdownRef.current.contains(event.target as Node)
-      ) {
+      if (recentsDropdownRef.current && !recentsDropdownRef.current.contains(event.target as Node)) {
         setIsRecentsDropdownOpen(false);
       }
     };
-
     if (isNetworkDropdownOpen || isRecentsDropdownOpen) {
       document.addEventListener("mousedown", handleClickOutside);
     }
-
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
@@ -350,6 +312,7 @@ export default function AirtimePage() {
           { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
         ]}
         availableBalance={getAvailableBalance()}
+        boltBalance={boltBalance}
       />
     );
   }
@@ -369,46 +332,44 @@ export default function AirtimePage() {
     const amountNum = parseFloat(amount) || 0;
     const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
 
+    const commonDetails = [
+      { label: "Network", value: selectedNetwork.name },
+      { label: "Phone Number", value: phoneNumber },
+      { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
+      { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+    ];
+
     if (transactionResult === "success") {
+      const successDetails = [
+        ...commonDetails,
+        { label: "Transaction Reference", value: transactionToken },
+        { label: "Bonus Earned", value: `₦${getCashback().toFixed(2)} Cashback` },
+        { label: "Transaction Date", value: getTransactionDate() },
+      ];
+
       return (
         <PaymentSuccess
+          title="Airtime Purchase Successful"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          token={transactionToken}
-          biller={selectedNetwork.name}
-          meterNumber={phoneNumber}
-          customerName={phoneNumber}
-          meterType="Airtime"
-          serviceAddress=""
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
-          bonusEarned={`₦${getCashback().toFixed(2)} Cashback`}
-          transactionDate={getTransactionDate()}
+          details={successDetails}
           onAddToBeneficiary={handleAddToBeneficiary}
           onContinue={handleContinue}
         />
       );
     } else if (transactionResult === "failure") {
+      const failureDetails = [
+        { label: "Failure Reason", value: failureReason || "Service provider down" },
+        ...commonDetails,
+        { label: "Transaction Date", value: getTransactionDate() }
+      ];
+
       return (
         <PaymentFailure
           title="Airtime Purchase Failed"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason={failureReason || "Service provider down"}
-          biller={selectedNetwork.name}
-          meterNumber={phoneNumber}
-          customerName={phoneNumber}
-          meterType="Airtime"
-          serviceAddress=""
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
-          transactionDate={getTransactionDate()}
+          details={failureDetails}
           onContinue={handleContinue}
         />
       );
@@ -428,11 +389,8 @@ export default function AirtimePage() {
       </header>
 
       <div className="flex flex-col gap-6 px-4 overflow-y-auto pb-6">
-        {/* Select Network Section */}
         <div className="flex flex-col gap-2">
-          <label className="text-white text-sm font-medium">
-            Select Network
-          </label>
+          <label className="text-white text-sm font-medium">Select Network</label>
           <div className="relative" ref={networkDropdownRef}>
             <button
               onClick={() => setIsNetworkDropdownOpen(!isNetworkDropdownOpen)}
@@ -440,40 +398,24 @@ export default function AirtimePage() {
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center flex-shrink-0">
-                  <span className="text-white text-xs font-bold">
-                    {selectedNetwork.logo}
-                  </span>
+                  <span className="text-white text-xs font-bold">{selectedNetwork.logo}</span>
                 </div>
-                <span className="text-white font-medium">
-                  {selectedNetwork.name}
-                </span>
+                <span className="text-white font-medium">{selectedNetwork.name}</span>
               </div>
-              {isNetworkDropdownOpen ? (
-                <HiChevronDown className="w-5 h-5 text-white flex-shrink-0" />
-              ) : (
-                <HiChevronRight className="w-5 h-5 text-white flex-shrink-0" />
-              )}
+              {isNetworkDropdownOpen ? <HiChevronDown className="w-5 h-5 text-white" /> : <HiChevronRight className="w-5 h-5 text-white" />}
             </button>
-
             {isNetworkDropdownOpen && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl shadow-lg z-10 max-h-60 overflow-y-auto">
                 {networkProviders.map((provider) => (
                   <button
                     key={provider.id}
-                    onClick={() => {
-                      setSelectedNetwork(provider);
-                      setIsNetworkDropdownOpen(false);
-                    }}
+                    onClick={() => { setSelectedNetwork(provider); setIsNetworkDropdownOpen(false); }}
                     className="w-full p-4 flex items-center gap-3 hover:bg-gray-800/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
                   >
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-xs font-bold">
-                        {provider.logo}
-                      </span>
+                      <span className="text-white text-xs font-bold">{provider.logo}</span>
                     </div>
-                    <span className="text-white font-medium">
-                      {provider.name}
-                    </span>
+                    <span className="text-white font-medium">{provider.name}</span>
                   </button>
                 ))}
               </div>
@@ -481,7 +423,6 @@ export default function AirtimePage() {
           </div>
         </div>
 
-        {/* Phone Number Section */}
         <div className="flex flex-col gap-2">
           <label className="text-white text-sm font-medium">Phone Number</label>
           <div className="relative" ref={recentsDropdownRef}>
@@ -498,7 +439,7 @@ export default function AirtimePage() {
                   <span className="text-white font-medium">{phoneNumber}</span>
                   <span className="text-white/80 text-sm">{selectedNetwork.name}</span>
                 </div>
-                <HiCheckCircle className="w-5 h-5 text-white flex-shrink-0" />
+                <HiCheckCircle className="w-5 h-5 text-white" />
               </div>
             )}
             <div className="flex justify-end mt-2">
@@ -507,11 +448,7 @@ export default function AirtimePage() {
                 className="text-blue-500 text-sm font-medium flex items-center gap-1 hover:text-blue-400 transition-colors"
               >
                 See Recents
-                {isRecentsDropdownOpen ? (
-                  <HiChevronDown className="w-4 h-4" />
-                ) : (
-                  <HiChevronRight className="w-4 h-4" />
-                )}
+                {isRecentsDropdownOpen ? <HiChevronDown className="w-4 h-4" /> : <HiChevronRight className="w-4 h-4" />}
               </button>
             </div>
             {isRecentsDropdownOpen && (
@@ -531,7 +468,6 @@ export default function AirtimePage() {
           </div>
         </div>
 
-        {/* Select Amount Section */}
         <div className="flex flex-col gap-2">
           <label className="text-white text-sm font-medium">Select Amount</label>
           <input
@@ -541,37 +477,25 @@ export default function AirtimePage() {
             placeholder="enter amount"
             className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm mb-2"
           />
-
-          {/* Amount Buttons Grid */}
+          {amount && parseFloat(amount) < 100 && <p className="text-red-500 text-xs text-right px-1">Minimum amount is ₦100</p>}
           <div className="grid grid-cols-3 gap-3">
             {amountOptions.map((option) => (
               <button
                 key={option.amount}
                 onClick={() => handleAmountSelect(option.amount)}
-                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString()
-                  ? "ring-2 ring-blue-500 border-blue-500"
-                  : ""
-                  }`}
+                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString() ? "ring-2 ring-blue-500 border-blue-500" : ""}`}
               >
-                <span className="text-white font-bold text-base">
-                  ₦{option.amount.toLocaleString()}
-                </span>
-                <span className="text-gray-400 text-xs mt-1">
-                  ₦{option.cashback} Cashback
-                </span>
+                <span className="text-white font-bold text-base">₦{option.amount.toLocaleString()}</span>
+                <span className="text-gray-400 text-xs mt-1">₦{option.cashback} Cashback</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Pay Button */}
         <button
           onClick={handlePayClick}
-          disabled={!phoneNumber || !amount || !phoneVerified}
-          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!phoneNumber || !amount || !phoneVerified
-            ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
-            : ""
-            }`}
+          disabled={!phoneNumber || !amount || !phoneVerified || parseFloat(amount) < 100}
+          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!phoneNumber || !amount || !phoneVerified || parseFloat(amount) < 100 ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed" : ""}`}
         >
           Pay
         </button>

@@ -21,6 +21,7 @@ interface ConfirmationProps {
   serviceAddress?: string;
   cashback?: number;
   availableBalance: string;
+  boltBalance?: number;
   // New dynamic props
   details?: QuoteDetails[];
 }
@@ -38,10 +39,10 @@ export default function Confirmation({
   serviceAddress,
   cashback,
   availableBalance,
+  boltBalance,
   details,
 }: ConfirmationProps) {
   const [useCashback, setUseCashback] = useState(false);
-  const cashbackBalance = 500;
 
   return (
     <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6">
@@ -83,29 +84,22 @@ export default function Confirmation({
             )}
           </div>
 
-          {/* Use Cashback Toggle */}
-          {/* <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between">
+          {/* Bolt Balance Display */}
+          <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-white font-medium">
-                Use Cashback (₦{cashbackBalance.toLocaleString()}.00)
+                Bolt Balance
               </span>
-              {useCashback && (
-                <span className="text-gray-400 text-sm mt-1">
-                  -₦{cashbackBalance.toLocaleString()}.00
-                </span>
-              )}
+              <span className="text-gray-400 text-sm mt-1">
+                ₦{boltBalance?.toLocaleString() || "0.00"} Available
+              </span>
             </div>
-            <button
-              onClick={() => setUseCashback(!useCashback)}
-              className={`relative w-12 h-6 rounded-full transition-colors ${useCashback ? "bg-blue-500" : "bg-gray-600"
-                }`}
-            >
-              <span
-                className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${useCashback ? "translate-x-6" : "translate-x-0"
-                  }`}
-              />
-            </button>
-          </div> */}
+            <div className="flex items-center gap-2">
+              <span className="text-blue-500 text-xs font-bold uppercase tracking-wider bg-blue-500/10 px-2 py-1 rounded-md">
+                Thunder Bolts
+              </span>
+            </div>
+          </div>
 
           {/* Available Balance */}
           <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4">

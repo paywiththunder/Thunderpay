@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import {
     HiOutlineEye,
+    HiOutlineEyeSlash,
     HiOutlineArrowUpRight,
     HiOutlineArrowDownLeft,
     HiOutlineArrowPath,
@@ -61,9 +62,11 @@ interface Transaction {
 }
 
 import { useQuery } from "@tanstack/react-query";
+import { useBalanceVisibility } from "@/hooks/useBalanceVisibility";
 
 export default function CryptoPage() {
     const router = useRouter();
+    const { showBalance, toggleBalance } = useBalanceVisibility();
     const [isAddWalletOpen, setIsAddWalletOpen] = useState(false);
 
     // Lock body scroll when modal is open
@@ -155,14 +158,16 @@ export default function CryptoPage() {
             <div className="flex flex-col items-center justify-center py-4">
                 <div className="flex items-center gap-2 text-gray-300 text-sm mb-2">
                     <span>Total assets</span>
-                    <HiOutlineEye className="text-gray-400" />
+                    <button onClick={toggleBalance} className="focus:outline-none transition-transform active:scale-90">
+                        {showBalance ? <HiOutlineEye className="text-gray-400 w-5 h-5" /> : <HiOutlineEyeSlash className="text-gray-400 w-5 h-5" />}
+                    </button>
                 </div>
                 <h2 className="text-4xl font-bold mb-1">
-                    {totalAssets.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                    {showBalance ? totalAssets.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : "****"}
                 </h2>
                 <div className="flex items-center gap-2 text-sm">
                     {/* Change placeholder - unavailable in API currently */}
-                    <span className="text-green-500 font-medium">+$0.00 +0.00</span>
+                    <span className="text-green-500 font-medium">{showBalance ? "+$0.00 +0.00" : "****"}</span>
                 </div>
             </div>
 
@@ -239,8 +244,8 @@ export default function CryptoPage() {
                                     icon={<div className={`w-8 h-8 rounded-full ${config.bg} flex items-center justify-center`}>{config.icon}</div>}
                                     name={currency?.name || config.name}
                                     symbol={symbol}
-                                    amount={`${balance} ${symbol}`}
-                                    value={usdValue}
+                                    amount={showBalance ? `${balance} ${symbol}` : "****"}
+                                    value={showBalance ? usdValue : "****"}
                                 />
                             );
                         })
@@ -270,7 +275,7 @@ export default function CryptoPage() {
                             const isNegative = ["send", "withdrawal", "bill", "electricity", "card"].includes(tx.source.toLowerCase());
                             return (
                                 <div
-                                    key={tx.id}
+                                    key={tx.reference}
                                     className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-xl p-4 flex items-center justify-between active:bg-white/5 transition-colors cursor-pointer"
                                     onClick={() => router.push(`/crypto/activity/${tx.reference}`)}
                                 >
@@ -304,7 +309,7 @@ export default function CryptoPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-[#111] w-full max-w-md rounded-3xl border border-white/10 relative shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden">
                         {/* Fixed Header with Close Button */}
-                        <div className="p-8 pb-0 relative">
+                        <div className="p-8 relative">
                             <button
                                 onClick={() => setIsAddWalletOpen(false)}
                                 className="absolute top-8 right-8 text-gray-400 hover:text-white transition-all hover:rotate-90 p-1.5 rounded-full hover:bg-white/10 border border-transparent hover:border-white/10 z-20"

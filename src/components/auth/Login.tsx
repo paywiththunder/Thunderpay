@@ -271,6 +271,7 @@ export default function Login() {
 
       // ✅ Store token
       localStorage.setItem("authToken", data.token);
+      console.log('token', data.token);
       const isContinueSignup = data.hasCompletedSignup
 
       // 👉 redirect

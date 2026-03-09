@@ -24,14 +24,16 @@ body {
   /* color: var(--foreground); */
   font-family: Arial, Helvetica, sans-serif;
 }
-.stars{
+
+.stars {
   background-image: url('../../public//stars.png');
   background-repeat: no-repeat;
   background-size: cover;
   width: 100%;
   background-position: center;
 }
-.assets{
+
+.assets {
   background-image: url('../../public/totalassetimg.png');
   background-repeat: no-repeat;
   background-size: cover;

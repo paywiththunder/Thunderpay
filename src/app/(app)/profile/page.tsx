@@ -86,6 +86,12 @@ const menuItems: MenuItem[] = [
     link: "/profile/set-pin",
   },
   {
+    id: 11,
+    icon: HiOutlineLockClosed,
+    label: "Change Password",
+    link: "/profile/change-password",
+  },
+  {
     id: 8,
     icon: HiOutlineArrowRightOnRectangle,
     label: "Sign out",

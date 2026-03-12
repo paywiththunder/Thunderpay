@@ -17,7 +17,7 @@ import Wlcomemessages from "./Wlcomemessages";
 import Image from "next/image";
 import NoTransaction from "../../../public/walletimg.png";
 import AppHeader from "./AppHeader";
-import { getCashbackBalance } from "@/services/cashback";
+import { getCashbackBalance, DEFAULT_CURRENCY_ID } from "@/services/cashback";
 import { getWallets } from "@/services/wallet";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
@@ -29,8 +29,8 @@ export default function HomePage() {
 
   // Fetch Bolts Balance
   const { data: cashbackResponse } = useQuery({
-    queryKey: ['cashbackBalance', 3],
-    queryFn: () => getCashbackBalance(3),
+    queryKey: ['cashbackBalance', DEFAULT_CURRENCY_ID],
+    queryFn: () => getCashbackBalance(DEFAULT_CURRENCY_ID),
   });
   const boltsBalance = cashbackResponse?.success ? cashbackResponse.data.availableBolts : null;
 

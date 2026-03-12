@@ -43,6 +43,7 @@ export const getAirtimeQuote = async (payload: AirtimeQuotePayload) => {
                 },
             }
         );
+        console.log("Airtime Quote Request:", payload);
         console.log("Airtime Quote Response:", response.data);
         return response.data;
     } catch (error: any) {
@@ -53,7 +54,8 @@ export const getAirtimeQuote = async (payload: AirtimeQuotePayload) => {
 
 export interface BillExecutionPayload {
     quoteReference: string;
-    pin: string | number;
+    pin: string;
+    applyCashback?: boolean;
 }
 
 export interface BillExecutionResponse {

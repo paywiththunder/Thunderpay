@@ -3,7 +3,7 @@ import { API_BASE_URL } from "@/config";
 
 const API_URL = `${API_BASE_URL}/users`;
 
-const getAuthToken = () => {
+export const getAuthToken = () => {
     if (typeof window !== "undefined") {
         return localStorage.getItem("authToken");
     }
@@ -109,5 +109,34 @@ export const getRecentTransactions = async () => {
         return response.data;
     } catch (error: any) {
         throw error.response?.data || error.message;
+    }
+};
+
+// --------------------------------------------------------------------
+// referrals
+// --------------------------------------------------------------------
+
+export interface Referral {
+    referredUserId: number;
+    name: string | null;
+    email: string | null;
+    qualified: boolean;
+    totalSpendUsd: number;
+    totalSpendNgn: number;
+    referredAt: string;
+    qualifiedAt: string | null;
+}
+
+export const getReferrals = async (): Promise<any> => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const res = await axios.get(`${API_URL}/referrals`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return res.data as Referral[];
+    } catch (err: any) {
+        throw err.response?.data || err.message;
     }
 };

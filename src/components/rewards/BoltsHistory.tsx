@@ -1,13 +1,13 @@
 "use client";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getBoltsHistory, BoltsTransaction } from "@/services/cashback";
+import { getBoltsHistory, BoltsTransaction, DEFAULT_CURRENCY_ID } from "@/services/cashback";
 import { HiMiniBolt, HiChevronRight } from "react-icons/hi2";
 
 export default function BoltsHistory() {
     const { data, isLoading, error } = useQuery({
         queryKey: ["boltsHistory"],
-        queryFn: () => getBoltsHistory({ currencyId: 3, page: 1, size: 20 }),
+        queryFn: () => getBoltsHistory({ currencyId: DEFAULT_CURRENCY_ID, page: 0, size: 20 }),
     });
 
     if (isLoading) {
@@ -21,7 +21,7 @@ export default function BoltsHistory() {
         );
     }
 
-    const transactions = data?.data?.transactions || [];
+    const transactions = data?.data || [];
 
     return (
         <div className="flex flex-col gap-4 mt-6 pb-20">
@@ -42,25 +42,28 @@ export default function BoltsHistory() {
                 </div>
             ) : (
                 <div className="flex flex-col gap-2 px-4">
-                    {transactions.map((tx: BoltsTransaction) => (
-                        <div key={tx.id} className="bg-linear-to-b from-[#161616] to-[#0A0A0A] border border-white/10 rounded-2xl p-4 flex items-center justify-between transition-all hover:bg-white/[0.02]">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === "credit" ? "bg-green-500/20 text-green-500" : "bg-blue-500/20 text-blue-500"}`}>
-                                    <HiMiniBolt className="w-5 h-5" />
+                    {transactions.map((tx: BoltsTransaction) => {
+                        const isCredit = tx.type === "credit" || tx.type === "EARNED";
+                        return (
+                            <div key={tx.id} className="bg-linear-to-b from-[#161616] to-[#0A0A0A] border border-white/10 rounded-2xl p-4 flex items-center justify-between transition-all hover:bg-white/[0.02]">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isCredit ? "bg-green-500/20 text-green-500" : "bg-blue-500/20 text-blue-500"}`}>
+                                        <HiMiniBolt className="w-5 h-5" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-white font-medium text-sm leading-tight">{tx.description}</span>
+                                        <span className="text-gray-500 text-[10px] mt-1">{new Date(tx.createdAt).toLocaleDateString()} at {new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-white font-medium text-sm leading-tight">{tx.description}</span>
-                                    <span className="text-gray-500 text-[10px] mt-1">{new Date(tx.createdAt).toLocaleDateString()} at {new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                <div className="flex flex-col items-end">
+                                    <span className={`font-bold text-sm ${isCredit ? "text-green-500" : "text-blue-500"}`}>
+                                        {isCredit ? "+" : "-"}{tx.amount}
+                                    </span>
+                                    <span className="text-gray-500 text-[10px] mt-1">Status: {tx.status}</span>
                                 </div>
                             </div>
-                            <div className="flex flex-col items-end">
-                                <span className={`font-bold text-sm ${tx.type === "credit" ? "text-green-500" : "text-blue-500"}`}>
-                                    {tx.type === "credit" ? "+" : "-"}{tx.amount}
-                                </span>
-                                <span className="text-gray-500 text-[10px] mt-1">Status: {tx.status}</span>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>

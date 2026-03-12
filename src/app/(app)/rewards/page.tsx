@@ -6,10 +6,11 @@ import CashbacksIcon from "../../../../public/cashbacks.png";
 import FAQIcon from "../../../../public/faq.png";
 import ReferIcon from "../../../../public/refer.png";
 import { HiGift, HiArrowPath, HiMiniBolt } from "react-icons/hi2";
-import { getCashbackBalance, convertBolts, CashbackBalanceData } from "@/services/cashback";
+import { getCashbackBalance, convertBolts, getConversionInfo, CashbackBalanceData, BoltsConversionInfo, DEFAULT_CURRENCY_ID } from "@/services/cashback";
 import { getWallets } from "@/services/wallet";
 import BoltsHistory from "@/components/rewards/BoltsHistory";
 import { toast } from "react-hot-toast";
+import { constructNow } from "date-fns";
 
 interface RewardCard {
   id: number;
@@ -27,15 +28,17 @@ export default function RewardsPage() {
   const [balance, setBalance] = useState<CashbackBalanceData | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conversionInfo, setConversionInfo] = useState<BoltsConversionInfo | null>(null);
 
   useEffect(() => {
     fetchBalance();
+    fetchConversionInfo();
   }, []);
 
   const fetchBalance = async () => {
     try {
       setLoading(true);
-      const response = await getCashbackBalance(3); // Using currencyId=3 as per your example
+      const response = await getCashbackBalance(DEFAULT_CURRENCY_ID); // Using default currency id
       if (response.success) {
         setBalance(response.data);
       }
@@ -44,6 +47,18 @@ export default function RewardsPage() {
       setError(err?.description || "Failed to load rewards balance");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchConversionInfo = async () => {
+    try {
+      const response = await getConversionInfo();
+      if (response.success && response.data) {
+        setConversionInfo(response.data);
+        console.log("Conversion Info:", response.data);
+      }
+    } catch (err) {
+      console.warn("Failed to load conversion info", err);
     }
   };
 
@@ -143,6 +158,19 @@ export default function RewardsPage() {
               <p className="text-blue-100 text-xs">
                 {loading ? "Loading balance..." : `Available for conversion: ${balance?.availableBolts || 0} Bolts`}
               </p>
+              {!loading && (
+                <>
+                  {conversionInfo ? (
+                    <p className="text-gray-400 text-[10px] mt-1">
+                      {conversionInfo.description || "Conversion rate info unavailable."}
+                    </p>
+                  ) : (
+                    <p className="text-gray-500 text-[10px] mt-1">
+                      Conversion info unavailable.
+                    </p>
+                  )}
+                </>
+              )}
             </div>
             <div className="flex flex-col items-end z-10">
               <div className="text-2xl font-bold text-white mb-2">

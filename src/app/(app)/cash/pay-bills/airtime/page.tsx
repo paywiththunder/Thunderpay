@@ -11,7 +11,7 @@ import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
 import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse, AirtimeQuotePayload, BillExecutionPayload } from "@/services/bills";
-import { getCashbackBalance } from "@/services/cashback";
+import { getCashbackBalance, DEFAULT_CURRENCY_ID } from "@/services/cashback";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 interface NetworkProvider {
@@ -81,7 +81,7 @@ export default function CashAirtimePage() {
     // Fetch Bolt Balance (Cashback)
     const { data: cashbackData } = useQuery({
         queryKey: ["cashbackBalance"],
-        queryFn: () => getCashbackBalance(3), // Assuming 3 is the currencyId for NGN/Cash
+        queryFn: () => getCashbackBalance(DEFAULT_CURRENCY_ID), // Assuming NGN/Cash
     });
 
     const boltBalance = cashbackData?.data?.availableBolts || 0;
@@ -244,7 +244,7 @@ export default function CashAirtimePage() {
 
         const payload: BillExecutionPayload = {
             quoteReference: currentQuote.quoteReference,
-            pin: parseInt(pin, 10)
+            pin: pin
         };
 
         paymentMutation.mutate(payload);

@@ -12,6 +12,7 @@ import {
   HiOutlineArrowRightOnRectangle,
   HiChevronRight,
   HiOutlineLockClosed,
+  HiOutlineUserGroup,
 } from "react-icons/hi2";
 import { useRouter } from "next/navigation";
 import { getUserProfile } from "@/services/user";
@@ -71,6 +72,18 @@ const menuItems: MenuItem[] = [
   //   label: "Settings",
   //   link: "/profile/settings",
   // },
+  {
+    id: 2,
+    icon: HiOutlineStar,
+    label: "Referrals",
+    link: "/profile/referrals",
+  },
+  {
+    id: 3,
+    icon: HiOutlineUserGroup,
+    label: "Ambassador",
+    link: "/profile/ambassador",
+  },
   {
     id: 9,
     icon: HiOutlineLockClosed,

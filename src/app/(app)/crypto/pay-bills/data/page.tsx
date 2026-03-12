@@ -403,7 +403,7 @@ export default function DataPage() {
 
     const payload: BillExecutionPayload = {
       quoteReference: quoteReference,
-      pin: parseInt(pin, 10) // or string if your API expects string, interface says string | number
+      pin: pin
     };
 
     paymentMutation.mutate(payload);

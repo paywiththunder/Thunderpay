@@ -277,7 +277,7 @@ export default function AirtimePage() {
 
     const payload: BillExecutionPayload = {
       quoteReference: currentQuote.quoteReference,
-      pin: parseInt(pin, 10)
+      pin: pin
     };
 
     paymentMutation.mutate(payload);

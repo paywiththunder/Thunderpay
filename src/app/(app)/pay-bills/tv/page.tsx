@@ -20,7 +20,7 @@ import {
   verifyTv,
   BillExecutionPayload
 } from "@/services/bills";
-import { getCashbackBalance } from "@/services/cashback";
+import { getCashbackBalance, DEFAULT_CURRENCY_ID } from "@/services/cashback";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 interface CableTVProvider {
@@ -81,7 +81,7 @@ export default function TVPage() {
   // Fetch Bolt Balance (Cashback)
   const { data: cashbackData } = useQuery({
     queryKey: ["cashbackBalance"],
-    queryFn: () => getCashbackBalance(3),
+    queryFn: () => getCashbackBalance(DEFAULT_CURRENCY_ID),
   });
 
   const boltBalance = cashbackData?.data?.availableBolts || 0;

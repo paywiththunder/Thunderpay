@@ -11,7 +11,7 @@ import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getCashbackBalance } from "@/services/cashback";
+import { getCashbackBalance, DEFAULT_CURRENCY_ID } from "@/services/cashback";
 import {
     getElectricityQuote,
     ElectricityQuotePayload,
@@ -74,7 +74,7 @@ export default function ElectricityPage() {
     // Fetch Bolt Balance (Cashback)
     const { data: cashbackData } = useQuery({
         queryKey: ["cashbackBalance"],
-        queryFn: () => getCashbackBalance(3), // Assuming 3 is the currencyId for NGN/Cash
+        queryFn: () => getCashbackBalance(DEFAULT_CURRENCY_ID), // Assuming NGN/Cash
     });
 
     const boltBalance = cashbackData?.data?.availableBolts || 0;

@@ -10,7 +10,7 @@ const BottomNav = () => {
   const isCrypto = pathname.includes("/crypto");
 
   const navItems = [
-    { name: "Home", href: "/home", icon: HiHome },
+    { name: "Home", href: "/crypto", icon: HiHome },
     { name: "Cards", href: "/cards", icon: HiCreditCard },
     isCrypto
       ? { name: "Activity", href: "/crypto/activity", icon: HiClock }

@@ -65,7 +65,7 @@ export default function AirtimePage() {
   );
   const [isNetworkDropdownOpen, setIsNetworkDropdownOpen] = useState(false);
   const [isRecentsDropdownOpen, setIsRecentsDropdownOpen] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("08011111111");
   const [amount, setAmount] = useState("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentOption | null>(null);
@@ -107,7 +107,7 @@ export default function AirtimePage() {
     onSuccess: (data) => {
       const response = data as BillExecutionResponse;
       if (response.success && response.data) {
-        setTransactionToken(response.data.transactionReference);
+        setTransactionToken(response.data.transactionReference || response.data.quoteReference || "");
         setTransactionDetails(response.data);
         setTransactionResult("success");
         setStep("result");

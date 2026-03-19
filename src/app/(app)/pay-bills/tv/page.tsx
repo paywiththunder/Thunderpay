@@ -142,7 +142,7 @@ export default function TVPage() {
     onSuccess: (response) => {
       const res = response as BillExecutionResponse;
       if (res.success && res.data) {
-        setTransactionToken(res.data.transactionReference);
+        setTransactionToken(res.data?.transactionReference || res.data?.quoteReference || "");
         setTransactionDetails(res.data);
         setTransactionResult("success");
         setStep("result");

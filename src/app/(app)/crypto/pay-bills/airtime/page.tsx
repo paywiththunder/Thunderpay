@@ -100,7 +100,7 @@ export default function AirtimePage() {
     onSuccess: (data) => {
       const response = data as BillExecutionResponse;
       if (response.success && response.data) {
-        setTransactionToken(response.data.transactionReference);
+        setTransactionToken(response.data?.transactionReference || response.data?.quoteReference || "");
         setTransactionDetails(response.data);
         setTransactionResult("success");
         setStep("result");

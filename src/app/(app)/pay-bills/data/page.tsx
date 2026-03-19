@@ -69,7 +69,7 @@ export default function DataPage() {
   );
   const [isNetworkDropdownOpen, setIsNetworkDropdownOpen] = useState(false);
   const [isRecentsDropdownOpen, setIsRecentsDropdownOpen] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("08011111111");
   const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
   const [offerCategory, setOfferCategory] = useState<OfferCategory>("hot-offers");
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
@@ -149,7 +149,7 @@ export default function DataPage() {
     onSuccess: (response) => {
       const res = response as BillExecutionResponse;
       if (res.success && res.data) {
-        setTransactionToken(res.data.transactionReference);
+        setTransactionToken(res.data?.transactionReference || res.data?.quoteReference || "");
         setTransactionDetails(res.data);
         setTransactionResult("success");
         setStep("result");

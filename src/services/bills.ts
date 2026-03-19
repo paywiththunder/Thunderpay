@@ -63,15 +63,15 @@ export interface BillExecutionResponse {
     success: boolean;
     description: string;
     data: {
-        transactionReference: string;
-        quoteReference: string;
-        baseAmount: number;
-        baseCurrency: string;
-        debitedAmount: number;
-        debitedCurrency: string;
-        status: string;
-        createdAt: string;
-        completedAt: string;
+        transactionReference?: string;
+        quoteReference?: string;
+        baseAmount?: number;
+        baseCurrency?: string;
+        debitedAmount?: number;
+        debitedCurrency?: string;
+        status?: string;
+        createdAt?: string;
+        completedAt?: string;
         metadata?: {
             customerAddress?: string;
             unit?: string;
@@ -79,6 +79,11 @@ export interface BillExecutionResponse {
             token?: string;
             [key: string]: any;
         };
+        boltsEarnable?: number;
+        bonusAvailable?: number;
+        maxCashbackApplicable?: number;
+        amountIfFullCashbackApplied?: number;
+        [key: string]: any;
     } | null;
     errors: any;
 }

@@ -29,10 +29,15 @@ export default function RewardsPage() {
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conversionInfo, setConversionInfo] = useState<BoltsConversionInfo | null>(null);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBalance();
     fetchConversionInfo();
+    const storedReferralCode = localStorage.getItem("referralCode");
+    if (storedReferralCode) {
+      setReferralCode(storedReferralCode);
+    }
   }, []);
 
   const fetchBalance = async () => {
@@ -101,6 +106,13 @@ export default function RewardsPage() {
       toast.error(err?.description || err?.message || "Conversion failed. Please try again.");
     } finally {
       setIsConverting(false);
+    }
+  };
+
+  const handleCopyReferral = () => {
+    if (referralCode) {
+      navigator.clipboard.writeText(referralCode);
+      toast.success("Referral code copied!");
     }
   };
 
@@ -215,9 +227,23 @@ export default function RewardsPage() {
               <p className="text-white/90 text-xs mb-4 leading-relaxed max-w-[200px]">
                 Share Thunder and get rewarded when your friends join.
               </p>
-              <button className="bg-white text-orange-500 font-bold px-6 py-2 rounded-full text-xs hover:bg-orange-50 transition-colors shadow-lg">
-                Refer now
-              </button>
+              {referralCode ? (
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="bg-white/20 px-3 py-1.5 rounded-lg border border-white/30 backdrop-blur-sm">
+                    <span className="text-white font-mono font-bold tracking-wider">{referralCode}</span>
+                  </div>
+                  <button
+                    onClick={handleCopyReferral}
+                    className="bg-white text-orange-500 font-bold px-4 py-1.5 rounded-lg text-xs hover:bg-orange-50 transition-colors shadow-sm"
+                  >
+                    Copy
+                  </button>
+                </div>
+              ) : (
+                <button className="bg-white text-orange-500 font-bold px-6 py-2 rounded-full text-xs hover:bg-orange-50 transition-colors shadow-lg">
+                  Refer now
+                </button>
+              )}
             </div>
             {/* Decorative elements */}
             <div className="absolute right-0 top-0 bottom-0 w-32 opacity-30 pointer-events-none">

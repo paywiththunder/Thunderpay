@@ -264,6 +264,7 @@ export default function Login() {
       );
 
       const { success, data, description } = res.data;
+      console.log('res', res);
 
       if (!success) {
         throw new Error(description || "Login failed");
@@ -271,6 +272,9 @@ export default function Login() {
 
       // ✅ Store token
       localStorage.setItem("authToken", data.token);
+      if (data.referralCode) {
+        localStorage.setItem("referralCode", data.referralCode);
+      }
       console.log('token', data.token);
       const isContinueSignup = data.hasCompletedSignup
 

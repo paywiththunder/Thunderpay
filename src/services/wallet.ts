@@ -86,6 +86,7 @@ export const getCurrencies = async () => {
                 "Content-Type": "application/json",
             },
         });
+        console.log("Currencies Response:", response.data);
         return response.data;
     } catch (error: any) {
         throw error.response?.data || error.message;

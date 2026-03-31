@@ -11,7 +11,7 @@ const getAuthToken = () => {
 };
 
 // default currency id used throughout the app (NGN teal)
-export const DEFAULT_CURRENCY_ID = 3; // adjust if backend uses different mapping
+export const DEFAULT_CURRENCY_ID = 1; // adjust if backend uses different mapping
 
 
 export interface CashbackBalanceData {
@@ -90,7 +90,10 @@ export interface BoltsHistoryResponse {
     statusCode: string;
     success: boolean;
     description: string;
-    data: BoltsTransaction[];
+    data: {
+        pagination: any;
+        transactions: BoltsTransaction[];
+    };
     errors: any;
 }
 
@@ -98,7 +101,7 @@ export interface BoltsHistoryResponse {
  * Fetch the cashback/bolts balance for a specific currency
  * @param currencyId The ID of the currency (e.g., 3)
  */
-export const getCashbackBalance = async (currencyId: number | string = 3): Promise<CashbackBalanceResponse> => {
+export const getCashbackBalance = async (currencyId: number | string = 1): Promise<CashbackBalanceResponse> => {
     const token = getAuthToken();
     if (!token) throw new Error("No auth token found");
 
@@ -146,7 +149,7 @@ export const convertBolts = async (payload: ConvertBoltsPayload): Promise<Cashba
  * @param params { currencyId, page, size }
  */
 export const getBoltsHistory = async (params: { currencyId: number | string; page?: number; size?: number }): Promise<BoltsHistoryResponse> => {
-    const { currencyId, page = 0, size = 20 } = params;
+    const { currencyId = 1, page = 0, size = 20 } = params;
     const token = getAuthToken();
     if (!token) throw new Error("No auth token found");
 

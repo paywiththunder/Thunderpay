@@ -2,6 +2,8 @@ import axios from "axios";
 import { API_BASE_URL } from "@/config";
 
 const API_URL = `${API_BASE_URL}/users`;
+const API_URL2 = `${API_BASE_URL}`;
+
 
 export const getAuthToken = () => {
     if (typeof window !== "undefined") {
@@ -132,7 +134,7 @@ export const getReferrals = async (): Promise<any> => {
     if (!token) throw new Error("No auth token found");
 
     try {
-        const res = await axios.get(`${API_URL}/referrals`, {
+        const res = await axios.get(`${API_URL2}/referrals`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         return res.data as Referral[];

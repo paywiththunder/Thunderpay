@@ -70,7 +70,7 @@ export default function ContinueSignup() {
 
       console.log("Signup continued successfully:", res.data);
 
-      router.push("/home");
+      router.push("/auth/set-pin");
       localStorage.setItem("firstName", data.firstName);
       localStorage.setItem("lastName", data.lastName);
       localStorage.setItem("dob", data.dob);

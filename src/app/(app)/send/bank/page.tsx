@@ -10,12 +10,14 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
+import { getBanksList, verifyAccountNumber, BankItem, initiateBankTransfer } from "@/services/transfer";
+import { useQuery } from "@tanstack/react-query";
 
 interface Bank {
-  id: string;
+  id: string;   // maps to BankItem.id from the API
   name: string;
   code: string;
-  logo: string;
+  logo: string; // derived from first char of name
 }
 
 interface RecentBankRecipient {
@@ -26,21 +28,6 @@ interface RecentBankRecipient {
   bankCode: string;
   initial?: string;
 }
-
-const banks: Bank[] = [
-  { id: "access", name: "Access Bank", code: "044", logo: "A" },
-  { id: "gtb", name: "Guaranty Trust Bank", code: "058", logo: "G" },
-  { id: "firstbank", name: "First Bank of Nigeria", code: "011", logo: "F" },
-  { id: "uba", name: "United Bank for Africa", code: "033", logo: "U" },
-  { id: "zenith", name: "Zenith Bank", code: "057", logo: "Z" },
-  { id: "fidelity", name: "Fidelity Bank", code: "070", logo: "F" },
-  { id: "union", name: "Union Bank", code: "032", logo: "U" },
-  { id: "sterling", name: "Sterling Bank", code: "232", logo: "S" },
-  { id: "ecobank", name: "Ecobank Nigeria", code: "050", logo: "E" },
-  { id: "wema", name: "Wema Bank", code: "035", logo: "W" },
-  { id: "stanbic", name: "Stanbic IBTC Bank", code: "221", logo: "S" },
-  { id: "providus", name: "Providus Bank", code: "101", logo: "P" },
-];
 
 const amountOptions = [
   { amount: 1000, cashback: 10 },
@@ -88,8 +75,10 @@ export default function SendToBankPage() {
   const [step, setStep] = useState<Step>("bank");
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
   const [isBankDropdownOpen, setIsBankDropdownOpen] = useState(false);
+  const [bankSearch, setBankSearch] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
+  const [accountVerifyError, setAccountVerifyError] = useState("");
   const [selectedRecipient, setSelectedRecipient] =
     useState<RecentBankRecipient | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("recents");
@@ -100,6 +89,26 @@ export default function SendToBankPage() {
     useState<TransactionResult>(null);
   const [transactionToken, setTransactionToken] = useState("");
   const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [transferError, setTransferError] = useState("");
+
+  // Fetch real banks list from API
+  const { data: banksData, isLoading: banksLoading, error: banksError } = useQuery<BankItem[]>({
+    queryKey: ["banksList"],
+    queryFn: getBanksList,
+    staleTime: 1000 * 60 * 30, // 30 minutes
+  });
+
+  const banks: Bank[] = (banksData ?? []).map((b) => ({
+    id: b.id,
+    name: b.name,
+    code: b.code,
+    logo: b.name.charAt(0).toUpperCase(),
+  }));
+
+  const filteredBanks = bankSearch.trim()
+    ? banks.filter((b) => b.name.toLowerCase().includes(bankSearch.toLowerCase()))
+    : banks;
 
   // Filter recipients based on selected bank and account number
   const filteredRecipients = recentRecipients.filter((recipient) => {
@@ -112,23 +121,29 @@ export default function SendToBankPage() {
   useEffect(() => {
     if (selectedBank && accountNumber.length >= 10) {
       setIsVerifyingAccount(true);
-      const timer = setTimeout(() => {
-        // Mock account verification
-        const match = recentRecipients.find(
-          (r) => r.accountNumber === accountNumber && r.bankCode === selectedBank.code
-        );
-        if (match) {
-          setAccountName(match.name);
-          setSelectedRecipient(match);
-        } else {
-          // Mock: generate a fake name for demo
-          setAccountName("Account Verified");
-        }
-        setIsVerifyingAccount(false);
-      }, 1500);
-      return () => clearTimeout(timer);
+      setAccountName("");
+      setAccountVerifyError("");
+
+      // Call real API
+      verifyAccountNumber({ bankId: selectedBank.id, accountNumber })
+        .then((name) => {
+          setAccountName(name);
+          setAccountVerifyError("");
+        })
+        .catch((err) => {
+          const msg =
+            typeof err === "string"
+              ? err
+              : err?.description || "Could not verify account number";
+          setAccountVerifyError(msg);
+          setAccountName("");
+        })
+        .finally(() => {
+          setIsVerifyingAccount(false);
+        });
     } else {
       setAccountName("");
+      setAccountVerifyError("");
       setSelectedRecipient(null);
     }
   }, [accountNumber, selectedBank]);
@@ -156,9 +171,11 @@ export default function SendToBankPage() {
   const handleBankSelect = (bank: Bank) => {
     setSelectedBank(bank);
     setIsBankDropdownOpen(false);
+    setBankSearch("");
     // Clear account details when bank changes
     setAccountNumber("");
     setAccountName("");
+    setAccountVerifyError("");
     setSelectedRecipient(null);
   };
 
@@ -183,7 +200,7 @@ export default function SendToBankPage() {
   };
 
   const handleAccountContinue = () => {
-    if (selectedBank && accountNumber.length >= 10 && accountName) {
+    if (selectedBank && accountNumber.length >= 10 && accountName && !accountVerifyError) {
       if (!amount) {
         setStep("amount");
       } else {
@@ -271,12 +288,47 @@ export default function SendToBankPage() {
   };
 
   const handlePinComplete = async (pin: string) => {
-    const token = generateTransactionToken();
-    setTransactionToken(token);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const isSuccess = Math.random() > 0.3;
-    setTransactionResult(isSuccess ? "success" : "failure");
-    setStep("result");
+    if (!selectedBank || !selectedPaymentMethod || !selectedPaymentMethod.walletId) {
+      setTransferError("Missing bank, payment method, or wallet ID.");
+      return;
+    }
+
+    setIsTransferring(true);
+    setTransferError("");
+
+    // Generate a reference (backend API likely has a strict length/format limit like "dev007")
+    const reference = Math.random().toString(36).substring(2, 10);
+    setTransactionToken(reference);
+
+    const payload = {
+      walletId: selectedPaymentMethod.walletId,
+      recipientAccountNumber: accountNumber,
+      bankCode: selectedBank.code,
+      amount: parseFloat(amount),
+      pin: pin,
+      reason: "Transfer to Bank",
+      reference: reference
+    };
+
+    console.log("➡️ Initiating Transfer with payload:", payload);
+
+    try {
+      const result = await initiateBankTransfer(payload);
+      console.log("✅ Transfer Success Response:", result);
+      setTransactionResult("success");
+      setStep("result");
+    } catch (error: any) {
+      console.error("❌ Full API Transfer Error Object:", JSON.stringify(error, null, 2));
+      console.error("❌ Raw error:", error);
+
+      const errorMessage = typeof error === "string" ? error : error?.description || error?.message || "Transfer failed";
+      setTransferError(errorMessage);
+      // Optional: if we want to show failure page instead of retry inside EnterPin
+      // setTransactionResult("failure");
+      // setStep("result");
+    } finally {
+      setIsTransferring(false);
+    }
   };
 
   const handleAddToBeneficiary = () => {
@@ -292,6 +344,8 @@ export default function SendToBankPage() {
     setAccountName("");
     setSelectedRecipient(null);
     setAmount("");
+    setTransferError("");
+    setIsTransferring(false);
   };
 
   // Payment Method Step
@@ -335,6 +389,8 @@ export default function SendToBankPage() {
       <EnterPin
         onBack={() => setStep("confirmation")}
         onComplete={handlePinComplete}
+        isLoading={isTransferring}
+        error={transferError}
       />
     );
   }
@@ -436,11 +492,10 @@ export default function SendToBankPage() {
               <button
                 key={option.amount}
                 onClick={() => handleAmountSelect(option.amount)}
-                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${
-                  amount === option.amount.toString()
-                    ? "ring-2 ring-blue-500 border-blue-500"
-                    : ""
-                }`}
+                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString()
+                  ? "ring-2 ring-blue-500 border-blue-500"
+                  : ""
+                  }`}
               >
                 <span className="text-white font-bold text-base">
                   ₦{option.amount.toLocaleString()}
@@ -470,11 +525,10 @@ export default function SendToBankPage() {
           <button
             onClick={handleAmountContinue}
             disabled={!amount}
-            className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${
-              !amount
-                ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
-                : ""
-            }`}
+            className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!amount
+              ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
+              : ""
+              }`}
           >
             Pay
           </button>
@@ -535,9 +589,13 @@ export default function SendToBankPage() {
                 <HiCheckCircle className="w-5 h-5 text-white flex-shrink-0" />
               </div>
             )}
+            {accountVerifyError && !isVerifyingAccount && (
+              <p className="text-red-400 text-xs">{accountVerifyError}</p>
+            )}
           </div>
 
           {/* Tabs */}
+          {/*
           <div className="flex items-center gap-0 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl overflow-hidden">
             <button
               onClick={() => setActiveTab("recents")}
@@ -561,8 +619,10 @@ export default function SendToBankPage() {
               Beneficiaries
             </button>
           </div>
+          */}
 
           {/* Recipients List */}
+          {/*
           <div className="flex flex-col gap-3">
             {(activeTab === "recents" ? filteredRecipients : recentRecipients).map(
               (recipient) => (
@@ -597,21 +657,23 @@ export default function SendToBankPage() {
               )
             )}
           </div>
+          */}
 
           {/* See more button */}
+          {/*
           <button className="text-blue-500 text-sm font-medium text-center hover:text-blue-400 transition-colors">
             See more
           </button>
+          */}
 
           {/* Continue Button */}
           <button
             onClick={handleAccountContinue}
-            disabled={!selectedBank || accountNumber.length < 10 || !accountName}
-            className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${
-              !selectedBank || accountNumber.length < 10 || !accountName
-                ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
-                : ""
-            }`}
+            disabled={!selectedBank || accountNumber.length < 10 || !accountName || isVerifyingAccount || !!accountVerifyError}
+            className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!selectedBank || accountNumber.length < 10 || !accountName || isVerifyingAccount || !!accountVerifyError
+              ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
+              : ""
+              }`}
           >
             Continue
           </button>
@@ -634,12 +696,14 @@ export default function SendToBankPage() {
       </header>
 
       <div className="flex flex-col gap-6 px-4 overflow-y-auto pb-6">
-        {/* Select Bank Section */}
+        {/* Select Bank Section — unified trigger + search + list */}
         <div className="flex flex-col gap-2">
           <label className="text-white text-sm font-medium">
             Select Bank
           </label>
+
           <div className="relative" ref={bankDropdownRef}>
+            {/* Trigger button */}
             <button
               onClick={() => setIsBankDropdownOpen(!isBankDropdownOpen)}
               className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors"
@@ -667,49 +731,61 @@ export default function SendToBankPage() {
               )}
             </button>
 
+            {/* Unified dropdown: search + scrollable list */}
             {isBankDropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl shadow-lg z-10 max-h-96 overflow-y-auto">
-                {banks.map((bank) => (
-                  <button
-                    key={bank.id}
-                    onClick={() => handleBankSelect(bank)}
-                    className="w-full p-4 flex items-center gap-3 hover:bg-gray-800/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-xs font-bold">
-                        {bank.logo}
-                      </span>
+              <div className="absolute top-full left-0 right-0 mt-2 bg-[#111] border border-white/20 rounded-2xl shadow-xl z-10 flex flex-col overflow-hidden">
+                {/* Sticky search input inside dropdown */}
+                <div className="p-3 border-b border-white/10 sticky top-0 bg-[#111] z-10">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={bankSearch}
+                    onChange={(e) => setBankSearch(e.target.value)}
+                    placeholder="Search banks..."
+                    className="w-full bg-[#1c1c1c] border border-white/10 text-white placeholder-gray-500 px-3 py-2.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
+                  />
+                </div>
+
+                {/* Scrollable bank list */}
+                <div className="max-h-56 overflow-y-auto">
+                  {banksLoading ? (
+                    <div className="flex justify-center py-6">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white" />
                     </div>
-                    <div className="flex flex-col items-start flex-grow">
-                      <span className="text-white font-medium">{bank.name}</span>
-                      <span className="text-gray-400 text-xs">Code: {bank.code}</span>
-                    </div>
-                    {selectedBank?.id === bank.id && (
-                      <HiCheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />
-                    )}
-                  </button>
-                ))}
+                  ) : banksError ? (
+                    <p className="text-red-400 text-sm text-center py-4">Failed to load banks</p>
+                  ) : filteredBanks.length === 0 ? (
+                    <p className="text-gray-400 text-sm text-center py-4">No banks found</p>
+                  ) : (
+                    filteredBanks.map((bank) => (
+                      <button
+                        key={bank.id}
+                        onClick={() => handleBankSelect(bank)}
+                        className="w-full p-4 flex items-center gap-3 hover:bg-gray-800/50 transition-colors"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-xs font-bold">
+                            {bank.logo}
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-start flex-grow">
+                          <span className="text-white font-medium">{bank.name}</span>
+                          <span className="text-gray-400 text-xs">Code: {bank.code}</span>
+                        </div>
+                        {selectedBank?.id === bank.id && (
+                          <HiCheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Search Banks */}
-        <div className="flex flex-col gap-2">
-          <label className="text-white text-sm font-medium">Search Bank</label>
-          <input
-            type="text"
-            placeholder="Search by bank name..."
-            className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
-            onChange={(e) => {
-              // Filter banks based on search (simplified - you can enhance this)
-              const searchTerm = e.target.value.toLowerCase();
-              // This is just a placeholder - you'd filter the banks array here
-            }}
-          />
-        </div>
-
         {/* Recent Recipients (Quick Access) */}
+        {/*
         {recentRecipients.length > 0 && (
           <div className="flex flex-col gap-3">
             <h3 className="text-white text-sm font-medium">Recent Recipients</h3>
@@ -742,16 +818,16 @@ export default function SendToBankPage() {
             ))}
           </div>
         )}
+        */}
 
         {/* Continue Button */}
         <button
           onClick={handleBankContinue}
           disabled={!selectedBank}
-          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${
-            !selectedBank
-              ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
-              : ""
-          }`}
+          className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!selectedBank
+            ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
+            : ""
+            }`}
         >
           Continue
         </button>

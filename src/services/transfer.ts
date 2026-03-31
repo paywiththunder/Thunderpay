@@ -10,6 +10,56 @@ const getAuthToken = () => {
     return null;
 };
 
+export interface BankItem {
+    id: string;
+    name: string;
+    code: string;
+}
+
+export const getBanksList = async (): Promise<BankItem[]> => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const response = await axios.get(`${API_URL}/banks/list`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        if (response.data?.success) {
+            return response.data.data as BankItem[];
+        }
+        throw new Error(response.data?.description || "Failed to fetch banks list");
+    } catch (error: any) {
+        throw error.response?.data || error.message;
+    }
+};
+
+export interface VerifyAccountPayload {
+    bankId: string;
+    accountNumber: string;
+}
+
+export const verifyAccountNumber = async (payload: VerifyAccountPayload): Promise<string> => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const response = await axios.post(`${API_URL}/verify-account-number`, payload, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        });
+        if (response.data?.success) {
+            return response.data.data as string; // account name
+        }
+        throw new Error(response.data?.description || "Account verification failed");
+    } catch (error: any) {
+        throw error.response?.data || error.message;
+    }
+};
+
 export type TransferScope = "INTERNAL" | "EXTERNAL_WALLET" | "EXTERNAL_BANK";
 
 export interface TransferQuotePayload {
@@ -80,6 +130,52 @@ export const executeTransfer = async (payload: TransferExecutionPayload) => {
             },
         });
         return response.data;
+    } catch (error: any) {
+        throw error.response?.data || error.message;
+    }
+};
+
+// ─── Bank Transfer ────────────────────────────────────────────────────────────
+
+export interface InitiateBankTransferPayload {
+    walletId: number;
+    recipientAccountNumber: string;
+    bankCode: string;
+    amount: number;
+    pin: string;
+    reason?: string;
+    reference?: string;
+}
+
+export interface InitiateBankTransferResponse {
+    reference: string;
+    bankCode?: string;
+    amount: number;
+    recipientAccountNumber?: string;
+    recipientAccountName?: string;
+    amountMinor: number;
+    status: string;
+    direction?: string;
+    providerTransferId?: string;
+}
+
+export const initiateBankTransfer = async (
+    payload: InitiateBankTransferPayload
+): Promise<InitiateBankTransferResponse> => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const response = await axios.post(`${API_URL}/to-bank/initiate`, payload, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        });
+        if (response.data?.success) {
+            return response.data.data as InitiateBankTransferResponse;
+        }
+        throw new Error(response.data?.description || "Transfer failed");
     } catch (error: any) {
         throw error.response?.data || error.message;
     }

@@ -1,13 +1,16 @@
 "use client";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getBoltsHistory, BoltsTransaction, DEFAULT_CURRENCY_ID } from "@/services/cashback";
+import { getBoltsHistory, BoltsTransaction } from "@/services/cashback";
+import { useCurrency } from "@/providers/CurrencyProvider";
 import { HiMiniBolt, HiChevronRight } from "react-icons/hi2";
 
 export default function BoltsHistory() {
+    const { ngnCurrencyId, isLoading: currencyLoading } = useCurrency();
     const { data, isLoading, error } = useQuery({
-        queryKey: ["boltsHistory"],
-        queryFn: () => getBoltsHistory({ currencyId: DEFAULT_CURRENCY_ID, page: 0, size: 20 }),
+        queryKey: ["boltsHistory", ngnCurrencyId],
+        queryFn: () => getBoltsHistory({ currencyId: ngnCurrencyId!, page: 0, size: 20 }),
+        enabled: ngnCurrencyId !== null && !currencyLoading,
     });
 
     if (isLoading) {

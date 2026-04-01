@@ -10,9 +10,6 @@ const getAuthToken = () => {
     return null;
 };
 
-// default currency id used throughout the app (NGN teal)
-export const DEFAULT_CURRENCY_ID = 1; // adjust if backend uses different mapping
-
 
 export interface CashbackBalanceData {
     minimumRequired: number;
@@ -99,11 +96,15 @@ export interface BoltsHistoryResponse {
 
 /**
  * Fetch the cashback/bolts balance for a specific currency
- * @param currencyId The ID of the currency (e.g., 3)
+ * @param currencyId The ID of the currency (required, pass from Context)
  */
-export const getCashbackBalance = async (currencyId: number | string = 1): Promise<CashbackBalanceResponse> => {
+export const getCashbackBalance = async (currencyId: number): Promise<CashbackBalanceResponse> => {
     const token = getAuthToken();
     if (!token) throw new Error("No auth token found");
+
+    if (!currencyId) {
+        throw new Error("Currency ID is required");
+    }
 
     try {
         const response = await axios.get(`${API_URL}/bolts/balance`, {
@@ -148,10 +149,14 @@ export const convertBolts = async (payload: ConvertBoltsPayload): Promise<Cashba
  * Fetch the conversion/earning history for bolts
  * @param params { currencyId, page, size }
  */
-export const getBoltsHistory = async (params: { currencyId: number | string; page?: number; size?: number }): Promise<BoltsHistoryResponse> => {
-    const { currencyId = 1, page = 0, size = 20 } = params;
+export const getBoltsHistory = async (params: { currencyId: number; page?: number; size?: number }): Promise<BoltsHistoryResponse> => {
+    const { currencyId, page = 0, size = 20 } = params;
     const token = getAuthToken();
     if (!token) throw new Error("No auth token found");
+    
+    if (!currencyId) {
+        throw new Error("Currency ID is required");
+    }
 
     try {
         const response = await axios.get(`${API_URL}/bolts/history`, {

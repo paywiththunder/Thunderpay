@@ -2,48 +2,31 @@
 import React, { useState, useRef } from "react";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import { useRouter } from "next/navigation";
-import { resetPin, verifyResetPin } from "@/services/user";
+import { resetPin, verifyResetPin, setPin } from "@/services/user";
 import toast from "react-hot-toast";
 
 export default function ResetPinPage() {
     const router = useRouter();
-    const [step, setStep] = useState<1 | 2>(1); // 1: Enter New PIN, 2: Verify Code
+    const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Confirmation, 2: Verify Code, 3: Reset PIN
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
-    const [pinCodes, setPinCodes] = useState(["", "", "", ""]);
-    const [verifyCodes, setVerifyCodes] = useState(["", "", "", "", "", ""]); // Assuming 6 digit code based on "872251"
+    const [verifyCodes, setVerifyCodes] = useState(["", "", "", "", "", ""]); // 6-digit verification code
+    const [newPinCodes, setNewPinCodes] = useState(["", "", "", ""]); // 4-digit new PIN
 
-    const pinInputRefs = useRef<(HTMLInputElement | null)[]>([]);
     const verifyInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const newPinInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
     const handleBack = () => {
         if (step === 2) {
             setStep(1);
             setError("");
-            // Reset verify codes
             setVerifyCodes(["", "", "", "", "", ""]);
+        } else if (step === 3) {
+            setStep(2);
+            setError("");
+            setNewPinCodes(["", "", "", ""]);
         } else {
             router.back();
-        }
-    };
-
-    const handlePinChange = (index: number, value: string) => {
-        if (isLoading) return;
-        if (value.length > 1) return;
-        if (!/^[0-9]?$/.test(value)) return;
-
-        const newCodes = [...pinCodes];
-        newCodes[index] = value;
-        setPinCodes(newCodes);
-
-        // Auto-advance
-        if (value && index < 3) {
-            pinInputRefs.current[index + 1]?.focus();
-        }
-
-        // Auto-submit when all 4 digits are entered
-        if (newCodes.every((code) => code !== "") && index === 3 && step === 1) {
-            submitNewPin(newCodes.join(""));
         }
     };
 
@@ -62,15 +45,8 @@ export default function ResetPinPage() {
         }
 
         // Auto-submit when all 6 digits are entered
-        if (newCodes.every((code) => code !== "") && index === 5 && step === 2) {
+        if (newCodes.every((code) => code !== "") && index === 5) {
             submitVerifyCode(newCodes.join(""));
-        }
-    };
-
-    const handlePinKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (isLoading) return;
-        if (e.key === "Backspace" && !pinCodes[index] && index > 0) {
-            pinInputRefs.current[index - 1]?.focus();
         }
     };
 
@@ -81,19 +57,37 @@ export default function ResetPinPage() {
         }
     };
 
-    const submitNewPin = async (pin: string) => {
+    const handleNewPinChange = (index: number, value: string) => {
+        if (isLoading) return;
+        if (value.length > 1) return;
+        if (!/^[0-9]?$/.test(value)) return;
+
+        const newCodes = [...newPinCodes];
+        newCodes[index] = value;
+        setNewPinCodes(newCodes);
+
+        // Auto-advance
+        if (value && index < 3) {
+            newPinInputRefs.current[index + 1]?.focus();
+        }
+    };
+
+    const handleNewPinKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (isLoading) return;
+        if (e.key === "Backspace" && !newPinCodes[index] && index > 0) {
+            newPinInputRefs.current[index - 1]?.focus();
+        }
+    };
+
+    const submitConfirmation = async () => {
         setIsLoading(true);
         setError("");
         try {
-            const response = await resetPin(pin);
+            // Send empty body to initiate PIN reset
+            const response = await resetPin("");
 
-            if (response && response.data) {
-                toast.success(`Verification Code: ${response.data}`, { duration: 10000 });
-            } else {
-                toast.success("PIN reset initiated! Check your messages.");
-            }
-
-            console.log("Reset PIN Response:", response); // For debugging
+            toast.success("Verification code sent to your email!");
+            console.log("Reset PIN Initiated:", response);
             setStep(2);
         } catch (err: any) {
             console.error(err);
@@ -109,16 +103,43 @@ export default function ResetPinPage() {
         setError("");
         try {
             const response = await verifyResetPin(code);
-            toast.success("PIN reset successful!");
-            console.log("Verify Response:", response);
-            router.push("/profile");
+
+            toast.success("Code verified! Now enter your new PIN.");
+            console.log("Verify Code Response:", response);
+            setStep(3);
         } catch (err: any) {
             console.error(err);
-            setError(err.description || "Verification failed");
-            toast.error(err.description || "Verification failed");
-            // Reset code on failure?
+            setError(err.description || "Invalid verification code");
+            toast.error(err.description || "Invalid verification code");
             setVerifyCodes(["", "", "", "", "", ""]);
-            verifyInputRefs.current[0]?.focus();
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const submitNewPin = async () => {
+        if (newPinCodes.some((code) => code === "")) {
+            setError("Please enter a complete 4-digit PIN");
+            return;
+        }
+
+        setIsLoading(true);
+        setError("");
+        try {
+            const newPin = newPinCodes.join("");
+            const response = await setPin(newPin);
+
+            toast.success("PIN reset successfully!");
+            console.log("PIN Reset Response:", response);
+            
+            // Redirect to profile after successful reset
+            setTimeout(() => {
+                router.push("/profile");
+            }, 1500);
+        } catch (err: any) {
+            console.error(err);
+            setError(err.description || "Failed to reset PIN");
+            toast.error(err.description || "Failed to reset PIN");
         } finally {
             setIsLoading(false);
         }
@@ -136,7 +157,7 @@ export default function ResetPinPage() {
                     <MdOutlineKeyboardDoubleArrowLeft className="text-white" />
                 </button>
                 <h1 className="text-2xl font-bold text-white">
-                    {step === 1 ? "Reset PIN" : "Verify Code"}
+                    {step === 1 ? "Reset PIN" : step === 2 ? "Verify Code" : "Enter New PIN"}
                 </h1>
             </header>
 
@@ -145,43 +166,35 @@ export default function ResetPinPage() {
 
                     {step === 1 && (
                         <>
-                            <p className="text-gray-400 text-center mb-4">
-                                Enter your new 4-digit PIN to reset your security pin.
-                            </p>
-                            <div className="flex justify-center gap-4">
-                                {pinCodes.map((digit, i) => (
-                                    <input
-                                        key={`pin-${i}`}
-                                        ref={(el) => {
-                                            pinInputRefs.current[i] = el;
-                                        }}
-                                        disabled={isLoading}
-                                        type="password"
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        maxLength={1}
-                                        value={digit}
-                                        onChange={(e) => {
-                                            const val = e.target.value.replace(/\D/g, "");
-                                            handlePinChange(i, val);
-                                        }}
-                                        onKeyDown={(e) => handlePinKeyDown(i, e)}
-                                        className={`w-14 h-14 text-center text-2xl font-medium rounded-xl border bg-[#0f1112] focus:outline-none focus:ring-2 transition-all ${error
-                                            ? "border-red-500 text-red-500 focus:border-red-500 focus:ring-red-500"
-                                            : digit
-                                                ? "border-blue-500/50 text-white ring-blue-500 shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]"
-                                                : "border-[#2B2F33] text-gray-400 focus:border-blue-500 focus:ring-blue-500"
-                                            } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-                                    />
-                                ))}
+                            <div className="text-center">
+                                <p className="text-gray-300 text-lg font-medium mb-2">
+                                    Are you sure you want to reset your PIN?
+                                </p>
+                                <p className="text-gray-500 text-sm">
+                                    You will receive a verification code via email.
+                                </p>
                             </div>
+
+                            <button
+                                onClick={submitConfirmation}
+                                disabled={isLoading}
+                                className="w-full py-3 mt-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors"
+                            >
+                                {isLoading ? "Sending..." : "Yes, Reset PIN"}
+                            </button>
+
+                            {error && (
+                                <p className="text-red-500 text-sm font-medium text-center">
+                                    {error}
+                                </p>
+                            )}
                         </>
                     )}
 
                     {step === 2 && (
                         <>
                             <p className="text-gray-400 text-center mb-4">
-                                Enter the 6-digit verification code sent to you.
+                                Enter the 6-digit verification code sent to your email.
                             </p>
                             <div className="flex justify-center gap-2">
                                 {verifyCodes.map((digit, i) => (
@@ -210,20 +223,76 @@ export default function ResetPinPage() {
                                     />
                                 ))}
                             </div>
+
+                            {error && (
+                                <p className="text-red-500 text-sm font-medium text-center animate-pulse">
+                                    {error}
+                                </p>
+                            )}
+
+                            {isLoading && (
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                                    <p className="text-blue-500 text-sm font-medium">Verifying...</p>
+                                </div>
+                            )}
                         </>
                     )}
 
-                    {error && (
-                        <p className="text-red-500 text-sm font-medium animate-pulse text-center">
-                            {error}
-                        </p>
-                    )}
+                    {step === 3 && (
+                        <>
+                            <p className="text-gray-400 text-center mb-4">
+                                Enter your new 4-digit PIN.
+                            </p>
+                            <div className="flex justify-center gap-4">
+                                {newPinCodes.map((digit, i) => (
+                                    <input
+                                        key={`new-pin-${i}`}
+                                        ref={(el) => {
+                                            newPinInputRefs.current[i] = el;
+                                        }}
+                                        disabled={isLoading}
+                                        type="password"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        maxLength={1}
+                                        value={digit}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/\D/g, "");
+                                            handleNewPinChange(i, val);
+                                        }}
+                                        onKeyDown={(e) => handleNewPinKeyDown(i, e)}
+                                        className={`w-14 h-14 text-center text-2xl font-medium rounded-xl border bg-[#0f1112] focus:outline-none focus:ring-2 transition-all ${error
+                                            ? "border-red-500 text-red-500 focus:border-red-500 focus:ring-red-500"
+                                            : digit
+                                                ? "border-blue-500/50 text-white ring-blue-500 shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]"
+                                                : "border-[#2B2F33] text-gray-400 focus:border-blue-500 focus:ring-blue-500"
+                                            } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                                    />
+                                ))}
+                            </div>
 
-                    {isLoading && (
-                        <div className="flex flex-col items-center gap-2">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                            <p className="text-blue-500 text-sm font-medium">Processing...</p>
-                        </div>
+                            <button
+                                onClick={submitNewPin}
+                                disabled={isLoading || newPinCodes.some((code) => code === "")}
+                                className="w-full py-3 mt-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors"
+                            >
+                                {isLoading ? "Resetting..." : "Reset PIN"}
+                            </button>
+
+                            {error && (
+                                <p className="text-red-500 text-sm font-medium text-center animate-pulse">
+                                    {error}
+                                </p>
+                            )}
+
+                            {isLoading && (
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                                    <p className="text-blue-500 text-sm font-medium">Processing...</p>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>

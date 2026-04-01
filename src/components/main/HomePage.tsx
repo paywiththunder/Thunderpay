@@ -17,20 +17,23 @@ import Wlcomemessages from "./Wlcomemessages";
 import Image from "next/image";
 import NoTransaction from "../../../public/walletimg.png";
 import AppHeader from "./AppHeader";
-import { getCashbackBalance, DEFAULT_CURRENCY_ID } from "@/services/cashback";
+import { getCashbackBalance } from "@/services/cashback";
 import { getWallets } from "@/services/wallet";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import { useBalanceVisibility } from "@/hooks/useBalanceVisibility";
+import { useCurrency } from "@/providers/CurrencyProvider";
 
 export default function HomePage() {
   const { showBalance, toggleBalance } = useBalanceVisibility();
+  const { ngnCurrencyId, isLoading: currencyLoading } = useCurrency();
   const isComingSoon = false; // Simple toggle for later use
 
   // Fetch Bolts Balance
   const { data: cashbackResponse } = useQuery({
-    queryKey: ['cashbackBalance', DEFAULT_CURRENCY_ID],
-    queryFn: () => getCashbackBalance(DEFAULT_CURRENCY_ID),
+    queryKey: ['cashbackBalance', ngnCurrencyId],
+    queryFn: () => getCashbackBalance(ngnCurrencyId!),
+    enabled: ngnCurrencyId !== null && !currencyLoading,
   });
   const boltsBalance = cashbackResponse?.success ? cashbackResponse.data.availableBolts : null;
 

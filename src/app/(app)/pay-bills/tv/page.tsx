@@ -20,7 +20,8 @@ import {
   verifyTv,
   BillExecutionPayload
 } from "@/services/bills";
-import { getCashbackBalance, DEFAULT_CURRENCY_ID } from "@/services/cashback";
+import { getCashbackBalance } from "@/services/cashback";
+import { useCurrency } from "@/providers/CurrencyProvider";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 interface CableTVProvider {
@@ -52,6 +53,7 @@ type PaymentOptionType = "hot-offers" | "monthly" | "quarterly";
 
 export default function TVPage() {
   const router = useRouter();
+  const { ngnCurrencyId, isLoading: currencyLoading } = useCurrency();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<Step>("form");
   const [selectedProvider, setSelectedProvider] = useState<CableTVProvider>(
@@ -80,8 +82,9 @@ export default function TVPage() {
 
   // Fetch Bolt Balance (Cashback)
   const { data: cashbackData } = useQuery({
-    queryKey: ["cashbackBalance"],
-    queryFn: () => getCashbackBalance(DEFAULT_CURRENCY_ID),
+    queryKey: ["cashbackBalance", ngnCurrencyId],
+    queryFn: () => getCashbackBalance(ngnCurrencyId!),
+    enabled: ngnCurrencyId !== null && !currencyLoading,
   });
 
   const boltBalance = cashbackData?.data?.availableBolts || 0;

@@ -6,8 +6,9 @@ import CashbacksIcon from "../../../../public/cashbacks.png";
 import FAQIcon from "../../../../public/faq.png";
 import ReferIcon from "../../../../public/refer.png";
 import { HiGift, HiArrowPath, HiMiniBolt } from "react-icons/hi2";
-import { getCashbackBalance, convertBolts, getConversionInfo, CashbackBalanceData, BoltsConversionInfo, DEFAULT_CURRENCY_ID } from "@/services/cashback";
+import { getCashbackBalance, convertBolts, getConversionInfo, CashbackBalanceData, BoltsConversionInfo } from "@/services/cashback";
 import { getWallets } from "@/services/wallet";
+import { useCurrency } from "@/providers/CurrencyProvider";
 import BoltsHistory from "@/components/rewards/BoltsHistory";
 import { toast } from "react-hot-toast";
 import { constructNow } from "date-fns";
@@ -23,6 +24,7 @@ interface RewardCard {
 }
 
 export default function RewardsPage() {
+  const { ngnCurrencyId, isLoading: currencyLoading } = useCurrency();
   const [isComingSoon, setIsComingSoon] = useState(false);
   const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState<CashbackBalanceData | null>(null);
@@ -32,18 +34,20 @@ export default function RewardsPage() {
   const [referralCode, setReferralCode] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchBalance();
-    fetchConversionInfo();
+    if (ngnCurrencyId && !currencyLoading) {
+      fetchBalance();
+      fetchConversionInfo();
+    }
     const storedReferralCode = localStorage.getItem("referralCode");
     if (storedReferralCode) {
       setReferralCode(storedReferralCode);
     }
-  }, []);
+  }, [ngnCurrencyId, currencyLoading]);
 
   const fetchBalance = async () => {
     try {
       setLoading(true);
-      const response = await getCashbackBalance(DEFAULT_CURRENCY_ID); // Using default currency id
+      const response = await getCashbackBalance(ngnCurrencyId!);
       if (response.success) {
         setBalance(response.data);
       }

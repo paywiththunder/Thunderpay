@@ -40,11 +40,11 @@ export const resetPin = async (pin: string) => {
     if (!token) throw new Error("No auth token found");
 
     try {
+        const body = pin === "" ? {} : { pin };
+
         const response = await axios.post(
             `${API_URL}/reset-pin`,
-            {
-                pin,
-            },
+            body,
             {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -52,7 +52,7 @@ export const resetPin = async (pin: string) => {
                 },
             }
         );
-        console.log(response.data);
+        console.log('Reset PIN response:', response.data);
         return response.data;
     } catch (error: any) {
         throw error.response?.data || error.message;
@@ -76,6 +76,7 @@ export const verifyResetPin = async (code: string) => {
                 },
             }
         );
+        console.log('Verify Reset PIN response:', response.data);
         return response.data;
     } catch (error: any) {
         throw error.response?.data || error.message;

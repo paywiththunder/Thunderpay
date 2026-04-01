@@ -11,7 +11,8 @@ import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
 import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse, getDataPlans, DataPlan as ApiDataPlan, getDataQuote, DataQuotePayload, BillExecutionPayload } from "@/services/bills";
-import { getCashbackBalance, DEFAULT_CURRENCY_ID } from "@/services/cashback";
+import { getCashbackBalance } from "@/services/cashback";
+import { useCurrency } from "@/providers/CurrencyProvider";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 interface NetworkProvider {
@@ -61,6 +62,7 @@ type OfferCategory = "hot-offers" | "daily" | "weekly";
 
 export default function DataPage() {
   const router = useRouter();
+  const { ngnCurrencyId, isLoading: currencyLoading } = useCurrency();
   const networkDropdownRef = useRef<HTMLDivElement>(null);
   const recentsDropdownRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<Step>("form");
@@ -87,8 +89,9 @@ export default function DataPage() {
 
   // Fetch Bolt Balance (Cashback)
   const { data: cashbackData } = useQuery({
-    queryKey: ["cashbackBalance"],
-    queryFn: () => getCashbackBalance(DEFAULT_CURRENCY_ID),
+    queryKey: ["cashbackBalance", ngnCurrencyId],
+    queryFn: () => getCashbackBalance(ngnCurrencyId!),
+    enabled: ngnCurrencyId !== null && !currencyLoading,
   });
 
   const boltBalance = cashbackData?.data?.availableBolts || 0;

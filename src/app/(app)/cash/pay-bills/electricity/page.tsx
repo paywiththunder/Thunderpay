@@ -11,7 +11,8 @@ import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getCashbackBalance, DEFAULT_CURRENCY_ID } from "@/services/cashback";
+import { getCashbackBalance } from "@/services/cashback";
+import { useCurrency } from "@/providers/CurrencyProvider";
 import {
     getElectricityQuote,
     ElectricityQuotePayload,
@@ -48,6 +49,7 @@ type TransactionResult = "success" | "failure" | null;
 
 export default function ElectricityPage() {
     const router = useRouter();
+    const { ngnCurrencyId, isLoading: currencyLoading } = useCurrency();
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [step, setStep] = useState<Step>("form");
     const [selectedProvider, setSelectedProvider] = useState<ElectricityProvider>(
@@ -73,8 +75,9 @@ export default function ElectricityPage() {
 
     // Fetch Bolt Balance (Cashback)
     const { data: cashbackData } = useQuery({
-        queryKey: ["cashbackBalance"],
-        queryFn: () => getCashbackBalance(DEFAULT_CURRENCY_ID), // Assuming NGN/Cash
+        queryKey: ["cashbackBalance", ngnCurrencyId],
+        queryFn: () => getCashbackBalance(ngnCurrencyId!),
+        enabled: ngnCurrencyId !== null && !currencyLoading,
     });
 
     const boltBalance = cashbackData?.data?.availableBolts || 0;

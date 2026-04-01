@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import QueryProvider from "@/providers/QueryProvider";
+import { CurrencyProvider } from "@/providers/CurrencyProvider";
 
 export const metadata: Metadata = {
   title: "Thunder",
@@ -21,8 +22,10 @@ export default function RootLayout({
         className={`${GeistSans.variable} ${GeistMono.variable} antialiased bg-black h-full`}
       >
         <QueryProvider>
-          {children}
-          <Toaster position="top-center" />
+          <CurrencyProvider>
+            {children}
+            <Toaster position="top-center" />
+          </CurrencyProvider>
         </QueryProvider>
       </body>
     </html>

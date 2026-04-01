@@ -42,12 +42,12 @@ const networkProviders: NetworkProvider[] = [
 ];
 
 const FALLBACK_PLANS: DataPlan[] = [
-    { id: "1gb", data: "1GB", price: 500, duration: "1 Day", cashback: 5 },
-    { id: "2.5gb", data: "2.5GB", price: 700, duration: "2 Days", cashback: 7 },
-    { id: "3.2gb", data: "3.2GB", price: 1000, duration: "2 Days", cashback: 10 },
-    { id: "2gb", data: "2GB", price: 1500, duration: "30 Days", cashback: 15 },
-    { id: "3.5gb", data: "3.5GB", price: 2500, duration: "30 Days", cashback: 25 },
-    { id: "20gb", data: "20GB", price: 5000, duration: "30 Days", cashback: 50 },
+    { id: "1gb", data: "1GB", price: 500, duration: "1 Day", cashback: 0 },
+    { id: "2.5gb", data: "2.5GB", price: 700, duration: "2 Days", cashback: 0 },
+    { id: "3.2gb", data: "3.2GB", price: 1000, duration: "2 Days", cashback: 0 },
+    { id: "2gb", data: "2GB", price: 1500, duration: "30 Days", cashback: 0 },
+    { id: "3.5gb", data: "3.5GB", price: 2500, duration: "30 Days", cashback: 0 },
+    { id: "20gb", data: "20GB", price: 5000, duration: "30 Days", cashback: 0 },
 ];
 
 const recentNumbers: RecentNumber[] = [

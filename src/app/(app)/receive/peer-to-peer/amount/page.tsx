@@ -4,12 +4,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 
 const amountOptions = [
-  { amount: 1000, cashback: 10 },
-  { amount: 2000, cashback: 20 },
-  { amount: 3000, cashback: 30 },
-  { amount: 5000, cashback: 50 },
-  { amount: 10000, cashback: 100 },
-  { amount: 20000, cashback: 200 },
+  { amount: 1000 },
+  { amount: 2000 },
+  { amount: 3000 },
+  { amount: 5000 },
+  { amount: 10000 },
+  { amount: 20000 },
 ];
 
 function PeerToPeerAmount() {
@@ -80,7 +80,7 @@ function PeerToPeerAmount() {
                 ₦{option.amount.toLocaleString()}
               </span>
               <span className="text-gray-400 text-xs mt-1">
-                ₦{option.cashback} Cashback
+                ₦0 Cashback
               </span>
             </button>
           ))}

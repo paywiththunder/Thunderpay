@@ -87,7 +87,7 @@ function CryptoWalletAmount() {
                 ₦{option.amount.toLocaleString()}
               </span>
               <span className="text-gray-400 text-xs mt-1">
-                ₦{option.cashback} Cashback
+                ₦0 Cashback
               </span>
             </button>
           ))}

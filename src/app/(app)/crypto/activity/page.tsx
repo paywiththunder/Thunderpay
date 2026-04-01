@@ -52,10 +52,15 @@ export default function ActivityPage() {
             }
         });
 
-        // 4. Sort by date (newest first)
-        allTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        // 4. Deduplicate transactions by reference
+        const uniqueTransactions = Array.from(
+            new Map(allTransactions.map((tx) => [tx.reference, tx])).values()
+        );
 
-        return allTransactions;
+        // 5. Sort by date (newest first)
+        uniqueTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        return uniqueTransactions;
     };
 
     const { data: transactions = [], isLoading: loading } = useQuery({
@@ -150,7 +155,7 @@ export default function ActivityPage() {
                                 const isNegative = ["send", "withdrawal", "bill", "electricity", "card"].includes(tx.source.toLowerCase());
                                 return (
                                     <div
-                                        key={tx.id}
+                                        key={tx.reference}
                                         className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-xl p-4 flex items-center justify-between active:bg-white/5 transition-colors cursor-pointer"
                                         onClick={() => router.push(`/crypto/activity/${tx.reference}`)}
                                     >

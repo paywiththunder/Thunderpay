@@ -236,9 +236,7 @@ export default function ElectricityPage() {
   };
 
   const getCashback = (): number => {
-    const amountNum = parseFloat(amount);
-    const option = amountOptions.find((opt) => opt.amount === amountNum);
-    return option?.cashback || 0;
+    return 0;
   };
 
   const getAvailableBalance = (): string => {
@@ -609,7 +607,7 @@ export default function ElectricityPage() {
                   ₦{option.amount.toLocaleString()}
                 </span>
                 <span className="text-gray-400 text-xs mt-1">
-                  ₦{option.cashback} Cashback
+                  ₦0 Cashback
                 </span>
               </button>
             ))}

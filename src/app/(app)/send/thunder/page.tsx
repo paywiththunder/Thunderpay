@@ -10,6 +10,7 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
+import { initiateThunderTransfer } from "@/services/transfer";
 
 interface RecentRecipient {
   id: string;
@@ -45,12 +46,12 @@ const recentRecipients: RecentRecipient[] = [
 ];
 
 const amountOptions = [
-  { amount: 1000, cashback: 10 },
-  { amount: 2000, cashback: 20 },
-  { amount: 3000, cashback: 30 },
-  { amount: 5000, cashback: 50 },
-  { amount: 10000, cashback: 100 },
-  { amount: 20000, cashback: 200 },
+  { amount: 1000 },
+  { amount: 2000 },
+  { amount: 3000 },
+  { amount: 5000 },
+  { amount: 10000 },
+  { amount: 20000 },
 ];
 
 type Step = "account" | "amount" | "payment" | "confirmation" | "enterPin" | "result";
@@ -162,10 +163,8 @@ export default function SendToThunderPage() {
   };
 
   const getCashback = (): number => {
-    const amountNum = parseFloat(amount);
-    const option = amountOptions.find((opt) => opt.amount === amountNum);
-    return option?.cashback || 0;
-  };
+        return 0;
+    };
 
   const getAvailableBalance = (): string => {
     if (!selectedPaymentMethod) return "₦0.00";
@@ -198,11 +197,27 @@ export default function SendToThunderPage() {
   };
 
   const handlePinComplete = async (pin: string) => {
-    const token = generateTransactionToken();
-    setTransactionToken(token);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const isSuccess = Math.random() > 0.3;
-    setTransactionResult(isSuccess ? "success" : "failure");
+    if (!selectedRecipient || !selectedPaymentMethod || !amount) {
+      setTransactionResult("failure");
+      setStep("result");
+      return;
+    }
+
+    try {
+      const walletId = selectedPaymentMethod.walletId || selectedPaymentMethod.id;
+      const result = await initiateThunderTransfer({
+        walletId: typeof walletId === "string" ? parseInt(walletId) : walletId,
+        recipientAccountNumber: accountNumber,
+        amount: parseFloat(amount),
+        pin: pin,
+      });
+
+      setTransactionToken(result.reference);
+      setTransactionResult("success");
+    } catch (error: any) {
+      console.error("Thunder transfer error:", error);
+      setTransactionResult("failure");
+    }
     setStep("result");
   };
 
@@ -367,7 +382,7 @@ export default function SendToThunderPage() {
                   ₦{option.amount.toLocaleString()}
                 </span>
                 <span className="text-gray-400 text-xs mt-1">
-                  ₦{option.cashback} Cashback
+                  ₦0 Cashback
                 </span>
               </button>
             ))}

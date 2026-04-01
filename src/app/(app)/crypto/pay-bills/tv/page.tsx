@@ -103,7 +103,7 @@ export default function TVPage() {
           name: p.name,
           price: parseFloat(p.variation_amount),
           duration: duration,
-          cashback: 0
+          cashback: (p.cashback ? Number(p.cashback) : 0) || 0
         };
       });
       setAvailablePlans(mappedPlans);

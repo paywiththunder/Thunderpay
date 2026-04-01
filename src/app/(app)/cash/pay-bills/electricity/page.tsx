@@ -271,7 +271,7 @@ export default function ElectricityPage() {
                     <input type="text" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="enter amount" className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm mb-2" />
                     <div className="grid grid-cols-3 gap-3">
                         {amountOptions.map((option) => (
-                            <button key={option.amount} onClick={() => setAmount(option.amount.toString())} className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString() ? "ring-2 ring-blue-500 border-blue-500" : ""}`}><span className="text-white font-bold text-base">₦{option.amount.toLocaleString()}</span><span className="text-gray-400 text-xs mt-1">₦{option.cashback} Cashback</span></button>
+                            <button key={option.amount} onClick={() => setAmount(option.amount.toString())} className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString() ? "ring-2 ring-blue-500 border-blue-500" : ""}`}><span className="text-white font-bold text-base">₦{option.amount.toLocaleString()}</span></button>
                         ))}
                     </div>
                 </div>

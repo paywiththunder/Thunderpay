@@ -128,6 +128,7 @@ export interface DataPlan {
     name: string;
     variation_amount: string;
     fixedPrice: string;
+    cashback?: number;
 }
 
 export interface DataPlansResponse {

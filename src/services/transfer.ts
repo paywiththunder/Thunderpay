@@ -180,3 +180,47 @@ export const initiateBankTransfer = async (
         throw error.response?.data || error.message;
     }
 };
+
+// ─── Thunder Transfer ────────────────────────────────────────────────────────────
+
+export interface InitiateThunderTransferPayload {
+    walletId: number;
+    recipientAccountNumber: string;
+    amount: number;
+    pin: string;
+    reason?: string;
+    reference?: string;
+}
+
+export interface InitiateThunderTransferResponse {
+    reference: string;
+    amount: number;
+    recipientAccountNumber?: string;
+    recipientAccountName?: string;
+    amountMinor: number;
+    status: string;
+    direction?: string;
+    transactionId?: string;
+}
+
+export const initiateThunderTransfer = async (
+    payload: InitiateThunderTransferPayload
+): Promise<InitiateThunderTransferResponse> => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const response = await axios.post(`${API_URL}/thunder/initiate`, payload, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        });
+        if (response.data?.success) {
+            return response.data.data as InitiateThunderTransferResponse;
+        }
+        throw new Error(response.data?.description || "Thunder transfer failed");
+    } catch (error: any) {
+        throw error.response?.data || error.message;
+    }
+};

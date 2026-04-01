@@ -30,12 +30,12 @@ interface RecentBankRecipient {
 }
 
 const amountOptions = [
-  { amount: 1000, cashback: 10 },
-  { amount: 2000, cashback: 20 },
-  { amount: 5000, cashback: 50 },
-  { amount: 10000, cashback: 100 },
-  { amount: 20000, cashback: 200 },
-  { amount: 50000, cashback: 500 },
+  { amount: 1000 },
+  { amount: 2000 },
+  { amount: 5000 },
+  { amount: 10000 },
+  { amount: 20000 },
+  { amount: 50000 },
 ];
 
 const recentRecipients: RecentBankRecipient[] = [
@@ -252,9 +252,7 @@ export default function SendToBankPage() {
   };
 
   const getCashback = (): number => {
-    const amountNum = parseFloat(amount);
-    const option = amountOptions.find((opt) => opt.amount === amountNum);
-    return option?.cashback || 0;
+    return 0;
   };
 
   const getAvailableBalance = (): string => {
@@ -501,7 +499,7 @@ export default function SendToBankPage() {
                   ₦{option.amount.toLocaleString()}
                 </span>
                 <span className="text-gray-400 text-xs mt-1">
-                  ₦{option.cashback} Cashback
+                  ₦0 Cashback
                 </span>
               </button>
             ))}

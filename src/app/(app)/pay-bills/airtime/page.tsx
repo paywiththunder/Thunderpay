@@ -40,12 +40,12 @@ const networkProviders: NetworkProvider[] = [
 ];
 
 const amountOptions = [
-  { amount: 1000, cashback: 10 },
-  { amount: 2000, cashback: 20 },
-  { amount: 3000, cashback: 30 },
-  { amount: 5000, cashback: 50 },
-  { amount: 10000, cashback: 100 },
-  { amount: 20000, cashback: 200 },
+  { amount: 1000 },
+  { amount: 2000 },
+  { amount: 3000 },
+  { amount: 5000 },
+  { amount: 10000 },
+  { amount: 20000 },
 ];
 
 const recentNumbers: RecentNumber[] = [
@@ -206,9 +206,7 @@ export default function AirtimePage() {
   };
 
   const getCashback = (): number => {
-    const amountNum = parseFloat(amount);
-    const option = amountOptions.find((opt) => opt.amount === amountNum);
-    return option?.cashback || 0;
+    return 0;
   };
 
   const getAvailableBalance = (): string => {
@@ -489,7 +487,6 @@ export default function AirtimePage() {
                 className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString() ? "ring-2 ring-blue-500 border-blue-500" : ""}`}
               >
                 <span className="text-white font-bold text-base">₦{option.amount.toLocaleString()}</span>
-                <span className="text-gray-400 text-xs mt-1">₦{option.cashback} Cashback</span>
               </button>
             ))}
           </div>

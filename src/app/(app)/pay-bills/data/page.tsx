@@ -39,17 +39,14 @@ const networkProviders: NetworkProvider[] = [
   { id: "mtn", name: "MTN", logo: "M" },
   { id: "airtel", name: "Airtel", logo: "A" },
   { id: "glo", name: "GLO", logo: "G" },
+  { id: "glo_sme", name: "GLO SME", logo: "G" },
   { id: "9mobile", name: "9mobile", logo: "9" },
+  { id: "etisalat", name: "Etisalat", logo: "E" },
+  { id: "foreign_airtime", name: "Foreign Airtime", logo: "F" },
+  { id: "smile", name: "Smile", logo: "S" },
+  { id: "spectranet", name: "Spectranet", logo: "SP" },
 ];
 
-const FALLBACK_PLANS: DataPlan[] = [
-  { id: "1gb", data: "1GB", price: 500, duration: "1 Day", cashback: 5 },
-  { id: "2.5gb", data: "2.5GB", price: 700, duration: "2 Days", cashback: 7 },
-  { id: "3.2gb", data: "3.2GB", price: 1000, duration: "2 Days", cashback: 10 },
-  { id: "2gb", data: "2GB", price: 1500, duration: "30 Days", cashback: 15 },
-  { id: "3.5gb", data: "3.5GB", price: 2500, duration: "30 Days", cashback: 25 },
-  { id: "20gb", data: "20GB", price: 5000, duration: "30 Days", cashback: 50 },
-];
 
 const recentNumbers: RecentNumber[] = [
   { id: "1", number: "09020933533", network: "MTN" },
@@ -83,7 +80,7 @@ export default function DataPage() {
   const [transactionToken, setTransactionToken] = useState("");
   const [pinError, setPinError] = useState("");
 
-  const [availablePlans, setAvailablePlans] = useState<DataPlan[]>(FALLBACK_PLANS);
+  const [availablePlans, setAvailablePlans] = useState<DataPlan[]>([]);
   const [transactionDetails, setTransactionDetails] = useState<any>(null);
   const [quote, setQuote] = useState<any>(null);
 
@@ -106,9 +103,23 @@ export default function DataPage() {
   useEffect(() => {
     if (queryPlans && queryPlans.success && queryPlans.data) {
       const mappedPlans = queryPlans.data.map((p: ApiDataPlan) => {
-        const nameParts = p.name.split('-');
-        const duration = nameParts.length > 1 ? nameParts[1].trim() : "N/A";
-        const dataMatch = p.name.match(/(\d+(\.\d+)?(MB|GB))/i);
+        // Extract duration from name - look for time patterns
+        let duration = "";
+        const durationMatch = p.name.match(/(\d+\s*(hrs?|days?|weeks?|months?|year))/i);
+        if (durationMatch) {
+          duration = durationMatch[1].trim();
+        } else if (p.name.includes('-')) {
+          // Fallback: try to get from after the dash
+          const parts = p.name.split('-');
+          if (parts.length > 1) {
+            const afterDash = parts[1].trim();
+            if (afterDash && !afterDash.toLowerCase().includes('mb') && !afterDash.toLowerCase().includes('gb') && !afterDash.toLowerCase().includes('tb')) {
+              duration = afterDash;
+            }
+          }
+        }
+
+        const dataMatch = p.name.match(/(\d+(\.\d+)?(MB|GB|TB))/i);
         const dataAmount = dataMatch ? dataMatch[0] : p.name;
 
         return {
@@ -116,7 +127,7 @@ export default function DataPage() {
           data: dataAmount,
           price: parseFloat(p.variation_amount),
           duration: duration,
-          cashback: 0
+          cashback: (p.cashback ? Number(p.cashback) : 0) || 0
         };
       });
       setAvailablePlans(mappedPlans);
@@ -199,6 +210,10 @@ export default function DataPage() {
   const getFilteredPlans = () => {
     if (!availablePlans.length) return [];
     return availablePlans.filter((plan) => {
+      // If no duration info, include in hot-offers by default
+      if (!plan.duration) {
+        return offerCategory === "hot-offers";
+      }
       const durationLower = plan.duration.toLowerCase();
       switch (offerCategory) {
         case "daily":
@@ -371,7 +386,7 @@ export default function DataPage() {
           { label: "Network", value: selectedNetwork.name },
           { label: "Phone Number", value: phoneNumber },
           { label: "Data Plan", value: selectedPlan.data },
-          { label: "Duration", value: selectedPlan.duration },
+          ...(selectedPlan.duration ? [{ label: "Duration", value: selectedPlan.duration }] : []),
           { label: "Amount", value: `₦${selectedPlan.price.toLocaleString()}.00` },
           { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
           { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
@@ -401,7 +416,7 @@ export default function DataPage() {
       { label: "Network", value: selectedNetwork.name },
       { label: "Phone Number", value: phoneNumber },
       { label: "Data Plan", value: selectedPlan.data },
-      { label: "Duration", value: selectedPlan.duration },
+      ...(selectedPlan.duration ? [{ label: "Duration", value: selectedPlan.duration }] : []),
       { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
     ];
 
@@ -564,7 +579,7 @@ export default function DataPage() {
                 >
                   <span className="text-white font-bold text-base mb-1">{plan.data}</span>
                   <span className="text-white font-bold text-lg mb-1">₦{plan.price.toLocaleString()}</span>
-                  <span className="text-gray-400 text-xs mb-1">{plan.duration}</span>
+                  {plan.duration && <span className="text-gray-400 text-xs mb-1">{plan.duration}</span>}
                   <span className="text-gray-400 text-xs">₦{plan.cashback} Cashback</span>
                 </button>
               ))) : (

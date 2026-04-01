@@ -3,6 +3,9 @@ import { API_BASE_URL } from "@/config";
 
 const API_URL = `${API_BASE_URL}/cashback`;
 
+// Default currency ID for NGN (Nigerian Naira)
+export const DEFAULT_CURRENCY_ID = 1;
+
 const getAuthToken = () => {
     if (typeof window !== "undefined") {
         return localStorage.getItem("authToken");

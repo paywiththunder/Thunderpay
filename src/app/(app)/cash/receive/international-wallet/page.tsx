@@ -3,7 +3,6 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import Image from "next/image";
-import Globe from "../../../../../public/internationalwallet.png";
 
 export default function CreateInternationalWalletPage() {
   const router = useRouter();
@@ -25,7 +24,7 @@ export default function CreateInternationalWalletPage() {
       <div className="flex flex-col items-center z-10 flex-1 justify-center w-full overflow-y-auto">
         <div className="w-full md:w-64 md:h-64 relative">
           <Image
-            src={Globe}
+            src="/internationalwallet.png"
             alt="Globe"
             width={384}
             height={519}

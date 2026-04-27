@@ -3,7 +3,6 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import Image from "next/image";
-import QRCode from "../../../../../public/qrcode.png";
 
 export default function ScanQRPage() {
   const router = useRouter();
@@ -27,7 +26,7 @@ export default function ScanQRPage() {
         {/* QR Code */}
         <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-3xl p-8 mb-6">
           <Image
-            src={QRCode}
+            src="/qrcode.png"
             alt="QR Code"
             width={300}
             height={300}

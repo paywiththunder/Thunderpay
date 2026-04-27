@@ -7,7 +7,6 @@ import { IoCopyOutline, IoClose } from "react-icons/io5";
 import { FaWhatsapp, FaFacebook, FaPhone } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import Image from "next/image";
-import Avatars from "../../../../../public/friends.png";
 
 export default function PeerToPeerRequestPage() {
   const router = useRouter();
@@ -62,7 +61,7 @@ export default function PeerToPeerRequestPage() {
       <div className="flex flex-col items-center z-10 flex-1 justify-center w-full overflow-y-auto">
         <div className="w-full md:w-64 md:h-64 relative">
           <Image
-            src={Avatars}
+            src="/friends.png"
             alt="Invite Friends"
             width={384}
             height={519}

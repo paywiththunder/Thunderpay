@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import { HiBolt } from "react-icons/hi2";
 import Image from "next/image";
-import Wallet from "../../../../../public/cryptowallet.png";
 
 export default function CreateCryptoWalletPage() {
   const router = useRouter();
@@ -26,7 +25,7 @@ export default function CreateCryptoWalletPage() {
       <div className="flex flex-col items-center z-10 flex-1 justify-center w-full overflow-y-auto">
         <div className="w-full md:w-64 md:h-64 relative">
           <Image
-            src={Wallet}
+            src="/cryptowallet.png"
             alt="Wallet"
             width={384}
             height={519}

@@ -29,7 +29,7 @@ import { SiTether, SiSolana } from "react-icons/si";
 import AppHeader from "./AppHeader";
 import Right from '../../../public/right.png'
 import Left from '../../../public/left.png'
-import { getWalletsUsd } from "@/services/wallet";
+import { getWallets } from "@/services/wallet";
 
 // Helper to match icons (reused logic from ReceivePage)
 const getAssetConfig = (symbol: string) => {
@@ -87,8 +87,8 @@ export default function CryptoPage() {
         isLoading: walletsLoading,
         refetch: refetchWallets
     } = useQuery({
-        queryKey: ['walletsUsd'],
-        queryFn: getWalletsUsd,
+        queryKey: ['wallets'],
+        queryFn: getWallets,
     });
 
     // Query for Recent Transactions
@@ -103,8 +103,8 @@ export default function CryptoPage() {
     const loading = walletsLoading || transactionsLoading;
 
     // Derived states
-    const wallets = walletsResponse?.success && walletsResponse?.data?.wallets ? walletsResponse.data.wallets : [];
-    const totalAssets = walletsResponse?.success && walletsResponse?.data?.totalAssetsUsd ? walletsResponse.data.totalAssetsUsd : 0;
+    const wallets = walletsResponse?.success && walletsResponse?.data ? walletsResponse.data : [];
+    const totalAssets = 0; // Will need to calculate from individual wallets or use a different endpoint
     const transactions = transactionsResponse?.success ? transactionsResponse.data.items : [];
 
     const fetchWallets = () => {
@@ -219,7 +219,7 @@ export default function CryptoPage() {
                             </Link>
                         </div>
                     ) : (
-                        wallets.map((wallet: any, index: number) => {
+                        wallets.filter((wallet: any) => wallet.walletType !== "FIAT").map((wallet: any, index: number) => {
                             const currency = wallet.currency;
                             const symbol = currency?.code || currency?.ticker || "UNKNOWN";
                             const config = getAssetConfig(symbol);
@@ -229,13 +229,8 @@ export default function CryptoPage() {
                             const rawBalance = wallet.availableBalance ?? wallet.totalBalance ?? 0;
                             const balance = Number(rawBalance).toLocaleString('en-US', { maximumFractionDigits: 8 });
 
-                            // Format USD equivalent
-                            const usdValue = wallet.usdEquivalent
-                                ? Number(wallet.usdEquivalent).toLocaleString('en-US', {
-                                    style: 'currency',
-                                    currency: 'USD'
-                                })
-                                : "$0.00";
+                            // Format USD equivalent - will need to calculate or get from another source
+                            const usdValue = "$0.00"; // Placeholder since regular wallets endpoint doesn't include USD equivalent
 
                             return (
                                 <TokenItem

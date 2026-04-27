@@ -10,6 +10,8 @@ const getAuthToken = () => {
     return null;
 };
 
+// Getting bank lists
+
 export interface BankItem {
     id: string;
     name: string;
@@ -35,6 +37,9 @@ export const getBanksList = async (): Promise<BankItem[]> => {
     }
 };
 
+
+// Bank account verification
+
 export interface VerifyAccountPayload {
     bankId: string;
     accountNumber: string;
@@ -59,6 +64,9 @@ export const verifyAccountNumber = async (payload: VerifyAccountPayload): Promis
         throw error.response?.data || error.message;
     }
 };
+
+
+// Transfer Quotes and Excute Transfer
 
 export type TransferScope = "INTERNAL" | "EXTERNAL_WALLET" | "EXTERNAL_BANK";
 
@@ -135,7 +143,7 @@ export const executeTransfer = async (payload: TransferExecutionPayload) => {
     }
 };
 
-// ─── Bank Transfer ────────────────────────────────────────────────────────────
+// ─── Bank Transfer
 
 export interface InitiateBankTransferPayload {
     walletId: number;
@@ -173,6 +181,7 @@ export const initiateBankTransfer = async (
             },
         });
         if (response.data?.success) {
+            console.log(response.data.data)
             return response.data.data as InitiateBankTransferResponse;
         }
         throw new Error(response.data?.description || "Transfer failed");
@@ -181,7 +190,7 @@ export const initiateBankTransfer = async (
     }
 };
 
-// ─── Thunder Transfer ────────────────────────────────────────────────────────────
+// ─── Thunder Transfer
 
 export interface InitiateThunderTransferPayload {
     walletId: number;
@@ -221,6 +230,67 @@ export const initiateThunderTransfer = async (
         }
         throw new Error(response.data?.description || "Thunder transfer failed");
     } catch (error: any) {
+        throw error.response?.data || error.message;
+    }
+};
+
+// ─── Crypto to NGN Transfer
+
+export interface CryptoToNgnQuotePayload {
+    walletId: number;
+    network: string;
+    sourceAmount: number;
+    scope: "INTERNAL";
+    recipientAccountNumber: string;
+}
+
+export interface CryptoToNgnQuoteResponse {
+    description: string;
+    success: boolean;
+    data: {
+        quoteId: number;
+        quoteReference?: string;
+        rate: number;
+        expiresAt: string;
+        sourceDebitAmount: number;
+        networkFee: number | null;
+        internalFee: number;
+        totalDebit: number;
+        recipientAmount: number;
+    };
+}
+
+export const getCryptoToNgnQuote = async (
+    payload: CryptoToNgnQuotePayload
+): Promise<CryptoToNgnQuoteResponse> => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        console.log("🚀 Sending Crypto-NGN Quote Request to:", `${API_URL}/crypto-ngn/quote`);
+        console.log("📤 Quote Request Payload:", JSON.stringify(payload, null, 2));
+        
+        const response = await axios.post(`${API_URL}/crypto-ngn/quote`, payload, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        });
+        
+        console.log("✅ Crypto-NGN Quote Response Status:", response.status);
+        console.log("✅ Crypto-NGN Quote Response Headers:", response.headers);
+        console.log("✅ Crypto-NGN Quote Response Data:", JSON.stringify(response.data, null, 2));
+        
+        return response.data;
+    } catch (error: any) {
+        console.error("❌ Crypto-NGN Quote Request Failed:");
+        console.error("  - Status:", error.response?.status);
+        console.error("  - Status Text:", error.response?.statusText);
+        console.error("  - Response Headers:", error.response?.headers);
+        console.error("  - Response Data:", JSON.stringify(error.response?.data, null, 2));
+        console.error("  - Error Message:", error.message);
+        console.error("  - Full Error Object:", JSON.stringify(error, null, 2));
+        
         throw error.response?.data || error.message;
     }
 };

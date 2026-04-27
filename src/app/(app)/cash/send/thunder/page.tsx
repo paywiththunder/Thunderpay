@@ -240,6 +240,7 @@ export default function SendToThunderPage() {
         onBack={() => setStep("amount")}
         onSelect={handlePaymentMethodSelect}
         amount={parseFloat(amount) || 0}
+        walletType="fiat"
       />
     );
   }

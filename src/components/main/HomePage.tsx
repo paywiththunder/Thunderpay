@@ -1,11 +1,17 @@
 'use client'
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import {
   HiOutlineEye,
   HiOutlineEyeSlash,
   HiOutlineDocumentDuplicate,
   HiMiniBolt,
+  HiOutlineArrowUpRight,
+  HiOutlineArrowDownLeft,
+  HiOutlineArrowPath,
+  HiOutlineLightBulb,
+  HiOutlineCreditCard,
+  HiOutlineInbox,
 } from "react-icons/hi2";
 import {
   GiReceiveMoney,
@@ -13,18 +19,35 @@ import {
   GiBanknote,
   GiWallet,
 } from "react-icons/gi";
-import Wlcomemessages from "./Wlcomemessages";
 import Image from "next/image";
 import NoTransaction from "../../../public/walletimg.png";
 import AppHeader from "./AppHeader";
 import { getCashbackBalance } from "@/services/cashback";
 import { getWallets } from "@/services/wallet";
+import { getRecentTransactions } from "@/services/user";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import { useBalanceVisibility } from "@/hooks/useBalanceVisibility";
 import { useCurrency } from "@/providers/CurrencyProvider";
+import { useRouter } from "next/navigation";
+import { format, parseISO } from "date-fns";
+
+// Transaction Interface
+interface Transaction {
+  id: number;
+  source: string;
+  amount: number;
+  fee: number;
+  status: string;
+  reference: string;
+  walletId: number;
+  fromAddress: string | null;
+  toAddress: string | null;
+  createdAt: string;
+}
 
 export default function HomePage() {
+  const router = useRouter();
   const { showBalance, toggleBalance } = useBalanceVisibility();
   const { ngnCurrencyId, isLoading: currencyLoading } = useCurrency();
   const isComingSoon = false; // Simple toggle for later use
@@ -42,12 +65,58 @@ export default function HomePage() {
     queryKey: ['wallets'],
     queryFn: getWallets,
   });
+  console.log('Wallet response', walletsResponse)
   const fiatWallet = walletsResponse?.success && walletsResponse?.data
     ? walletsResponse.data.find((w: any) => w.walletType === "FIAT")
     : null;
 
+  // Fetch Recent Transactions
+  const { data: transactionsResponse, isLoading: transactionsLoading } = useQuery({
+    queryKey: ['recentTransactions'],
+    queryFn: getRecentTransactions,
+  });
+
+  const transactions = transactionsResponse?.success ? transactionsResponse.data.items : [];
+
+  const getIcon = (source: string) => {
+    switch (source.toLowerCase()) {
+      case "send":
+      case "withdrawal":
+        return HiOutlineArrowUpRight;
+      case "receive":
+      case "deposit":
+        return HiOutlineArrowDownLeft;
+      case "swap":
+      case "convert":
+        return HiOutlineArrowPath;
+      case "bill":
+      case "electricity":
+        return HiOutlineLightBulb;
+      case "card":
+        return HiOutlineCreditCard;
+      default:
+        return HiOutlineInbox;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "completed":
+      case "success":
+        return "text-green-500";
+      case "pending":
+      case "processing":
+        return "text-yellow-500";
+      case "failed":
+      case "cancelled":
+        return "text-red-500";
+      default:
+        return "text-gray-400";
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-3 w-full">
+    <div className="flex flex-col gap-3 w-full pb-20">
       <AppHeader />
 
       <div className="relative">
@@ -96,21 +165,61 @@ export default function HomePage() {
 
           {/* Action Buttons Grid */}
           <div className="grid grid-cols-4 gap-4">
-            <ActionButton icon={GiPayMoney} label="Pay Bills" href="/pay-bills" />
-            <ActionButton icon={GiBanknote} label="Send" href="/send" />
-            <ActionButton icon={GiReceiveMoney} label="Receive" href="/receive" />
-            <ActionButton icon={GiWallet} label="Convert" href="/convert" />
+            <ActionButton icon={GiPayMoney} label="Pay Bills" href="cash/pay-bills" />
+            <ActionButton icon={GiBanknote} label="Send" href="cash/send" />
+            <ActionButton icon={GiReceiveMoney} label="Receive" href="cash/receive" />
+            <ActionButton icon={GiWallet} label="Convert" href="cash/convert" />
           </div>
 
-          <Wlcomemessages />
+          {/* <Wlcomemessages /> */}
 
           {/* Recent Transactions */}
           <div>
             <h3 className="font-semibold mb-4">Recent transactions</h3>
-            <div className="flex flex-col items-center justify-center">
-              <Image src={NoTransaction} className="mb-3" alt="No Transaction" width={200} height={200} />
-              <p className="text-gray-500 font-[600] text-[2rem] -mt-18 mb-16">No Transaction Yet</p>
-            </div>
+            {transactionsLoading ? (
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+              </div>
+            ) : transactions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center">
+                <Image src={NoTransaction} className="mb-3" alt="No Transaction" width={200} height={200} />
+                <p className="text-gray-500 font-[600] text-[2rem] -mt-18 mb-16">No Transaction Yet</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {transactions.map((tx: Transaction) => {
+                  const Icon = getIcon(tx.source);
+                  const isNegative = ["send", "withdrawal", "bill", "electricity", "card"].includes(tx.source.toLowerCase());
+                  return (
+                    <div
+                      key={tx.reference}
+                      className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-xl p-4 flex items-center justify-between active:bg-white/5 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/crypto/activity/${tx.reference}`)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl border border-white/20 flex items-center justify-center">
+                          <Icon className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-white font-medium capitalize">{tx.source}</span>
+                          <span className="text-gray-500 text-xs truncate max-w-[150px]">
+                            {tx.status} • {format(parseISO(tx.createdAt), "MMM dd, HH:mm")}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className={`font-medium ${isNegative ? "text-red-500" : "text-green-500"}`}>
+                          {isNegative ? "-" : "+"}₦{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className={`text-[10px] uppercase font-bold ${getStatusColor(tx.status)}`}>
+                          {tx.status}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 

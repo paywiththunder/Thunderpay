@@ -50,19 +50,20 @@ export const getWallets = async () => {
                 "Content-Type": "application/json",
             },
         });
-        console.log(response.data);
+        console.log( 'Wallet', response.data);
         return response.data;
     } catch (error: any) {
         throw error.response?.data || error.message;
     }
 };
 
-export const getWalletsUsd = async () => {
+export const getWalletsUsd = async (type?: 'fiat' | 'crypto') => {
     const token = getAuthToken();
     if (!token) throw new Error("No auth token found");
 
     try {
-        const response = await axios.get(`${API_URL}/usd`, {
+        const url = type ? `${API_URL}/usd?type=${type}` : `${API_URL}/usd`;
+        const response = await axios.get(url, {
             headers: {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",

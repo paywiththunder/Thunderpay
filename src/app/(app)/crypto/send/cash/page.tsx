@@ -1,8 +1,8 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
-import { HiChevronRight, HiChevronDown, HiCheckCircle } from "react-icons/hi2";
+import { HiCheckCircle, HiChevronRight, HiChevronDown } from "react-icons/hi2";
 import PaymentMethod, {
   PaymentOption,
 } from "@/components/payment/PaymentMethod";
@@ -10,23 +10,24 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
-import { getBanksList, verifyAccountNumber, BankItem, initiateBankTransfer } from "@/services/transfer";
+import { getCryptoToNgnQuote, executeTransfer, verifyAccountNumber, getBanksList, BankItem } from "@/services/transfer";
+import { toast } from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 
-interface Bank {
-  id: string;   // maps to BankItem.id from the API
-  name: string;
-  code: string;
-  logo: string; // derived from first char of name
-}
-
-interface RecentBankRecipient {
+interface RecentRecipient {
   id: string;
   name: string;
   accountNumber: string;
-  bankName: string;
-  bankCode: string;
+  bankName?: string;
+  bankCode?: string;
   initial?: string;
+}
+
+interface Bank {
+  id: string;
+  name: string;
+  code: string;
+  logo: string;
 }
 
 const amountOptions = [
@@ -38,38 +39,13 @@ const amountOptions = [
   { amount: 50000 },
 ];
 
-const recentRecipients: RecentBankRecipient[] = [
-  {
-    id: "1",
-    name: "John Adebayo",
-    accountNumber: "0123456789",
-    bankName: "Access Bank",
-    bankCode: "044",
-    initial: "J",
-  },
-  {
-    id: "2",
-    name: "Sarah Okoro",
-    accountNumber: "9876543210",
-    bankName: "GTBank",
-    bankCode: "058",
-    initial: "S",
-  },
-  {
-    id: "3",
-    name: "Michael Chukwu",
-    accountNumber: "5555666677",
-    bankName: "Zenith Bank",
-    bankCode: "057",
-    initial: "M",
-  },
-];
+const recentRecipients: RecentRecipient[] = [];
 
 type Step = "bank" | "account" | "amount" | "payment" | "confirmation" | "enterPin" | "result";
 type TransactionResult = "success" | "failure" | null;
 type TabType = "recents" | "beneficiaries";
 
-export default function SendToBankPage() {
+export default function SendCryptoToCashPage() {
   const router = useRouter();
   const bankDropdownRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<Step>("bank");
@@ -78,9 +54,8 @@ export default function SendToBankPage() {
   const [bankSearch, setBankSearch] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
-  const [accountVerifyError, setAccountVerifyError] = useState("");
   const [selectedRecipient, setSelectedRecipient] =
-    useState<RecentBankRecipient | null>(null);
+    useState<RecentRecipient | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("recents");
   const [amount, setAmount] = useState("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
@@ -89,10 +64,11 @@ export default function SendToBankPage() {
     useState<TransactionResult>(null);
   const [transactionToken, setTransactionToken] = useState("");
   const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
-  const [isTransferring, setIsTransferring] = useState(false);
-  const [transferError, setTransferError] = useState("");
+  const [quote, setQuote] = useState<any>(null);
+  const [isQuoting, setIsQuoting] = useState(false);
+  const [verificationError, setVerificationError] = useState<string>("");
 
-  // Fetch real banks list from API
+  // Fetch banks list
   const { data: banksData, isLoading: banksLoading, error: banksError } = useQuery<BankItem[]>({
     queryKey: ["banksList"],
     queryFn: getBanksList,
@@ -119,32 +95,42 @@ export default function SendToBankPage() {
 
   // Auto-verify account number when bank and account number are provided
   useEffect(() => {
-    if (selectedBank && accountNumber.length >= 10) {
+    if (selectedBank && accountNumber.length === 10) {
       setIsVerifyingAccount(true);
+      setVerificationError("");
       setAccountName("");
-      setAccountVerifyError("");
-
-      // Call real API
-      verifyAccountNumber({ bankId: selectedBank.id, accountNumber })
-        .then((name) => {
-          setAccountName(name);
-          setAccountVerifyError("");
-        })
-        .catch((err) => {
-          const msg =
-            typeof err === "string"
-              ? err
-              : err?.description || "Could not verify account number";
-          setAccountVerifyError(msg);
-          setAccountName("");
-        })
-        .finally(() => {
-          setIsVerifyingAccount(false);
-        });
+      
+      // Check if it's a recent recipient first
+      const match = recentRecipients.find(
+        (r) => r.accountNumber === accountNumber && r.bankCode === selectedBank.code
+      );
+      
+      if (match) {
+        setAccountName(match.name);
+        setSelectedRecipient(match);
+        setIsVerifyingAccount(false);
+      } else {
+        // Call API to verify account
+        verifyAccountNumber({ bankId: selectedBank.id, accountNumber })
+          .then((name) => {
+            setAccountName(name);
+            setSelectedRecipient(null);
+            setVerificationError("");
+          })
+          .catch((error: any) => {
+            const errorMsg = error?.description || error?.message || "Unable to verify account";
+            setVerificationError(errorMsg);
+            setAccountName("");
+            toast.error(errorMsg);
+          })
+          .finally(() => {
+            setIsVerifyingAccount(false);
+          });
+      }
     } else {
       setAccountName("");
-      setAccountVerifyError("");
       setSelectedRecipient(null);
+      setVerificationError("");
     }
   }, [accountNumber, selectedBank]);
 
@@ -175,90 +161,18 @@ export default function SendToBankPage() {
     // Clear account details when bank changes
     setAccountNumber("");
     setAccountName("");
-    setAccountVerifyError("");
+    setVerificationError("");
     setSelectedRecipient(null);
   };
 
-  const handleRecipientSelect = (recipient: RecentBankRecipient) => {
+  const handleRecipientSelect = (recipient: RecentRecipient) => {
     setSelectedRecipient(recipient);
     setAccountNumber(recipient.accountNumber);
+    setAccountName(recipient.name);
     const bank = banks.find((b) => b.code === recipient.bankCode);
     if (bank) {
       setSelectedBank(bank);
     }
-    setAccountName(recipient.name);
-  };
-
-  const handleBankContinue = () => {
-    if (selectedBank) {
-      setStep("account");
-    }
-  };
-
-  const handleAmountSelect = (selectedAmount: number) => {
-    setAmount(selectedAmount.toString());
-  };
-
-  const handleAccountContinue = () => {
-    if (selectedBank && accountNumber.length >= 10 && accountName && !accountVerifyError) {
-      if (!amount) {
-        setStep("amount");
-      } else {
-        setStep("payment");
-      }
-    }
-  };
-
-  const handleAmountContinue = () => {
-    if (amount) {
-      setStep("payment");
-    }
-  };
-
-  const handlePaymentMethodSelect = (paymentMethod: PaymentOption) => {
-    setSelectedPaymentMethod(paymentMethod);
-    setStep("confirmation");
-  };
-
-  const calculatePaymentAmount = (): string => {
-    if (!selectedPaymentMethod || !amount) return "0";
-    const amountNum = parseFloat(amount);
-
-    if (selectedPaymentMethod.type === "fiat") {
-      return `₦${amountNum.toLocaleString()}.00`;
-    }
-
-    const rates: { [key: string]: number } = {
-      usdt: 1.0,
-      bitcoin: 0.000023,
-      ethereum: 0.00042,
-      solana: 0.006,
-    };
-
-    const rate = rates[selectedPaymentMethod.id] || 1;
-    const cryptoAmount = amountNum / (rate * 1500);
-
-    if (selectedPaymentMethod.id === "usdt") {
-      return `${cryptoAmount.toFixed(4)} USDT`;
-    } else if (selectedPaymentMethod.id === "bitcoin") {
-      return `${cryptoAmount.toFixed(8)} BTC`;
-    } else if (selectedPaymentMethod.id === "ethereum") {
-      return `${cryptoAmount.toFixed(6)} ETH`;
-    } else if (selectedPaymentMethod.id === "solana") {
-      return `${cryptoAmount.toFixed(4)} SOL`;
-    }
-
-    return `₦${amountNum.toLocaleString()}.00`;
-  };
-
-  const getCashback = (): number => {
-    return 0;
-  };
-
-  const getAvailableBalance = (): string => {
-    if (!selectedPaymentMethod) return "₦0.00";
-    if (selectedPaymentMethod.balance) return selectedPaymentMethod.balance;
-    return selectedPaymentMethod.value;
   };
 
   const generateTransactionToken = (): string => {
@@ -266,6 +180,10 @@ export default function SendToBankPage() {
       Math.floor(1000 + Math.random() * 9000).toString()
     );
     return segments.join("-");
+  };
+
+  const getCashback = (): number => {
+    return 0;
   };
 
   const getTransactionDate = (): string => {
@@ -285,48 +203,157 @@ export default function SendToBankPage() {
       .padStart(2, "0")} ${ampm}`;
   };
 
-  const handlePinComplete = async (pin: string) => {
-    if (!selectedBank || !selectedPaymentMethod || !selectedPaymentMethod.walletId) {
-      setTransferError("Missing bank, payment method, or wallet ID.");
-      return;
+  const handleAmountSelect = (selectedAmount: number) => {
+    setAmount(selectedAmount.toString());
+  };
+
+  const handleBankContinue = () => {
+    if (selectedBank) {
+      setStep("account");
     }
+  };
 
-    setIsTransferring(true);
-    setTransferError("");
+  const handleAccountContinue = () => {
+    if (selectedBank && accountNumber.length === 10 && accountName && !verificationError) {
+      if (!amount) {
+        setStep("amount");
+      } else {
+        setStep("payment");
+      }
+    }
+  };
 
-    // Generate a reference (backend API likely has a strict length/format limit like "dev007")
-    const reference = Math.random().toString(36).substring(2, 10);
-    setTransactionToken(reference);
+  const handleAmountContinue = () => {
+    if (amount) {
+      setStep("payment");
+    }
+  };
 
-    const payload = {
-      walletId: selectedPaymentMethod.walletId,
-      recipientAccountNumber: accountNumber,
-      bankCode: selectedBank.code,
-      amount: parseFloat(amount),
-      pin: pin,
-      reason: "Transfer to Bank",
-      reference: reference
-    };
+  const handlePaymentMethodSelect = async (paymentMethod: PaymentOption) => {
+    setSelectedPaymentMethod(paymentMethod);
+    setIsQuoting(true);
+    setStep("confirmation");
 
-    console.log("➡️ Initiating Transfer with payload:", payload);
+    console.log("� ===== CRYPTO TO CASH TRANSFER INITIATED =====");
+    console.log("�🔍 Payment Method Selected:");
+    console.log("  - Name:", paymentMethod.name);
+    console.log("  - Currency Code:", paymentMethod.currencyCode);
+    console.log("  - Network:", paymentMethod.network);
+    console.log("  - Wallet ID:", paymentMethod.walletId);
+    console.log("  - Type:", paymentMethod.type);
+    console.log("  - Balance:", paymentMethod.balance);
+    console.log("  - Full Payment Method Object:", JSON.stringify(paymentMethod, null, 2));
 
     try {
-      const result = await initiateBankTransfer(payload);
-      console.log("✅ Transfer Success Response:", result);
-      setTransactionResult("success");
-      setStep("result");
-    } catch (error: any) {
-      console.error("❌ Full API Transfer Error Object:", JSON.stringify(error, null, 2));
-      console.error("❌ Raw error:", error);
+      if (!paymentMethod.network) {
+        throw new Error("Network is missing from payment method. Please ensure wallet has network information.");
+      }
 
-      const errorMessage = typeof error === "string" ? error : error?.description || error?.message || "Transfer failed";
-      setTransferError(errorMessage);
-      // Optional: if we want to show failure page instead of retry inside EnterPin
-      // setTransactionResult("failure");
-      // setStep("result");
+      if (!paymentMethod.walletId) {
+        throw new Error("Wallet ID is missing from payment method.");
+      }
+
+      const payload = {
+        walletId: paymentMethod.walletId,
+        network: paymentMethod.network,
+        sourceAmount: parseFloat(amount),
+        scope: "INTERNAL" as const,
+        recipientAccountNumber: accountNumber,
+      };
+      
+      console.log("📤 ===== CRYPTO TO CASH QUOTE REQUEST PAYLOAD =====");
+      console.log("📤 API Endpoint: /transfers/crypto-ngn/quote");
+      console.log("📤 Request Method: POST");
+      console.log("📤 Payload Details:");
+      console.log("  - walletId:", payload.walletId, "(type:", typeof payload.walletId, ")");
+      console.log("  - network:", payload.network, "(type:", typeof payload.network, ")");
+      console.log("  - sourceAmount:", payload.sourceAmount, "(type:", typeof payload.sourceAmount, ")");
+      console.log("  - scope:", payload.scope, "(type:", typeof payload.scope, ")");
+      console.log("  - recipientAccountNumber:", payload.recipientAccountNumber, "(type:", typeof payload.recipientAccountNumber, ")");
+      console.log("📤 Full JSON Payload:", JSON.stringify(payload, null, 2));
+      
+      console.log("🏦 ===== RECIPIENT & TRANSACTION DETAILS =====");
+      console.log("  - Account Number:", accountNumber);
+      console.log("  - Account Name:", accountName);
+      console.log("  - Selected Bank Name:", selectedBank?.name);
+      console.log("  - Selected Bank Code:", selectedBank?.code);
+      console.log("  - Selected Bank ID:", selectedBank?.id);
+      console.log("  - Amount (NGN):", amount);
+      console.log("  - Amount (parsed):", parseFloat(amount));
+      console.log("  - Timestamp:", new Date().toISOString());
+      
+      const response = await getCryptoToNgnQuote(payload);
+      
+      console.log("📥 ===== CRYPTO TO CASH QUOTE RESPONSE =====");
+      console.log("  - Success:", response.success);
+      console.log("  - Description:", response.description);
+      console.log("  - Response Timestamp:", new Date().toISOString());
+      console.log("📥 Full Response Object:", JSON.stringify(response, null, 2));
+      
+      if (response.success) {
+        console.log("✅ ===== QUOTE SUCCESSFUL - DETAILED BREAKDOWN =====");
+        console.log("  - Quote ID:", response.data.quoteId);
+        console.log("  - Quote Reference:", response.data.quoteReference);
+        console.log("  - Exchange Rate:", response.data.rate);
+        console.log("  - Source Debit Amount:", response.data.sourceDebitAmount, paymentMethod.currencyCode);
+        console.log("  - Recipient Amount:", response.data.recipientAmount, "NGN");
+        console.log("  - Network Fee:", response.data.networkFee, paymentMethod.currencyCode);
+        console.log("  - Internal Fee:", response.data.internalFee, paymentMethod.currencyCode);
+        console.log("  - Total Debit:", response.data.totalDebit, paymentMethod.currencyCode);
+        console.log("  - Quote Expires At:", response.data.expiresAt);
+        console.log("✅ Quote Data Set Successfully");
+        
+        setQuote(response.data);
+      } else {
+        const errorMsg = response.description || "Failed to get quote";
+        console.error("❌ ===== QUOTE FAILED =====");
+        console.error("❌ Error Message:", errorMsg);
+        console.error("❌ Full Error Response:", JSON.stringify(response, null, 2));
+        toast.error(errorMsg);
+        setStep("payment");
+      }
+    } catch (error: any) {
+      console.error("❌ ===== QUOTE REQUEST EXCEPTION =====");
+      console.error("❌ Error Type:", error.constructor.name);
+      console.error("❌ Error Message:", error?.message);
+      console.error("❌ Error Description:", error?.description);
+      console.error("❌ HTTP Status:", error?.status);
+      console.error("❌ Response Data:", error?.response?.data);
+      console.error("❌ Full Error Object:", JSON.stringify(error, null, 2));
+      const errorMsg = error?.description || error?.message || "Error fetching quote";
+      toast.error(errorMsg);
+      setStep("payment");
     } finally {
-      setIsTransferring(false);
+      setIsQuoting(false);
+      console.log("🏁 ===== CRYPTO TO CASH QUOTE REQUEST COMPLETED =====");
     }
+  };
+
+  const handlePinComplete = async (pin: string) => {
+    if (!quote) return;
+
+    try {
+      const payload = {
+        quoteReference: quote.quoteId.toString(),
+        recipientIdentifier: accountNumber,
+        pin: pin,
+      };
+
+      const response = await executeTransfer(payload);
+      if (response.success) {
+        setTransactionToken(response.data?.transactionReference || generateTransactionToken());
+        setTransactionResult("success");
+      } else {
+        toast.error(response.description || "Transfer failed");
+        setStep("confirmation");
+        return;
+      }
+    } catch (error: any) {
+      console.error("Transfer error:", error);
+      toast.error(error.description || "Transaction failed");
+      setTransactionResult("failure");
+    }
+    setStep("result");
   };
 
   const handleAddToBeneficiary = () => {
@@ -342,8 +369,6 @@ export default function SendToBankPage() {
     setAccountName("");
     setSelectedRecipient(null);
     setAmount("");
-    setTransferError("");
-    setIsTransferring(false);
   };
 
   // Payment Method Step
@@ -353,30 +378,28 @@ export default function SendToBankPage() {
         onBack={() => setStep("amount")}
         onSelect={handlePaymentMethodSelect}
         amount={parseFloat(amount) || 0}
+        walletType="crypto"
       />
     );
   }
 
   // Confirmation Step
-  if (step === "confirmation" && selectedPaymentMethod && selectedBank) {
+  if (step === "confirmation" && selectedPaymentMethod) {
     return (
       <Confirmation
         onBack={() => setStep("payment")}
         onPay={() => setStep("enterPin")}
         amount={parseFloat(amount) || 0}
-        paymentAmount={calculatePaymentAmount()}
-        paymentMethod={
-          selectedPaymentMethod.type === "fiat"
-            ? "Fiat"
-            : `Crypto (${selectedPaymentMethod.name})`
-        }
-        biller={selectedBank.name}
+        paymentAmount={quote ? `${quote.sourceDebitAmount.toLocaleString()} ${selectedPaymentMethod.currencyCode || ""}` : "Calculating..."}
+        paymentMethod={`Crypto (${selectedPaymentMethod.name})`}
+        biller="Thunder Cash Account"
         meterNumber={accountNumber}
         customerName={accountName}
-        meterType="Bank Transfer"
+        meterType="Cash Transfer"
         serviceAddress=""
         cashback={getCashback()}
-        availableBalance={getAvailableBalance()}
+        availableBalance={selectedPaymentMethod.balance || "0.00"}
+        recipientAmount={quote ? `₦${quote.recipientAmount?.toLocaleString() || "0"}` : undefined}
       />
     );
   }
@@ -387,17 +410,16 @@ export default function SendToBankPage() {
       <EnterPin
         onBack={() => setStep("confirmation")}
         onComplete={handlePinComplete}
-        isLoading={isTransferring}
-        error={transferError}
       />
     );
   }
 
   // Result Step
-  if (step === "result" && selectedPaymentMethod && selectedBank) {
-    const paymentAmount = calculatePaymentAmount();
+  if (step === "result" && selectedPaymentMethod) {
+    const paymentAmount = quote ? `${quote.sourceDebitAmount.toLocaleString()} ${selectedPaymentMethod.currencyCode || ""}` : "0";
     const amountNum = parseFloat(amount) || 0;
-    const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
+    const amountEquivalent = quote ? `≈ ₦${quote.recipientAmount?.toLocaleString() || "0"}.00` : `≈ ₦${amountNum.toLocaleString()}.00`;
+    const transactionDate = getTransactionDate();
 
     if (transactionResult === "success") {
       return (
@@ -405,18 +427,14 @@ export default function SendToBankPage() {
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
           token={transactionToken}
-          biller={selectedBank.name}
+          biller="Thunder Cash Account"
           meterNumber={accountNumber}
           customerName={accountName}
-          meterType="Bank Transfer"
+          meterType="Cash Transfer"
           serviceAddress=""
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
+          paymentMethod={selectedPaymentMethod.name}
           bonusEarned={`₦${getCashback().toFixed(2)} Cashback`}
-          transactionDate={getTransactionDate()}
+          transactionDate={transactionDate}
           onAddToBeneficiary={handleAddToBeneficiary}
           onContinue={handleContinueFromResult}
         />
@@ -427,17 +445,13 @@ export default function SendToBankPage() {
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
           failureReason="Transaction failed"
-          biller={selectedBank.name}
+          biller="Thunder Cash Account"
           meterNumber={accountNumber}
           customerName={accountName}
-          meterType="Bank Transfer"
+          meterType="Cash Transfer"
           serviceAddress=""
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
-          transactionDate={getTransactionDate()}
+          paymentMethod={selectedPaymentMethod.name}
+          transactionDate={transactionDate}
           onContinue={handleContinueFromResult}
         />
       );
@@ -445,7 +459,7 @@ export default function SendToBankPage() {
   }
 
   // Amount Entry Step
-  if (step === "amount" && selectedBank) {
+  if (step === "amount") {
     return (
       <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6">
         <header className="relative flex items-center justify-center px-4 py-6">
@@ -455,7 +469,7 @@ export default function SendToBankPage() {
           >
             <MdOutlineKeyboardDoubleArrowLeft className="text-white" />
           </button>
-          <h1 className="text-2xl font-bold text-white">Send to Bank</h1>
+          <h1 className="text-2xl font-bold text-white">Crypto to Cash</h1>
         </header>
 
         <div className="flex flex-col gap-6 px-4 overflow-y-auto pb-6">
@@ -471,7 +485,7 @@ export default function SendToBankPage() {
                 {accountName || "Unknown"}
               </span>
               <span className="text-gray-400 text-sm">
-                {accountNumber} • {selectedBank.name}
+                {accountNumber} • Thunder Cash
               </span>
             </div>
           </div>
@@ -546,7 +560,7 @@ export default function SendToBankPage() {
           >
             <MdOutlineKeyboardDoubleArrowLeft className="text-white" />
           </button>
-          <h1 className="text-2xl font-bold text-white">Send to Bank</h1>
+          <h1 className="text-2xl font-bold text-white">Crypto to Cash</h1>
         </header>
 
         <div className="flex flex-col gap-6 px-4 overflow-y-auto pb-6">
@@ -587,88 +601,16 @@ export default function SendToBankPage() {
                 <HiCheckCircle className="w-5 h-5 text-white flex-shrink-0" />
               </div>
             )}
-            {accountVerifyError && !isVerifyingAccount && (
-              <p className="text-red-400 text-xs">{accountVerifyError}</p>
+            {verificationError && !isVerifyingAccount && (
+              <p className="text-red-400 text-xs">{verificationError}</p>
             )}
           </div>
-
-          {/* Tabs */}
-          {/*
-          <div className="flex items-center gap-0 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl overflow-hidden">
-            <button
-              onClick={() => setActiveTab("recents")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                activeTab === "recents"
-                  ? "bg-gray-700 text-white"
-                  : "text-white/70 hover:text-white"
-              }`}
-            >
-              Recents
-            </button>
-            <div className="w-px bg-white/20"></div>
-            <button
-              onClick={() => setActiveTab("beneficiaries")}
-              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-                activeTab === "beneficiaries"
-                  ? "bg-gray-700 text-white"
-                  : "text-white/70 hover:text-white"
-              }`}
-            >
-              Beneficiaries
-            </button>
-          </div>
-          */}
-
-          {/* Recipients List */}
-          {/*
-          <div className="flex flex-col gap-3">
-            {(activeTab === "recents" ? filteredRecipients : recentRecipients).map(
-              (recipient) => (
-                <button
-                  key={recipient.id}
-                  onClick={() => handleRecipientSelect(recipient)}
-                  className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors ${
-                    selectedRecipient?.id === recipient.id
-                      ? "bg-blue-500/20 border-blue-500"
-                      : ""
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-lg font-bold">
-                        {recipient.initial || recipient.name.charAt(0)}
-                      </span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-white font-medium">
-                        {recipient.name}
-                      </span>
-                      <span className="text-gray-400 text-sm">
-                        {recipient.accountNumber} • {recipient.bankName}
-                      </span>
-                    </div>
-                  </div>
-                  {selectedRecipient?.id === recipient.id && (
-                    <HiCheckCircle className="w-6 h-6 text-blue-500 flex-shrink-0" />
-                  )}
-                </button>
-              )
-            )}
-          </div>
-          */}
-
-          {/* See more button */}
-          {/*
-          <button className="text-blue-500 text-sm font-medium text-center hover:text-blue-400 transition-colors">
-            See more
-          </button>
-          */}
 
           {/* Continue Button */}
           <button
             onClick={handleAccountContinue}
-            disabled={!selectedBank || accountNumber.length < 10 || !accountName || isVerifyingAccount || !!accountVerifyError}
-            className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!selectedBank || accountNumber.length < 10 || !accountName || isVerifyingAccount || !!accountVerifyError
+            disabled={!selectedBank || accountNumber.length < 10 || !accountName || isVerifyingAccount || !!verificationError}
+            className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!selectedBank || accountNumber.length < 10 || !accountName || isVerifyingAccount || !!verificationError
               ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
               : ""
               }`}
@@ -690,11 +632,11 @@ export default function SendToBankPage() {
         >
           <MdOutlineKeyboardDoubleArrowLeft className="text-white" />
         </button>
-        <h1 className="text-2xl font-bold text-white">Send to Bank</h1>
+        <h1 className="text-2xl font-bold text-white">Crypto to Cash</h1>
       </header>
 
       <div className="flex flex-col gap-6 px-4 overflow-y-auto pb-6">
-        {/* Select Bank Section — unified trigger + search + list */}
+        {/* Select Bank Section */}
         <div className="flex flex-col gap-2">
           <label className="text-white text-sm font-medium">
             Select Bank
@@ -729,7 +671,7 @@ export default function SendToBankPage() {
               )}
             </button>
 
-            {/* Unified dropdown: search + scrollable list */}
+            {/* Dropdown: search + scrollable list */}
             {isBankDropdownOpen && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-[#111] border border-white/20 rounded-2xl shadow-xl z-10 flex flex-col overflow-hidden">
                 {/* Sticky search input inside dropdown */}
@@ -782,42 +724,6 @@ export default function SendToBankPage() {
           </div>
         </div>
 
-        {/* Recent Recipients (Quick Access) */}
-        {/*
-        {recentRecipients.length > 0 && (
-          <div className="flex flex-col gap-3">
-            <h3 className="text-white text-sm font-medium">Recent Recipients</h3>
-            {recentRecipients.slice(0, 3).map((recipient) => (
-              <button
-                key={recipient.id}
-                onClick={() => {
-                  handleRecipientSelect(recipient);
-                  setStep("account");
-                }}
-                className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-lg font-bold">
-                      {recipient.initial || recipient.name.charAt(0)}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-white font-medium">
-                      {recipient.name}
-                    </span>
-                    <span className="text-gray-400 text-sm">
-                      {recipient.accountNumber} • {recipient.bankName}
-                    </span>
-                  </div>
-                </div>
-                <HiChevronRight className="w-5 h-5 text-white flex-shrink-0" />
-              </button>
-            ))}
-          </div>
-        )}
-        */}
-
         {/* Continue Button */}
         <button
           onClick={handleBankContinue}
@@ -833,4 +739,3 @@ export default function SendToBankPage() {
     </div>
   );
 }
-

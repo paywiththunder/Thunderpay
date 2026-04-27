@@ -65,8 +65,8 @@ export default function AppHeader() {
                     Crypto
                 </Link>
                 <Link
-                    href="/home"
-                    className={`${isActive("/home")
+                    href="/cash"
+                    className={`${isActive("/cash")
                         ? "text-white border-b-2 border-[#3B82F6] pb-1"
                         : "text-gray-400 hover:text-white transition-colors"
                         }`}

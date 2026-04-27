@@ -1,6 +1,8 @@
 "use client";
-import React from "react";
+import { useRef } from "react";
 import { HiCheckCircle, HiOutlineInformationCircle } from "react-icons/hi2";
+
+import { printReceipt } from "@/utils/printReceipt";
 
 interface DetailItem {
   label: string;
@@ -10,7 +12,7 @@ interface DetailItem {
 interface PaymentSuccessProps {
   title?: string;
   amount: string; // e.g., "0.0060 SOL"
-  amountEquivalent: string; // e.g., "≈ ₦20,000.00"
+  amountEquivalent: string; // e.g., "â‰ˆ â‚¦20,000.00"
   // Legacy props (optional)
   token?: string;
   biller?: string;
@@ -56,6 +58,16 @@ export default function PaymentSuccess({
   onAddToBeneficiary,
   onContinue,
 }: PaymentSuccessProps) {
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  const handleDownload = () => {
+    if (!receiptRef.current) {
+      return;
+    }
+
+    void printReceipt(receiptRef.current, title);
+  };
+
   return (
     <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6 mb-16">
       <div className="flex flex-col items-center justify-center flex-1 px-4 pb-6">
@@ -70,10 +82,15 @@ export default function PaymentSuccess({
         </h1>
 
         {/* Receipt Header */}
-        <div className="w-full max-w-md mb-4">
+        <div ref={receiptRef} data-receipt-root className="w-full max-w-md mb-4">
           <div className="flex items-center justify-between mb-4">
             <span className="text-white font-medium">Receipt</span>
-            <button className="text-blue-500 text-sm font-medium flex items-center gap-1 hover:text-blue-400 transition-colors">
+            <button
+              type="button"
+              data-receipt-download
+              onClick={handleDownload}
+              className="text-blue-500 text-sm font-medium flex items-center gap-1 hover:text-blue-400 transition-colors"
+            >
               Download
               <HiOutlineInformationCircle className="w-4 h-4" />
             </button>

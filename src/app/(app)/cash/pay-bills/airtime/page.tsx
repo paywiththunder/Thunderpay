@@ -290,6 +290,7 @@ export default function CashAirtimePage() {
                     onBack={() => setStep("form")}
                     onSelect={handlePaymentMethodSelect}
                     amount={parseFloat(amount) || 0}
+                    walletType="fiat"
                 />
             </>
         );
@@ -307,7 +308,7 @@ export default function CashAirtimePage() {
                     { label: "Phone Number", value: phoneNumber },
                     { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
                     { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-                    { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+                    { label: "Bonus to Earn", value: `${getCashback().toFixed(2)} Cashback` },
                 ]}
                 availableBalance={getAvailableBalance()}
                 boltBalance={boltBalance}
@@ -341,7 +342,7 @@ export default function CashAirtimePage() {
             const successDetails = [
                 ...commonDetails,
                 { label: "Transaction Reference", value: transactionToken },
-                { label: "Bonus Earned", value: `₦${getCashback().toFixed(2)} Cashback` },
+                { label: "Bonus Earned", value: `${getCashback().toFixed(2)} Cashback` },
                 { label: "Transaction Date", value: getTransactionDate() },
             ];
 
@@ -484,7 +485,7 @@ export default function CashAirtimePage() {
                                 className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString() ? "ring-2 ring-blue-500 border-blue-500" : ""}`}
                             >
                                 <span className="text-white font-bold text-base">₦{option.amount.toLocaleString()}</span>
-                                <span className="text-gray-400 text-xs mt-1">₦0 Cashback</span>
+                                <span className="text-gray-400 text-xs mt-1">0 Cashback</span>
                             </button>
                         ))}
                     </div>

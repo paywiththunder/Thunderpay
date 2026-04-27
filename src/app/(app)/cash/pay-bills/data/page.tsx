@@ -353,6 +353,7 @@ export default function DataPage() {
                 onBack={() => setStep("form")}
                 onSelect={handlePaymentMethodSelect}
                 amount={selectedPlan?.price || 0}
+                walletType="fiat"
             />
         );
     }
@@ -371,7 +372,7 @@ export default function DataPage() {
                     { label: "Duration", value: selectedPlan.duration },
                     { label: "Amount", value: `₦${selectedPlan.price.toLocaleString()}.00` },
                     { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-                    { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+                    { label: "Bonus to Earn", value: `${getCashback().toFixed(2)} Cashback` },
                 ]}
                 availableBalance={getAvailableBalance()}
                 boltBalance={boltBalance}
@@ -406,7 +407,7 @@ export default function DataPage() {
             const successDetails = [
                 ...commonDetails,
                 { label: "Transaction Reference", value: transactionToken },
-                { label: "Bonus Earned", value: `₦${getCashback().toFixed(2)} Cashback` },
+                { label: "Bonus Earned", value: `${getCashback().toFixed(2)} Cashback` },
                 { label: "Transaction Date", value: getTransactionDate() },
             ];
             return (
@@ -562,7 +563,7 @@ export default function DataPage() {
                                     <span className="text-white font-bold text-base mb-1">{plan.data}</span>
                                     <span className="text-white font-bold text-lg mb-1">₦{plan.price.toLocaleString()}</span>
                                     <span className="text-gray-400 text-xs mb-1">{plan.duration}</span>
-                                    <span className="text-gray-400 text-xs">₦{plan.cashback} Cashback</span>
+                                    <span className="text-gray-400 text-xs">{plan.cashback} Cashback</span>
                                 </button>
                             ))) : (
                             <div className="col-span-3 text-center text-gray-500 py-8">No plans available for this network.</div>

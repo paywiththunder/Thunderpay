@@ -22,7 +22,7 @@ export default function SendPage() {
 
       <div className="flex flex-col gap-4 px-4 overflow-y-auto pb-6">
         <Link
-          href="/send/thunder"
+          href="/cash/send/thunder"
           className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-2xl p-5 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors"
         >
           <div className="flex items-center gap-4">
@@ -33,7 +33,7 @@ export default function SendPage() {
         </Link>
 
         <Link
-          href="/send/bank"
+          href="/cash/send/bank"
           className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-2xl p-5 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors"
         >
           <div className="flex items-center gap-4">

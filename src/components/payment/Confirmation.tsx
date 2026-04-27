@@ -15,13 +15,18 @@ interface ConfirmationProps {
   // Legacy props (optional for backward compatibility)
   paymentMethod?: string;
   biller?: string;
+  billerLabel?: string;
   meterNumber?: string;
+  meterNumberLabel?: string;
   customerName?: string;
+  customerNameLabel?: string;
   meterType?: string;
+  meterTypeLabel?: string;
   serviceAddress?: string;
   cashback?: number;
   availableBalance: string;
   boltBalance?: number;
+  recipientAmount?: string; // e.g., "₦5,000"
   // New dynamic props
   details?: QuoteDetails[];
 }
@@ -33,13 +38,18 @@ export default function Confirmation({
   paymentAmount,
   paymentMethod,
   biller,
+  billerLabel = "Biller",
   meterNumber,
+  meterNumberLabel = "Meter Number",
   customerName,
+  customerNameLabel = "Customer Name",
   meterType,
+  meterTypeLabel = "Meter Type",
   serviceAddress,
   cashback,
   availableBalance,
   boltBalance,
+  recipientAmount,
   details,
 }: ConfirmationProps) {
   const [useCashback, setUseCashback] = useState(false);
@@ -61,7 +71,9 @@ export default function Confirmation({
         {/* Amount Display */}
         <div className="flex flex-col items-center gap-2 py-4">
           <h2 className="text-3xl font-bold text-white">{paymentAmount}</h2>
-          <p className="text-gray-400 text-sm">≈ ₦{amount.toLocaleString()}.00</p>
+          <p className="text-gray-400 text-sm">
+            {recipientAmount || `≈ ₦${amount.toLocaleString()}.00`}
+          </p>
         </div>
 
         {/* Payment Details */}
@@ -73,13 +85,13 @@ export default function Confirmation({
               ))
             ) : (
               <>
-                {biller && <DetailRow label="Biller" value={biller} />}
-                {meterNumber && <DetailRow label="Meter Number" value={meterNumber} />}
-                {customerName && <DetailRow label="Customer Name" value={customerName} />}
-                {meterType && <DetailRow label="Meter Type" value={meterType} />}
+                {biller && <DetailRow label={billerLabel} value={biller} />}
+                {meterNumber && <DetailRow label={meterNumberLabel} value={meterNumber} />}
+                {customerName && <DetailRow label={customerNameLabel} value={customerName} />}
+                {meterType && <DetailRow label={meterTypeLabel} value={meterType} />}
                 {serviceAddress && <DetailRow label="Service Address" value={serviceAddress} />}
                 {paymentMethod && <DetailRow label="Payment Method" value={paymentMethod} />}
-                {cashback !== undefined && <DetailRow label="Bonus to Earn" value={`₦${cashback.toFixed(2)} Cashback`} />}
+                {cashback !== undefined && <DetailRow label="Bolt to Earn" value={`${cashback.toFixed(2)} bolts`} />}
               </>
             )}
           </div>
@@ -91,7 +103,7 @@ export default function Confirmation({
                 Bolt Balance
               </span>
               <span className="text-gray-400 text-sm mt-1">
-                ₦{boltBalance?.toLocaleString() || "0.00"} Available
+                {boltBalance?.toLocaleString() || "0.00"} Available
               </span>
             </div>
             <div className="flex items-center gap-2">

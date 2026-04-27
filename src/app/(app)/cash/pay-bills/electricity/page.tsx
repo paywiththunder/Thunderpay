@@ -195,7 +195,7 @@ export default function ElectricityPage() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [isDropdownOpen]);
 
-    if (step === "payment") return <PaymentMethod onBack={() => setStep("form")} onSelect={handlePaymentMethodSelect} amount={parseFloat(amount) || 0} />;
+    if (step === "payment") return <PaymentMethod onBack={() => setStep("form")} onSelect={handlePaymentMethodSelect} amount={parseFloat(amount) || 0} walletType="fiat" />;
 
     if (step === "confirmation" && selectedPaymentMethod) {
         return <Confirmation onBack={() => setStep("payment")} onPay={() => setStep("enterPin")} amount={parseFloat(amount) || 0} paymentAmount={calculatePaymentAmount()} availableBalance={selectedPaymentMethod.balance || selectedPaymentMethod.value} boltBalance={boltBalance} details={[{ label: "Provider", value: selectedProvider.name }, { label: "Meter Number", value: meterNumber }, { label: "Customer Name", value: customerName || "N/A" }, { label: "Meter Type", value: paymentType === "prepaid" ? "Prepaid" : "Postpaid" }, { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` }, { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` }]} />;

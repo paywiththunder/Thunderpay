@@ -267,7 +267,7 @@ export default function TVPage() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [isDropdownOpen]);
 
-    if (step === "payment") return <PaymentMethod onBack={() => setStep("form")} onSelect={handlePaymentMethodSelect} amount={selectedPlan?.price || 0} />;
+    if (step === "payment") return <PaymentMethod onBack={() => setStep("form")} onSelect={handlePaymentMethodSelect} amount={selectedPlan?.price || 0} walletType="fiat" />;
 
     if (step === "confirmation" && selectedPaymentMethod && selectedPlan) {
         const details = [
@@ -276,7 +276,7 @@ export default function TVPage() {
             { label: "Account Name", value: customerName || "N/A" },
             { label: "Package", value: selectedPlan.name },
             { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-            ...(selectedPlan.cashback > 0 ? [{ label: "Bonus to Earn", value: `₦${selectedPlan.cashback.toFixed(2)} Cashback` }] : []),
+            ...(selectedPlan.cashback > 0 ? [{ label: "Bonus to Earn", value: `${selectedPlan.cashback.toFixed(2)} Cashback` }] : []),
         ];
         if (quoteData?.transactionFee > 0) details.push({ label: "Transaction Fee", value: `₦${quoteData.transactionFee}` });
         let displayAmount = calculatePaymentAmount();
@@ -299,11 +299,11 @@ export default function TVPage() {
         if (transactionResult === "success") {
             const successDetails = [{ label: "Transaction Reference", value: transactionToken }, ...commonDetails, { label: "Duration", value: `${quantity} ${quantity > 1 ? "Months" : "Month"}` }];
             if (quoteData?.transactionFee > 0) successDetails.push({ label: "Transaction Fee", value: `₦${quoteData.transactionFee}` });
-            if (selectedPlan.cashback > 0) successDetails.push({ label: "Bonus Earned", value: `₦${selectedPlan.cashback.toFixed(2)} Cashback` });
+            if (selectedPlan.cashback > 0) successDetails.push({ label: "Bonus Earned", value: `${selectedPlan.cashback.toFixed(2)} Cashback` });
             successDetails.push({ label: "Transaction Date", value: getTransactionDate() });
             return <PaymentSuccess title="TV Subscription Successful" amount={paymentAmount} amountEquivalent={`≈ ₦${selectedPlan.price.toLocaleString()}.00`} details={successDetails} onAddToBeneficiary={() => { }} onContinue={handleContinue} />;
         } else {
-            const failureDetails = [{ label: "Failure Reason", value: failureReason || "Service provider down" }, ...commonDetails, ...(selectedPlan.cashback > 0 ? [{ label: "Bonus Available", value: `₦${selectedPlan.cashback.toFixed(2)} Cashback` }] : []), { label: "Transaction Date", value: getTransactionDate() }];
+            const failureDetails = [{ label: "Failure Reason", value: failureReason || "Service provider down" }, ...commonDetails, ...(selectedPlan.cashback > 0 ? [{ label: "Bonus Available", value: `${selectedPlan.cashback.toFixed(2)} Cashback` }] : []), { label: "Transaction Date", value: getTransactionDate() }];
             return <PaymentFailure title="TV Subscription Failed" amount={paymentAmount} amountEquivalent={`≈ ₦${selectedPlan.price.toLocaleString()}.00`} details={failureDetails} onContinue={handleContinue} />;
         }
     }
@@ -372,7 +372,7 @@ export default function TVPage() {
                                 <span className="text-white font-bold text-center text-sm mb-1 leading-snug">{plan.name}</span>
                                 <span className="text-white font-bold text-lg mb-1">₦{plan.price.toLocaleString()}</span>
                                 <span className="text-gray-400 text-xs mb-1">{plan.duration}</span>
-                                <span className="text-gray-400 text-xs">₦{plan.cashback} Cashback</span>
+                                <span className="text-gray-400 text-xs">{plan.cashback} Cashback</span>
                             </button>
                         )) : <div className="col-span-3 text-center text-gray-500 py-8">No plans available for this provider.</div>}
                     </div>

@@ -1,8 +1,7 @@
 "use client";
 import React from "react";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
-import { HiCheckCircle } from "react-icons/hi2";
-import { getWallets } from "@/services/wallet";
+import { getWalletsUsd } from "@/services/wallet";
 import { useQuery } from "@tanstack/react-query";
 
 export interface PaymentOption {
@@ -17,12 +16,14 @@ export interface PaymentOption {
   currencyCode?: string;
   currency?: string;
   walletId?: number;
+  network?: string;
 }
 
 interface PaymentMethodProps {
   onBack: () => void;
   onSelect: (paymentMethod: PaymentOption) => void;
   amount: number;
+  walletType?: "crypto" | "fiat" | "all"; // New prop to control which wallets to show
 }
 
 const getIconForCurrency = (code: string) => {
@@ -50,26 +51,80 @@ export default function PaymentMethod({
   onBack,
   onSelect,
   amount,
+  walletType = "crypto", // Default to crypto for backward compatibility
 }: PaymentMethodProps) {
+  // Fetch wallets based on the walletType prop
   const { data: walletsResponse, isLoading: loading, error: queryError } = useQuery({
-    queryKey: ['wallets'],
-    queryFn: getWallets,
+    queryKey: ['walletsUsd', walletType],
+    queryFn: () => {
+      if (walletType === "all") {
+        return getWalletsUsd(); // Get all wallets
+      } else {
+        return getWalletsUsd(walletType); // Get specific type (crypto or fiat)
+      }
+    },
     staleTime: 1000 * 60 * 5, // 5 minutes cache
   });
 
   const wallets = React.useMemo(() => {
     if (!walletsResponse) return [];
 
-    // Handle both array response and { data: [] } response patterns
-    const walletList = Array.isArray(walletsResponse) ? walletsResponse : walletsResponse.data || [];
+    // Handle the response structure from /wallets/usd endpoint
+    const walletList = walletsResponse?.success && walletsResponse?.data?.wallets 
+      ? walletsResponse.data.wallets 
+      : [];
+
+    console.log("🔍 Wallets Response for type:", walletType, JSON.stringify(walletsResponse, null, 2));
 
     return walletList.map((wallet: any) => {
+      console.log("🔍 Processing Wallet for type:", walletType, JSON.stringify(wallet, null, 2));
+      
       const currency = wallet.currency;
       const currencyCode = currency?.code || currency?.ticker || "UNKNOWN";
       const styling = getIconForCurrency(currencyCode);
 
       const rawBalance = wallet.availableBalance ?? wallet.totalBalance ?? 0;
       const formattedBalance = Number(rawBalance).toLocaleString("en-US", { maximumFractionDigits: 8 });
+
+      // Get network from wallet - check multiple possible locations
+      const activeAddress = wallet.addresses?.find((a: any) => a.isActive) || wallet.addresses?.[0];
+      const networkCode = wallet.network || activeAddress?.network || activeAddress?.chainCode || currency?.network;
+
+      console.log("🔍 Network Detection for", currencyCode, ":");
+      console.log("  - wallet.network:", wallet.network);
+      console.log("  - activeAddress:", activeAddress);
+      console.log("  - activeAddress?.network:", activeAddress?.network);
+      console.log("  - activeAddress?.chainCode:", activeAddress?.chainCode);
+      console.log("  - currency?.network:", currency?.network);
+      console.log("  - Final networkCode:", networkCode);
+
+      // Map network codes to standard format expected by API
+      const getNetworkId = (code: string | undefined) => {
+        if (!code) {
+          // Default fallback based on currency
+          const currUpper = currencyCode.toUpperCase();
+          if (currUpper === "USDT") return "trc20"; // Default USDT to TRC20
+          if (currUpper === "ETH") return "erc20";
+          if (currUpper === "BTC") return "bitcoin";
+          if (currUpper === "SOL") return "solana";
+          console.warn(`⚠️ No network found for ${currencyCode}, using default: trc20`);
+          return "trc20"; // Safe default
+        }
+        
+        const upper = code.toUpperCase();
+        // Handle various network naming conventions
+        if (upper === "TRX" || upper === "TRON" || upper === "TRC20") return "trc20";
+        if (upper === "ETH" || upper === "ETHEREUM" || upper === "ERC20") return "erc20";
+        if (upper === "BSC" || upper === "BEP20" || upper === "BINANCE") return "bep20";
+        if (upper === "SOL" || upper === "SOLANA") return "solana";
+        if (upper === "BTC" || upper === "BITCOIN") return "bitcoin";
+        
+        // If already in correct format, return lowercase
+        return code.toLowerCase();
+      };
+
+      const mappedNetwork = getNetworkId(networkCode);
+      console.log(`✅ Wallet ${wallet.walletId} - Currency: ${currencyCode}, Raw Network: ${networkCode}, Mapped Network: ${mappedNetwork}`);
 
       return {
         id: wallet.walletId?.toString() || "",
@@ -83,6 +138,7 @@ export default function PaymentMethod({
         currencyCode: currencyCode,
         currency: currencyCode,
         walletId: wallet.walletId,
+        network: mappedNetwork,
       };
     });
   }, [walletsResponse]);

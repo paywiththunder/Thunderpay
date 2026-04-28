@@ -12,10 +12,8 @@ const getAuthToken = () => {
 
 export const createWallet = async (currencyId: number, network: string) => {
     const token = getAuthToken();
-    console.log(token);
     if (!token) throw new Error("No auth token found");
 
-    console.log("Creating wallet with payload:", { currencyId, network });
 
     try {
         const response = await axios.post(
@@ -31,10 +29,9 @@ export const createWallet = async (currencyId: number, network: string) => {
                 },
             }
         );
-        console.log(response);
+        console.log("Create Wallet Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.log(error);
         throw error.response?.data || error.message;
     }
 };
@@ -109,7 +106,7 @@ export const getWalletActivity = async (walletId: number) => {
         return response.data;
     } catch (error: any) {
         // Return null or empty representation on error to prevent failing all requests
-        console.error(`Failed to fetch activity for wallet ${walletId}:`, error);
+        console.error(`Failed to fetch activity for wallet ${walletId}:`, error.response?.data || error.message);
         return { success: false, data: { items: [] } };
     }
 };

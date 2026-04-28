@@ -77,6 +77,7 @@ export default function SendToBankPage() {
     useState<TransactionResult>(null);
   const [transactionToken, setTransactionToken] = useState("");
   const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
+  const [failureReason, setFailureReason] = useState("");
 
   // Filter recipients based on selected bank and account number
   const filteredRecipients = recentRecipients.filter((recipient) => {
@@ -211,18 +212,22 @@ export default function SendToBankPage() {
     setIsQuoting(true);
     setStep("confirmation");
 
+    console.log("======", paymentMethod)
+    const payload = {
+      scope: "EXTERNAL_BANK" as const,
+      walletId: paymentMethod.walletId!,
+      amount: parseFloat(amount),
+      fixedSide: "SOURCE" as const,
+      recipientAddress: accountNumber, // Mapping account number to recipientAddress for bank
+      // For banks, we might need bank code etc, but the prompt's quote payload 
+      // didn't specify bank details. Usually EXTERNAL_BANK quote might need them.
+      // Assuming current simple payload for now or mapping bank details if needed.
+    };
+    console.log("CLICKED PAYLOAD:", payload);
+
     try {
-      const payload = {
-        scope: "EXTERNAL_BANK" as const,
-        walletId: paymentMethod.walletId!,
-        amount: parseFloat(amount),
-        fixedSide: "SOURCE" as const,
-        recipientAddress: accountNumber, // Mapping account number to recipientAddress for bank
-        // For banks, we might need bank code etc, but the prompt's quote payload 
-        // didn't specify bank details. Usually EXTERNAL_BANK quote might need them.
-        // Assuming current simple payload for now or mapping bank details if needed.
-      };
       const response = await getTransferQuote(payload);
+      console.log("QUOTE API RESPONSE:", response);
       if (response.success) {
         setQuote(response.data);
       } else {
@@ -255,12 +260,15 @@ export default function SendToBankPage() {
         setTransferData(response.data);
         setTransactionResult("success");
       } else {
-        toast.error(response.description || "Transfer failed");
-        setStep("confirmation");
-        return;
+        const errorMsg = response.description || "Transfer failed";
+        toast.error(errorMsg);
+        setFailureReason(errorMsg);
+        setTransactionResult("failure");
       }
     } catch (error: any) {
-      toast.error(error.description || "Transaction failed");
+      const errorMsg = error.description || error.message || "Transaction failed";
+      toast.error(errorMsg);
+      setFailureReason(errorMsg);
       setTransactionResult("failure");
     }
     setStep("result");
@@ -370,11 +378,15 @@ export default function SendToBankPage() {
         <PaymentFailure
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason="Transaction failed"
+          failureReason={failureReason || "Transaction failed"}
           biller={selectedBank.name}
+          billerLabel="Bank Name"
           meterNumber={accountNumber}
+          meterNumberLabel="Account Number"
           customerName={accountName}
+          customerNameLabel="Account Name"
           meterType="Bank Transfer"
+          meterTypeLabel="Transfer Type"
           serviceAddress=""
           paymentMethod={
             selectedPaymentMethod.type === "fiat"

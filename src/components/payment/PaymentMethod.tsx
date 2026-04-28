@@ -17,6 +17,7 @@ export interface PaymentOption {
   currency?: string;
   walletId?: number;
   network?: string;
+  addresses?: any[];
 }
 
 interface PaymentMethodProps {
@@ -53,9 +54,11 @@ export default function PaymentMethod({
   amount,
   walletType = "crypto", // Default to crypto for backward compatibility
 }: PaymentMethodProps) {
+  const [selectedWallet, setSelectedWallet] = React.useState<PaymentOption | null>(null);
+
   // Fetch wallets based on the walletType prop
   const { data: walletsResponse, isLoading: loading, error: queryError } = useQuery({
-    queryKey: ['walletsUsd', walletType],
+    queryKey: ["walletsUsd", walletType],
     queryFn: () => {
       if (walletType === "all") {
         return getWalletsUsd(); // Get all wallets
@@ -70,61 +73,19 @@ export default function PaymentMethod({
     if (!walletsResponse) return [];
 
     // Handle the response structure from /wallets/usd endpoint
-    const walletList = walletsResponse?.success && walletsResponse?.data?.wallets 
-      ? walletsResponse.data.wallets 
+    const walletList = walletsResponse?.success && walletsResponse?.data?.wallets
+      ? walletsResponse.data.wallets
       : [];
 
-    console.log("🔍 Wallets Response for type:", walletType, JSON.stringify(walletsResponse, null, 2));
-
     return walletList.map((wallet: any) => {
-      console.log("🔍 Processing Wallet for type:", walletType, JSON.stringify(wallet, null, 2));
-      
       const currency = wallet.currency;
       const currencyCode = currency?.code || currency?.ticker || "UNKNOWN";
       const styling = getIconForCurrency(currencyCode);
 
       const rawBalance = wallet.availableBalance ?? wallet.totalBalance ?? 0;
-      const formattedBalance = Number(rawBalance).toLocaleString("en-US", { maximumFractionDigits: 8 });
-
-      // Get network from wallet - check multiple possible locations
-      const activeAddress = wallet.addresses?.find((a: any) => a.isActive) || wallet.addresses?.[0];
-      const networkCode = wallet.network || activeAddress?.network || activeAddress?.chainCode || currency?.network;
-
-      console.log("🔍 Network Detection for", currencyCode, ":");
-      console.log("  - wallet.network:", wallet.network);
-      console.log("  - activeAddress:", activeAddress);
-      console.log("  - activeAddress?.network:", activeAddress?.network);
-      console.log("  - activeAddress?.chainCode:", activeAddress?.chainCode);
-      console.log("  - currency?.network:", currency?.network);
-      console.log("  - Final networkCode:", networkCode);
-
-      // Map network codes to standard format expected by API
-      const getNetworkId = (code: string | undefined) => {
-        if (!code) {
-          // Default fallback based on currency
-          const currUpper = currencyCode.toUpperCase();
-          if (currUpper === "USDT") return "trc20"; // Default USDT to TRC20
-          if (currUpper === "ETH") return "erc20";
-          if (currUpper === "BTC") return "bitcoin";
-          if (currUpper === "SOL") return "solana";
-          console.warn(`⚠️ No network found for ${currencyCode}, using default: trc20`);
-          return "trc20"; // Safe default
-        }
-        
-        const upper = code.toUpperCase();
-        // Handle various network naming conventions
-        if (upper === "TRX" || upper === "TRON" || upper === "TRC20") return "trc20";
-        if (upper === "ETH" || upper === "ETHEREUM" || upper === "ERC20") return "erc20";
-        if (upper === "BSC" || upper === "BEP20" || upper === "BINANCE") return "bep20";
-        if (upper === "SOL" || upper === "SOLANA") return "solana";
-        if (upper === "BTC" || upper === "BITCOIN") return "bitcoin";
-        
-        // If already in correct format, return lowercase
-        return code.toLowerCase();
-      };
-
-      const mappedNetwork = getNetworkId(networkCode);
-      console.log(`✅ Wallet ${wallet.walletId} - Currency: ${currencyCode}, Raw Network: ${networkCode}, Mapped Network: ${mappedNetwork}`);
+      const formattedBalance = Number(rawBalance).toLocaleString("en-US", {
+        maximumFractionDigits: 8,
+      });
 
       return {
         id: wallet.walletId?.toString() || "",
@@ -138,12 +99,112 @@ export default function PaymentMethod({
         currencyCode: currencyCode,
         currency: currencyCode,
         walletId: wallet.walletId,
-        network: mappedNetwork,
+        addresses: wallet.addresses || [],
       };
     });
   }, [walletsResponse]);
 
   const error = queryError ? "Failed to load wallets" : "";
+
+  // Map network codes to standard format expected by API
+  const getNetworkId = (code: string | undefined, currencyCode: string) => {
+    if (!code) {
+      // Default fallback based on currency
+      const currUpper = currencyCode.toUpperCase();
+      if (currUpper === "USDT") return "trc20"; // Default USDT to TRC20
+      if (currUpper === "ETH") return "erc20";
+      if (currUpper === "BTC") return "bitcoin";
+      if (currUpper === "SOL") return "solana";
+      return "trc20"; // Safe default
+    }
+
+    const upper = code.toUpperCase();
+    // Handle various network naming conventions
+    if (upper === "TRX" || upper === "TRON" || upper === "TRC20") return "trc20";
+    if (upper === "ETH" || upper === "ETHEREUM" || upper === "ERC20") return "erc20";
+    if (upper === "BSC" || upper === "BEP20" || upper === "BINANCE") return "bep20";
+    if (upper === "SOL" || upper === "SOLANA") return "solana";
+    if (upper === "BTC" || upper === "BITCOIN") return "bitcoin";
+
+    // If already in correct format, return lowercase
+    return code.toLowerCase();
+  };
+
+  const handleNetworkSelect = (addressObj: any) => {
+    if (!selectedWallet) return;
+
+    const networkCode = addressObj.network || addressObj.chainCode;
+    const mappedNetwork = getNetworkId(networkCode, selectedWallet.currencyCode || "");
+
+    onSelect({
+      ...selectedWallet,
+      network: mappedNetwork,
+    });
+  };
+
+  if (selectedWallet) {
+    return (
+      <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6">
+        <header className="relative flex items-center justify-center px-4 py-6">
+          <button
+            onClick={() => setSelectedWallet(null)}
+            className="absolute left-4 p-3 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] text-[1.2rem] border border-white/20"
+          >
+            <MdOutlineKeyboardDoubleArrowLeft className="text-white" />
+          </button>
+          <h1 className="text-2xl font-bold text-white">Select Network</h1>
+        </header>
+
+        <div className="px-4 mb-6">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-full ${selectedWallet.iconBg} flex items-center justify-center`}>
+              <span className="text-white text-lg font-bold">{selectedWallet.icon}</span>
+            </div>
+            <div>
+              <p className="text-white font-medium">{selectedWallet.name}</p>
+              <p className="text-gray-400 text-sm">Balance: {selectedWallet.balance}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 px-4 overflow-y-auto pb-6">
+          <p className="text-gray-400 text-sm px-1 mb-1">Choose a network for this transaction:</p>
+          {selectedWallet.addresses?.map((addr: any, index: number) => (
+            <button
+              key={index}
+              onClick={() => handleNetworkSelect(addr)}
+              className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors"
+            >
+              <div className="flex flex-col items-start">
+                <span className="text-white font-medium text-base uppercase">
+                  {addr.network || addr.chainCode || selectedWallet.currencyCode}
+                </span>
+                <span className="text-gray-500 text-xs font-mono break-all text-left mt-1">
+                  {addr.address}
+                </span>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+              </div>
+            </button>
+          ))}
+          {(!selectedWallet.addresses || selectedWallet.addresses.length === 0) && (
+            <button
+              onClick={() => handleNetworkSelect({})}
+              className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors"
+            >
+              <div className="flex flex-col items-start">
+                <span className="text-white font-medium text-base uppercase">
+                  Default Network
+                </span>
+                <p className="text-gray-500 text-xs mt-1">Use wallet default network</p>
+              </div>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6">
@@ -169,7 +230,13 @@ export default function PaymentMethod({
           wallets.map((option: PaymentOption) => (
             <button
               key={option.id}
-              onClick={() => onSelect(option)}
+              onClick={() => {
+                if (option.type === "crypto") {
+                  setSelectedWallet(option);
+                } else {
+                  onSelect(option);
+                }
+              }}
               className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors"
             >
               <div className="flex items-center gap-4">

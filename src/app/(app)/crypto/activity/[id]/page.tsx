@@ -212,15 +212,6 @@ function ActivityReceipt({
                         </div>
                     </div>
                 )}
-
-                {transaction.walletId && (
-                    <div className="flex flex-col gap-2">
-                        <span className="text-gray-400 text-xs uppercase font-semibold">Wallet ID</span>
-                        <p className="text-white text-sm bg-white/5 rounded-lg p-3 border border-white/10 font-mono">
-                            {transaction.walletId}
-                        </p>
-                    </div>
-                )}
             </div>
 
             <div className="h-px bg-white/10"></div>

@@ -120,7 +120,7 @@ export const getCashbackBalance = async (currencyId: number): Promise<CashbackBa
         console.log("Cashback Balance Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.error("Cashback Balance Error:", error);
+        console.error("Cashback Balance Error:", error.response?.data || error.message);
         throw error.response?.data || error.message;
     }
 };
@@ -143,7 +143,7 @@ export const convertBolts = async (payload: ConvertBoltsPayload): Promise<Cashba
         console.log("Convert Bolts Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.error("Convert Bolts Error:", error);
+        console.error("Convert Bolts Error:", error.response?.data || error.message);
         throw error.response?.data || error.message;
     }
 };
@@ -173,13 +173,7 @@ export const getBoltsHistory = async (params: { currencyId: number; page?: numbe
         return response.data;
     } catch (error: any) {
         // log the raw error plus structured info so we never print `{}`
-        console.error("Bolts History Error Details raw:", error);
-        console.error("Bolts History Error Details structured:", {
-            message: error?.message,
-            status: error?.response?.status,
-            data: error?.response?.data,
-            params: { currencyId, page, size }
-        });
+        console.error("Bolts History Error:", error.response?.data || error.message);
         throw error?.response?.data || error?.message || "Unknown error";
     }
 };
@@ -201,11 +195,7 @@ export const getConversionInfo = async (): Promise<BoltsConversionInfoResponse> 
         });
         return response.data;
     } catch (error: any) {
-        console.error("Conversion Info Error:", {
-            message: error.message,
-            status: error.response?.status,
-            data: error.response?.data,
-        });
+        console.error("Conversion Info Error:", error.response?.data || error.message);
         throw error.response?.data || error.message;
     }
 };

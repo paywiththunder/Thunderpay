@@ -67,6 +67,7 @@ export default function SendCryptoToCashPage() {
   const [quote, setQuote] = useState<any>(null);
   const [isQuoting, setIsQuoting] = useState(false);
   const [verificationError, setVerificationError] = useState<string>("");
+  const [failureReason, setFailureReason] = useState<string>("");
 
   // Fetch banks list
   const { data: banksData, isLoading: banksLoading, error: banksError } = useQuery<BankItem[]>({
@@ -99,12 +100,12 @@ export default function SendCryptoToCashPage() {
       setIsVerifyingAccount(true);
       setVerificationError("");
       setAccountName("");
-      
+
       // Check if it's a recent recipient first
       const match = recentRecipients.find(
         (r) => r.accountNumber === accountNumber && r.bankCode === selectedBank.code
       );
-      
+
       if (match) {
         setAccountName(match.name);
         setSelectedRecipient(match);
@@ -234,33 +235,35 @@ export default function SendCryptoToCashPage() {
     setIsQuoting(true);
     setStep("confirmation");
 
-    console.log("� ===== CRYPTO TO CASH TRANSFER INITIATED =====");
-    console.log("�🔍 Payment Method Selected:");
-    console.log("  - Name:", paymentMethod.name);
-    console.log("  - Currency Code:", paymentMethod.currencyCode);
-    console.log("  - Network:", paymentMethod.network);
-    console.log("  - Wallet ID:", paymentMethod.walletId);
-    console.log("  - Type:", paymentMethod.type);
-    console.log("  - Balance:", paymentMethod.balance);
-    console.log("  - Full Payment Method Object:", JSON.stringify(paymentMethod, null, 2));
+    if (!paymentMethod.network || !paymentMethod.walletId) {
+      const errorMsg = "Payment method is missing network or wallet information.";
+      console.error("❌", errorMsg, paymentMethod);
+      toast.error(errorMsg);
+      return;
+    }
+
+    const payload = {
+      walletId: paymentMethod.walletId,
+      network: paymentMethod.network,
+      sourceAmount: parseFloat(amount),
+      scope: "EXTERNAL_BANK" as const,
+      recipientAccountNumber: accountNumber,
+    };
+    console.log("CLICKED PAYLOAD:", payload);
+
+    // console.log(" ===== CRYPTO TO CASH TRANSFER INITIATED =====");
+    // console.log("🔍 Payment Method Selected:");
+    // console.log("  - Name:", paymentMethod.name);
+    // console.log("  - Currency Code:", paymentMethod.currencyCode);
+    // console.log("  - Network:", paymentMethod.network);
+    // console.log("  - Wallet ID:", paymentMethod.walletId);
+    // console.log("  - Type:", paymentMethod.type);
+    // console.log("  - Balance:", paymentMethod.balance);
+    // console.log("  - Full Payment Method Object:", JSON.stringify(paymentMethod, null, 2));
 
     try {
-      if (!paymentMethod.network) {
-        throw new Error("Network is missing from payment method. Please ensure wallet has network information.");
-      }
 
-      if (!paymentMethod.walletId) {
-        throw new Error("Wallet ID is missing from payment method.");
-      }
 
-      const payload = {
-        walletId: paymentMethod.walletId,
-        network: paymentMethod.network,
-        sourceAmount: parseFloat(amount),
-        scope: "INTERNAL" as const,
-        recipientAccountNumber: accountNumber,
-      };
-      
       console.log("📤 ===== CRYPTO TO CASH QUOTE REQUEST PAYLOAD =====");
       console.log("📤 API Endpoint: /transfers/crypto-ngn/quote");
       console.log("📤 Request Method: POST");
@@ -271,7 +274,7 @@ export default function SendCryptoToCashPage() {
       console.log("  - scope:", payload.scope, "(type:", typeof payload.scope, ")");
       console.log("  - recipientAccountNumber:", payload.recipientAccountNumber, "(type:", typeof payload.recipientAccountNumber, ")");
       console.log("📤 Full JSON Payload:", JSON.stringify(payload, null, 2));
-      
+
       console.log("🏦 ===== RECIPIENT & TRANSACTION DETAILS =====");
       console.log("  - Account Number:", accountNumber);
       console.log("  - Account Name:", accountName);
@@ -281,28 +284,26 @@ export default function SendCryptoToCashPage() {
       console.log("  - Amount (NGN):", amount);
       console.log("  - Amount (parsed):", parseFloat(amount));
       console.log("  - Timestamp:", new Date().toISOString());
-      
+
       const response = await getCryptoToNgnQuote(payload);
-      
+      console.log("QUOTE API RESPONSE:", response);
+
       console.log("📥 ===== CRYPTO TO CASH QUOTE RESPONSE =====");
       console.log("  - Success:", response.success);
       console.log("  - Description:", response.description);
       console.log("  - Response Timestamp:", new Date().toISOString());
       console.log("📥 Full Response Object:", JSON.stringify(response, null, 2));
-      
+
       if (response.success) {
         console.log("✅ ===== QUOTE SUCCESSFUL - DETAILED BREAKDOWN =====");
-        console.log("  - Quote ID:", response.data.quoteId);
         console.log("  - Quote Reference:", response.data.quoteReference);
         console.log("  - Exchange Rate:", response.data.rate);
-        console.log("  - Source Debit Amount:", response.data.sourceDebitAmount, paymentMethod.currencyCode);
-        console.log("  - Recipient Amount:", response.data.recipientAmount, "NGN");
-        console.log("  - Network Fee:", response.data.networkFee, paymentMethod.currencyCode);
-        console.log("  - Internal Fee:", response.data.internalFee, paymentMethod.currencyCode);
-        console.log("  - Total Debit:", response.data.totalDebit, paymentMethod.currencyCode);
+        console.log("  - Source Amount:", response.data.sourceAmount, response.data.sourceCurrency);
+        console.log("  - Estimated Payout:", response.data.estimatedPayoutNgn, "NGN");
+        console.log("  - Platform Fee:", response.data.platformFeeNgn, "NGN");
         console.log("  - Quote Expires At:", response.data.expiresAt);
         console.log("✅ Quote Data Set Successfully");
-        
+
         setQuote(response.data);
       } else {
         const errorMsg = response.description || "Failed to get quote";
@@ -334,7 +335,7 @@ export default function SendCryptoToCashPage() {
 
     try {
       const payload = {
-        quoteReference: quote.quoteId.toString(),
+        quoteReference: quote.quoteReference,
         recipientIdentifier: accountNumber,
         pin: pin,
       };
@@ -344,13 +345,16 @@ export default function SendCryptoToCashPage() {
         setTransactionToken(response.data?.transactionReference || generateTransactionToken());
         setTransactionResult("success");
       } else {
-        toast.error(response.description || "Transfer failed");
-        setStep("confirmation");
-        return;
+        const errorMsg = response.description || "Transfer failed";
+        toast.error(errorMsg);
+        setFailureReason(errorMsg);
+        setTransactionResult("failure");
       }
     } catch (error: any) {
       console.error("Transfer error:", error);
-      toast.error(error.description || "Transaction failed");
+      const errorMsg = error.description || error.message || "Transaction failed";
+      toast.error(errorMsg);
+      setFailureReason(errorMsg);
       setTransactionResult("failure");
     }
     setStep("result");
@@ -390,16 +394,20 @@ export default function SendCryptoToCashPage() {
         onBack={() => setStep("payment")}
         onPay={() => setStep("enterPin")}
         amount={parseFloat(amount) || 0}
-        paymentAmount={quote ? `${quote.sourceDebitAmount.toLocaleString()} ${selectedPaymentMethod.currencyCode || ""}` : "Calculating..."}
+        paymentAmount={quote ? `${(quote.sourceAmount ?? 0).toLocaleString()} ${selectedPaymentMethod.currencyCode || ""}` : "Calculating..."}
         paymentMethod={`Crypto (${selectedPaymentMethod.name})`}
         biller="Thunder Cash Account"
+        billerLabel="Service"
         meterNumber={accountNumber}
+        meterNumberLabel="Account Number"
         customerName={accountName}
+        customerNameLabel="Account Name"
         meterType="Cash Transfer"
+        meterTypeLabel="Transfer Type"
         serviceAddress=""
         cashback={getCashback()}
         availableBalance={selectedPaymentMethod.balance || "0.00"}
-        recipientAmount={quote ? `₦${quote.recipientAmount?.toLocaleString() || "0"}` : undefined}
+        recipientAmount={quote ? `₦${(quote.estimatedPayoutNgn ?? 0).toLocaleString()}` : undefined}
       />
     );
   }
@@ -416,21 +424,26 @@ export default function SendCryptoToCashPage() {
 
   // Result Step
   if (step === "result" && selectedPaymentMethod) {
-    const paymentAmount = quote ? `${quote.sourceDebitAmount.toLocaleString()} ${selectedPaymentMethod.currencyCode || ""}` : "0";
+    const paymentAmount = quote ? `${(quote.sourceAmount ?? 0).toLocaleString()} ${selectedPaymentMethod.currencyCode || ""}` : "0";
     const amountNum = parseFloat(amount) || 0;
-    const amountEquivalent = quote ? `≈ ₦${quote.recipientAmount?.toLocaleString() || "0"}.00` : `≈ ₦${amountNum.toLocaleString()}.00`;
+    const amountEquivalent = quote ? `≈ ₦${(quote.estimatedPayoutNgn ?? 0).toLocaleString()}` : `≈ ₦${amountNum.toLocaleString()}.00`;
     const transactionDate = getTransactionDate();
 
     if (transactionResult === "success") {
       return (
         <PaymentSuccess
+          title="Transfer Successful"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
           token={transactionToken}
           biller="Thunder Cash Account"
+          billerLabel="Service"
           meterNumber={accountNumber}
+          meterNumberLabel="Account Number"
           customerName={accountName}
+          customerNameLabel="Account Name"
           meterType="Cash Transfer"
+          meterTypeLabel="Transfer Type"
           serviceAddress=""
           paymentMethod={selectedPaymentMethod.name}
           bonusEarned={`₦${getCashback().toFixed(2)} Cashback`}
@@ -444,11 +457,15 @@ export default function SendCryptoToCashPage() {
         <PaymentFailure
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason="Transaction failed"
+          failureReason={failureReason || "Transaction failed"}
           biller="Thunder Cash Account"
+          billerLabel="Service"
           meterNumber={accountNumber}
+          meterNumberLabel="Account Number"
           customerName={accountName}
+          customerNameLabel="Account Name"
           meterType="Cash Transfer"
+          meterTypeLabel="Transfer Type"
           serviceAddress=""
           paymentMethod={selectedPaymentMethod.name}
           transactionDate={transactionDate}

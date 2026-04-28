@@ -107,7 +107,7 @@ export default function PaymentFailure({
             ) : (
               // Legacy rendering
               <>
-                {failureReason && <DetailRow label="Failure Reason" value={failureReason} />}
+                {failureReason && <DetailRow label="Status" value={failureReason} />}
                 {biller && <DetailRow label={billerLabel} value={biller} />}
                 {meterNumber && <DetailRow label={meterNumberLabel} value={meterNumber} />}
                 {customerName && <DetailRow label={customerNameLabel} value={customerName} />}

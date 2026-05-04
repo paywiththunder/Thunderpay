@@ -20,10 +20,26 @@ interface Transaction {
     fee: number;
     status: string;
     reference: string;
-    walletId: number;
+    walletId: number | null;
     fromAddress: string | null;
     toAddress: string | null;
     createdAt: string;
+    details?: {
+        transactionType?: string;
+        productName?: string;
+        phone?: string;
+        price?: string;
+        requestId?: string;
+        transactionId?: string;
+        quoteBill?: string;
+        serviceIdentifier?: string;
+        purchaseValueNgn?: number;
+        quoteProviderParams?: {
+            variation_code?: string;
+            [key: string]: any;
+        };
+        [key: string]: any;
+    };
 }
 
 import { useQuery } from "@tanstack/react-query";
@@ -153,6 +169,8 @@ export default function ActivityPage() {
                             {groupedTransactions[dateKey].map((tx) => {
                                 const Icon = getIcon(tx.source);
                                 const isNegative = ["send", "withdrawal", "bill", "electricity", "card"].includes(tx.source.toLowerCase());
+                                // Debug: Check what's in the transaction
+                                console.log('CryptoActivity Transaction:', tx.source, 'Details:', tx.details, 'TransactionType:', tx.details?.transactionType);
                                 return (
                                     <div
                                         key={tx.reference}
@@ -164,7 +182,9 @@ export default function ActivityPage() {
                                                 <Icon className="w-5 h-5 text-gray-400" />
                                             </div>
                                             <div className="flex flex-col">
-                                                <span className="text-white font-medium capitalize">{tx.source}</span>
+                                                <span className="text-white font-medium capitalize">
+                                                    {tx.details?.transactionType || tx.source}
+                                                </span>
                                                 <span className="text-gray-500 text-xs truncate max-w-[150px]">
                                                     {tx.status} • {format(parseISO(tx.createdAt), "HH:mm")}
                                                 </span>

@@ -29,7 +29,22 @@ interface TransactionDetail {
     fromAddress: string | null;
     toAddress: string | null;
     createdAt: string;
-    details?: any;
+    details?: {
+        transactionType?: string;
+        productName?: string;
+        phone?: string;
+        price?: string;
+        requestId?: string;
+        transactionId?: string;
+        quoteBill?: string;
+        serviceIdentifier?: string;
+        purchaseValueNgn?: number;
+        quoteProviderParams?: {
+            variation_code?: string;
+            [key: string]: any;
+        };
+        [key: string]: any;
+    };
 }
 
 interface ActivityReceiptProps {
@@ -96,7 +111,9 @@ function ActivityReceipt({
                     <Icon className="w-7 h-7 text-white" />
                 </div>
                 <div className="text-center">
-                    <p className="text-gray-400 text-sm capitalize mb-2">{transaction.source}</p>
+                    <p className="text-gray-400 text-sm capitalize mb-2">
+                        {transaction.details?.transactionType || transaction.source}
+                    </p>
                     <p className={`text-3xl font-bold ${isNegative ? "text-red-500" : "text-green-500"}`}>
                         {isNegative ? "-" : "+"}
                         {transaction.amount.toLocaleString(undefined, {
@@ -181,13 +198,47 @@ function ActivityReceipt({
                     </div>
                 )}
 
-                {transaction.source.toLowerCase() === "bill" && transaction.details && (
+                {transaction.details && Object.keys(transaction.details).length > 0 && (
                     <div className="flex flex-col gap-2">
-                        <span className="text-gray-400 text-xs uppercase font-semibold">Bill Details</span>
-                        <div className="bg-white/5 rounded-lg p-3 border border-white/10 flex flex-col gap-2 text-sm">
+                        <span className="text-gray-400 text-xs uppercase font-semibold">
+                            {transaction.source.toLowerCase() === "bill" ? "Bill Details" : "Transaction Details"}
+                        </span>
+                        <div className="bg-white/5 rounded-lg p-3 border border-white/10 flex flex-col gap-3 text-sm">
+                            {transaction.details.transactionType && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-400">Transaction Type</span>
+                                    <span className="text-white font-medium">
+                                        {transaction.details.transactionType}
+                                    </span>
+                                </div>
+                            )}
+                            {transaction.details.productName && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-400">Product</span>
+                                    <span className="text-white font-medium">
+                                        {transaction.details.productName}
+                                    </span>
+                                </div>
+                            )}
+                            {transaction.details.phone && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-400">Phone Number</span>
+                                    <span className="text-white font-medium">
+                                        {transaction.details.phone}
+                                    </span>
+                                </div>
+                            )}
+                            {transaction.details.price && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-400">Price</span>
+                                    <span className="text-white font-medium">
+                                        ₦{transaction.details.price}
+                                    </span>
+                                </div>
+                            )}
                             {transaction.details.quoteBill && (
                                 <div className="flex items-center justify-between">
-                                    <span className="text-gray-400">Type</span>
+                                    <span className="text-gray-400">Bill Type</span>
                                     <span className="text-white font-medium capitalize">
                                         {transaction.details.quoteBill.toLowerCase()}
                                     </span>
@@ -203,9 +254,51 @@ function ActivityReceipt({
                             )}
                             {transaction.details.purchaseValueNgn && (
                                 <div className="flex items-center justify-between">
-                                    <span className="text-gray-400">Value (NGN)</span>
+                                    <span className="text-gray-400">Purchase Value (NGN)</span>
                                     <span className="text-white font-medium">
-                                        {transaction.details.purchaseValueNgn.toLocaleString()}
+                                        ₦{transaction.details.purchaseValueNgn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                </div>
+                            )}
+                            {transaction.details.transactionId && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-400">Transaction ID</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-white font-mono text-xs truncate max-w-[150px]">
+                                            {transaction.details.transactionId}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => onCopy(transaction.details!.transactionId!)}
+                                            className="p-1 rounded bg-white/10 hover:bg-white/20 transition-colors shrink-0"
+                                        >
+                                            <IoCopyOutline className="w-3 h-3 text-gray-400 hover:text-white" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            {transaction.details.requestId && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-400">Request ID</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-white font-mono text-xs truncate max-w-[150px]">
+                                            {transaction.details.requestId}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => onCopy(transaction.details!.requestId!)}
+                                            className="p-1 rounded bg-white/10 hover:bg-white/20 transition-colors shrink-0"
+                                        >
+                                            <IoCopyOutline className="w-3 h-3 text-gray-400 hover:text-white" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            {transaction.details.quoteProviderParams?.variation_code && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-400">Variation Code</span>
+                                    <span className="text-white font-medium">
+                                        {transaction.details.quoteProviderParams.variation_code}
                                     </span>
                                 </div>
                             )}

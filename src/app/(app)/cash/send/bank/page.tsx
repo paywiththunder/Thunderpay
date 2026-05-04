@@ -309,9 +309,22 @@ export default function SendToBankPage() {
       reference: reference
     };
 
+    // Log the payload before executing transfer
+    console.log("📤 ===== BANK TRANSFER PAYLOAD (BEFORE EXECUTE) =====");
+    console.log("📤 Payload Details:");
+    console.log("  - walletId:", payload.walletId, "(type:", typeof payload.walletId, ")");
+    console.log("  - recipientAccountNumber:", payload.recipientAccountNumber, "(type:", typeof payload.recipientAccountNumber, ")");
+    console.log("  - bankCode:", payload.bankCode, "(type:", typeof payload.bankCode, ")");
+    console.log("  - amount:", payload.amount, "(type:", typeof payload.amount, ")");
+    console.log("  - pin:", "[REDACTED]");
+    console.log("  - reason:", payload.reason, "(type:", typeof payload.reason, ")");
+    console.log("  - reference:", payload.reference, "(type:", typeof payload.reference, ")");
+    console.log("📤 Full JSON Payload (pin redacted):", JSON.stringify({...payload, pin: "[REDACTED]"}, null, 2));
+    console.log("📤 Timestamp:", new Date().toISOString());
+
     try {
       const result = await initiateBankTransfer(payload);
-      console.log("Transfer Response:", result);
+      console.log("📥 Transfer Response:", result);
       setTransferData(result);
       setTransactionResult("success");
       setStep("result");

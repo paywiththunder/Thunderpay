@@ -204,6 +204,95 @@ export default function SendCryptoToCashPage() {
       .padStart(2, "0")} ${ampm}`;
   };
 
+  // Format expiration time as countdown with real-time updates
+  const formatExpirationTime = (expiresAt: string): string => {
+    try {
+      console.log("🕒 Raw expiresAt:", expiresAt);
+      
+      // Parse the timestamp more carefully
+      // Format: 2026-05-03T13:26:42.097126121
+      const timestampMatch = expiresAt.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+      
+      if (!timestampMatch) {
+        console.error("🕒 Invalid timestamp format");
+        return "Invalid date";
+      }
+      
+      const [, year, month, day, hour, minute, second] = timestampMatch;
+      
+      // Create date using local timezone - add current timezone offset to match local time
+      const expirationDate = new Date(
+        parseInt(year),
+        parseInt(month) - 1, // Month is 0-indexed
+        parseInt(day),
+        parseInt(hour),
+        parseInt(minute),
+        parseInt(second)
+      );
+      
+      const now = new Date();
+      
+      console.log("🕒 Parsed components:", { year, month, day, hour, minute, second });
+      console.log("🕒 Expiration Date (local):", expirationDate.toLocaleString());
+      console.log("🕒 Current Date (local):", now.toLocaleString());
+      
+      const diffMs = expirationDate.getTime() - now.getTime();
+      console.log("🕒 Time difference (ms):", diffMs);
+      console.log("🕒 Time difference (seconds):", Math.floor(diffMs / 1000));
+      
+      if (diffMs <= 0) {
+        console.log("🕒 Quote has expired");
+        return "Expired";
+      }
+      
+      const totalSeconds = Math.floor(diffMs / 1000);
+      const diffMinutes = Math.floor(totalSeconds / 60);
+      const diffSeconds = totalSeconds % 60;
+      
+      console.log("🕒 Minutes:", diffMinutes, "Seconds:", diffSeconds);
+      
+      if (diffMinutes > 0) {
+        return `${diffMinutes}m ${diffSeconds}s`;
+      } else {
+        return `${diffSeconds}s`;
+      }
+    } catch (error) {
+      console.error("Error formatting expiration time:", error);
+      return "Invalid date";
+    }
+  };
+
+  // Real-time countdown state
+  const [countdown, setCountdown] = useState<string>("");
+  
+  // Update countdown every second when quote has expiration
+  useEffect(() => {
+    console.log("🕒 Countdown useEffect triggered", { quote, expiresAt: quote?.expiresAt });
+    
+    if (!quote || !quote.expiresAt) {
+      console.log("🕒 No quote or expiresAt, clearing countdown");
+      setCountdown("");
+      return;
+    }
+    
+    const updateCountdown = () => {
+      const newCountdown = formatExpirationTime(quote.expiresAt);
+      console.log("🕒 Updating countdown:", newCountdown);
+      setCountdown(newCountdown);
+    };
+    
+    // Update immediately when quote is received
+    updateCountdown();
+    
+    // Update every second
+    const interval = setInterval(updateCountdown, 1000);
+    
+    return () => {
+      console.log("🕒 Clearing countdown interval");
+      clearInterval(interval);
+    };
+  }, [quote?.expiresAt, quote?.quoteReference]); // Also depend on quoteReference to reset on new quotes
+
   const handleAmountSelect = (selectedAmount: number) => {
     setAmount(selectedAmount.toString());
   };
@@ -245,7 +334,7 @@ export default function SendCryptoToCashPage() {
     const payload = {
       walletId: paymentMethod.walletId,
       network: paymentMethod.network,
-      sourceAmount: parseFloat(amount),
+      targetAmount: parseFloat(amount),  // Changed to targetAmount as requested
       scope: "EXTERNAL_BANK" as const,
       recipientAccountNumber: accountNumber,
     };
@@ -270,7 +359,7 @@ export default function SendCryptoToCashPage() {
       console.log("📤 Payload Details:");
       console.log("  - walletId:", payload.walletId, "(type:", typeof payload.walletId, ")");
       console.log("  - network:", payload.network, "(type:", typeof payload.network, ")");
-      console.log("  - sourceAmount:", payload.sourceAmount, "(type:", typeof payload.sourceAmount, ")");
+      console.log("  - targetAmount:", payload.targetAmount, "(type:", typeof payload.targetAmount, ")");
       console.log("  - scope:", payload.scope, "(type:", typeof payload.scope, ")");
       console.log("  - recipientAccountNumber:", payload.recipientAccountNumber, "(type:", typeof payload.recipientAccountNumber, ")");
       console.log("📤 Full JSON Payload:", JSON.stringify(payload, null, 2));
@@ -298,7 +387,7 @@ export default function SendCryptoToCashPage() {
         console.log("✅ ===== QUOTE SUCCESSFUL - DETAILED BREAKDOWN =====");
         console.log("  - Quote Reference:", response.data.quoteReference);
         console.log("  - Exchange Rate:", response.data.rate);
-        console.log("  - Source Amount:", response.data.sourceAmount, response.data.sourceCurrency);
+        console.log("  - Target Amount:", response.data.targetAmount, response.data.sourceCurrency);
         console.log("  - Estimated Payout:", response.data.estimatedPayoutNgn, "NGN");
         console.log("  - Platform Fee:", response.data.platformFeeNgn, "NGN");
         console.log("  - Quote Expires At:", response.data.expiresAt);
@@ -389,25 +478,65 @@ export default function SendCryptoToCashPage() {
 
   // Confirmation Step
   if (step === "confirmation" && selectedPaymentMethod) {
+    const expirationTime = quote?.expiresAt || quote?.expiresAtTimestamp;
+    console.log("🔍 Confirmation step - Quote:", quote);
+    console.log("🔍 Confirmation step - Countdown:", countdown);
+    console.log("🔍 Confirmation step - ExpirationTime:", expirationTime);
+    
     return (
       <Confirmation
         onBack={() => setStep("payment")}
         onPay={() => setStep("enterPin")}
         amount={parseFloat(amount) || 0}
-        paymentAmount={quote ? `${(quote.sourceAmount ?? 0).toLocaleString()} ${selectedPaymentMethod.currencyCode || ""}` : "Calculating..."}
-        paymentMethod={`Crypto (${selectedPaymentMethod.name})`}
-        biller="Thunder Cash Account"
-        billerLabel="Service"
-        meterNumber={accountNumber}
-        meterNumberLabel="Account Number"
-        customerName={accountName}
-        customerNameLabel="Account Name"
-        meterType="Cash Transfer"
-        meterTypeLabel="Transfer Type"
-        serviceAddress=""
-        cashback={getCashback()}
+        paymentAmount={quote ? `${quote.sourceAmount ?? 0} ${quote.sourceCurrency || selectedPaymentMethod.currencyCode}` : "Calculating..."}
         availableBalance={selectedPaymentMethod.balance || "0.00"}
         recipientAmount={quote ? `₦${(quote.estimatedPayoutNgn ?? 0).toLocaleString()}` : undefined}
+        details={quote ? [
+          { label: "Payment Method", value: `Crypto (${selectedPaymentMethod.name})` },
+          { label: "Service", value: "Thunder Cash Account" },
+          { label: "Account Number", value: accountNumber },
+          { label: "Account Name", value: accountName },
+          { label: "Transfer Type", value: "Cash Transfer" },
+          { label: "Crypto Deduction", value: `${quote.sourceAmount ?? 0} ${quote.sourceCurrency || selectedPaymentMethod.currencyCode}` },
+          ...(expirationTime ? [
+            { 
+              label: "Quote Expires", 
+              value: countdown || "Loading..."
+            }
+          ] : []),
+          ...(quote.transactionFee !== undefined ? [
+            { label: "Transaction Fee", value: `${quote.transactionFee} ${quote.deductionCurrency || 'NGN'}` }
+          ] : []),
+          ...(quote.boltsEarnable !== undefined ? [
+            { label: "Bolts Earnable", value: `${quote.boltsEarnable} bolts` }
+          ] : []),
+          ...(quote.exchangeRate !== undefined ? [
+            { label: "Exchange Rate", value: `1 ${quote.sourceCurrency || 'USDT'} = ${quote.exchangeRate} NGN` }
+          ] : []),
+          ...(quote.platformFeeNgn !== undefined ? [
+            { label: "Platform Fee", value: `₦${quote.platformFeeNgn.toLocaleString()}` }
+          ] : []),
+          ...(quote.amountIfFullCashbackApplied !== undefined ? [
+            { label: "Full Cashback Amount", value: `${quote.amountIfFullCashbackApplied} ${quote.deductionCurrency || 'USDT'}` }
+          ] : []),
+          ...(quote.bonusAvailable !== undefined ? [
+            { label: "Bonus Available", value: `${quote.bonusAvailable} ${quote.deductionCurrency || 'USDT'}` }
+          ] : []),
+          ...(quote.deductionAmount !== undefined ? [
+            { label: "Deduction Amount", value: `${quote.deductionAmount} ${quote.deductionCurrency || 'USDT'}` }
+          ] : []),
+          ...(quote.maxCashbackApplicable !== undefined ? [
+            { label: "Max Cashback", value: `${quote.maxCashbackApplicable} ${quote.deductionCurrency || 'USDT'}` }
+          ] : []),
+          { label: "Quote Reference", value: quote.quoteReference || "N/A" },
+        ] : [
+          { label: "Payment Method", value: `Crypto (${selectedPaymentMethod.name})` },
+          { label: "Service", value: "Thunder Cash Account" },
+          { label: "Account Number", value: accountNumber },
+          { label: "Account Name", value: accountName },
+          { label: "Transfer Type", value: "Cash Transfer" },
+          { label: "Status", value: "Fetching quote..." },
+        ]}
       />
     );
   }
@@ -424,7 +553,7 @@ export default function SendCryptoToCashPage() {
 
   // Result Step
   if (step === "result" && selectedPaymentMethod) {
-    const paymentAmount = quote ? `${(quote.sourceAmount ?? 0).toLocaleString()} ${selectedPaymentMethod.currencyCode || ""}` : "0";
+    const paymentAmount = quote ? `${quote.sourceAmount ?? 0} ${quote.sourceCurrency || selectedPaymentMethod.currencyCode}` : "0";
     const amountNum = parseFloat(amount) || 0;
     const amountEquivalent = quote ? `≈ ₦${(quote.estimatedPayoutNgn ?? 0).toLocaleString()}` : `≈ ₦${amountNum.toLocaleString()}.00`;
     const transactionDate = getTransactionDate();

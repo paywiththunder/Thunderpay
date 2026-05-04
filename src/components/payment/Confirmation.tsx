@@ -132,10 +132,14 @@ export default function Confirmation({
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
+  const isExpired = value === "Expired";
+  
   return (
     <div className="flex justify-between items-start">
       <span className="text-gray-400 text-sm">{label}</span>
-      <span className="text-white text-sm font-medium text-right max-w-[60%]">
+      <span className={`text-sm font-medium text-right max-w-[60%] ${
+        isExpired ? "text-red-500" : "text-white"
+      }`}>
         {value}
       </span>
     </div>

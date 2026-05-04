@@ -106,20 +106,55 @@ export const getTransferQuote = async (payload: TransferQuotePayload) => {
     if (!token) throw new Error("No auth token found");
 
     try {
+        console.log("📤 ===== TRANSFER QUOTE REQUEST =====");
+        console.log("📤 API Endpoint: /transfers/quote");
+        console.log("📤 Request Method: POST");
+        console.log("📤 Payload Details:");
+        console.log("  - scope:", payload.scope, "(type:", typeof payload.scope, ")");
+        console.log("  - walletId:", payload.walletId, "(type:", typeof payload.walletId, ")");
+        console.log("  - amount:", payload.amount, "(type:", typeof payload.amount, ")");
+        console.log("  - fixedSide:", payload.fixedSide, "(type:", typeof payload.fixedSide, ")");
+        if (payload.network) console.log("  - network:", payload.network, "(type:", typeof payload.network, ")");
+        if (payload.toCurrencyId) console.log("  - toCurrencyId:", payload.toCurrencyId, "(type:", typeof payload.toCurrencyId, ")");
+        if (payload.recipientEmail) console.log("  - recipientEmail:", payload.recipientEmail, "(type:", typeof payload.recipientEmail, ")");
+        if (payload.recipientAddress) console.log("  - recipientAddress:", payload.recipientAddress, "(type:", typeof payload.recipientAddress, ")");
+        console.log("📤 Full JSON Payload:", JSON.stringify(payload, null, 2));
+        console.log("📤 Timestamp:", new Date().toISOString());
+
         const response = await axios.post(`${API_URL}/quote`, payload, {
             headers: {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
             },
         });
-        console.log("Quote Response Success:", response.data);
+        
+        console.log("📥 ===== TRANSFER QUOTE RESPONSE =====");
+        console.log("📥 Success:", response.data.success);
+        console.log("📥 Description:", response.data.description);
+        console.log("📥 Response Timestamp:", new Date().toISOString());
+        console.log("📥 Full Response Object:", JSON.stringify(response.data, null, 2));
+        
+        if (response.data.success && response.data.data) {
+            console.log("✅ ===== QUOTE DETAILS =====");
+            console.log("  - Quote ID:", response.data.data.quoteId);
+            console.log("  - Quote Reference:", response.data.data.quoteReference);
+            console.log("  - Rate:", response.data.data.rate);
+            console.log("  - Source Debit Amount:", response.data.data.sourceDebitAmount);
+            console.log("  - Network Fee:", response.data.data.networkFee);
+            console.log("  - Internal Fee:", response.data.data.internalFee);
+            console.log("  - Total Debit:", response.data.data.totalDebit);
+            console.log("  - Expires At:", response.data.data.expiresAt);
+        }
+        
         return response.data;
     } catch (error: any) {
-        console.error("Quote Request Failed:", {
-            status: error.response?.status,
-            data: error.response?.data,
-            message: error.message
-        });
+        console.error("❌ ===== QUOTE REQUEST FAILED =====");
+        console.error("❌ Error Type:", error.constructor.name);
+        console.error("❌ Error Message:", error?.message);
+        console.error("❌ Error Description:", error?.description);
+        console.error("❌ HTTP Status:", error?.response?.status);
+        console.error("❌ Response Data:", error?.response?.data);
+        console.error("❌ Full Error Object:", JSON.stringify(error, null, 2));
         throw error.response?.data || error.message;
     }
 };
@@ -172,18 +207,55 @@ export const initiateBankTransfer = async (
     if (!token) throw new Error("No auth token found");
 
     try {
+        console.log("📤 ===== BANK TRANSFER REQUEST =====");
+        console.log("📤 API Endpoint: /transfers/to-bank/initiate");
+        console.log("📤 Request Method: POST");
+        console.log("📤 Payload Details:");
+        console.log("  - walletId:", payload.walletId, "(type:", typeof payload.walletId, ")");
+        console.log("  - recipientAccountNumber:", payload.recipientAccountNumber, "(type:", typeof payload.recipientAccountNumber, ")");
+        console.log("  - bankCode:", payload.bankCode, "(type:", typeof payload.bankCode, ")");
+        console.log("  - amount:", payload.amount, "(type:", typeof payload.amount, ")");
+        if (payload.reason) console.log("  - reason:", payload.reason, "(type:", typeof payload.reason, ")");
+        if (payload.reference) console.log("  - reference:", payload.reference, "(type:", typeof payload.reference, ")");
+        console.log("📤 Full JSON Payload:", JSON.stringify(payload, null, 2));
+        console.log("📤 Timestamp:", new Date().toISOString());
+
         const response = await axios.post(`${API_URL}/to-bank/initiate`, payload, {
             headers: {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
             },
         });
+        
         if (response.data?.success) {
-            console.log("Bank Transfer Response:", response.data.data);
+            console.log("📥 ===== BANK TRANSFER RESPONSE =====");
+            console.log("📥 Success:", response.data.success);
+            console.log("📥 Description:", response.data.description);
+            console.log("📥 Response Timestamp:", new Date().toISOString());
+            console.log("📥 Full Response Object:", JSON.stringify(response.data, null, 2));
+            
+            if (response.data.data) {
+                console.log("✅ ===== TRANSFER DETAILS =====");
+                console.log("  - Reference:", response.data.data.reference);
+                console.log("  - Amount:", response.data.data.amount);
+                console.log("  - Amount Minor:", response.data.data.amountMinor);
+                console.log("  - Status:", response.data.data.status);
+                if (response.data.data.recipientAccountName) console.log("  - Recipient Account Name:", response.data.data.recipientAccountName);
+                if (response.data.data.bankCode) console.log("  - Bank Code:", response.data.data.bankCode);
+                if (response.data.data.providerTransferId) console.log("  - Provider Transfer ID:", response.data.data.providerTransferId);
+            }
+            
             return response.data.data as InitiateBankTransferResponse;
         }
         throw new Error(response.data?.description || "Transfer failed");
     } catch (error: any) {
+        console.error("❌ ===== BANK TRANSFER FAILED =====");
+        console.error("❌ Error Type:", error.constructor.name);
+        console.error("❌ Error Message:", error?.message);
+        console.error("❌ Error Description:", error?.description);
+        console.error("❌ HTTP Status:", error?.response?.status);
+        console.error("❌ Response Data:", error?.response?.data);
+        console.error("❌ Full Error Object:", JSON.stringify(error, null, 2));
         throw error.response?.data || error.message;
     }
 };
@@ -217,17 +289,53 @@ export const initiateThunderTransfer = async (
     if (!token) throw new Error("No auth token found");
 
     try {
+        console.log("📤 ===== THUNDER TRANSFER REQUEST =====");
+        console.log("📤 API Endpoint: /transfers/thunder/initiate");
+        console.log("📤 Request Method: POST");
+        console.log("📤 Payload Details:");
+        console.log("  - walletId:", payload.walletId, "(type:", typeof payload.walletId, ")");
+        console.log("  - recipientAccountNumber:", payload.recipientAccountNumber, "(type:", typeof payload.recipientAccountNumber, ")");
+        console.log("  - amount:", payload.amount, "(type:", typeof payload.amount, ")");
+        if (payload.reason) console.log("  - reason:", payload.reason, "(type:", typeof payload.reason, ")");
+        if (payload.reference) console.log("  - reference:", payload.reference, "(type:", typeof payload.reference, ")");
+        console.log("📤 Full JSON Payload:", JSON.stringify(payload, null, 2));
+        console.log("📤 Timestamp:", new Date().toISOString());
+
         const response = await axios.post(`${API_URL}/thunder/initiate`, payload, {
             headers: {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
             },
         });
+        
         if (response.data?.success) {
+            console.log("📥 ===== THUNDER TRANSFER RESPONSE =====");
+            console.log("📥 Success:", response.data.success);
+            console.log("📥 Description:", response.data.description);
+            console.log("📥 Response Timestamp:", new Date().toISOString());
+            console.log("📥 Full Response Object:", JSON.stringify(response.data, null, 2));
+            
+            if (response.data.data) {
+                console.log("✅ ===== TRANSFER DETAILS =====");
+                console.log("  - Reference:", response.data.data.reference);
+                console.log("  - Amount:", response.data.data.amount);
+                console.log("  - Amount Minor:", response.data.data.amountMinor);
+                console.log("  - Status:", response.data.data.status);
+                if (response.data.data.recipientAccountName) console.log("  - Recipient Account Name:", response.data.data.recipientAccountName);
+                if (response.data.data.transactionId) console.log("  - Transaction ID:", response.data.data.transactionId);
+            }
+            
             return response.data.data as InitiateThunderTransferResponse;
         }
         throw new Error(response.data?.description || "Thunder transfer failed");
     } catch (error: any) {
+        console.error("❌ ===== THUNDER TRANSFER FAILED =====");
+        console.error("❌ Error Type:", error.constructor.name);
+        console.error("❌ Error Message:", error?.message);
+        console.error("❌ Error Description:", error?.description);
+        console.error("❌ HTTP Status:", error?.response?.status);
+        console.error("❌ Response Data:", error?.response?.data);
+        console.error("❌ Full Error Object:", JSON.stringify(error, null, 2));
         throw error.response?.data || error.message;
     }
 };
@@ -237,7 +345,7 @@ export const initiateThunderTransfer = async (
 export interface CryptoToNgnQuotePayload {
     walletId: number;
     network: string;
-    sourceAmount: number;
+    targetAmount: number;  // Changed to targetAmount as requested
     scope: "INTERNAL" | "EXTERNAL_BANK";
     recipientAccountNumber: string;
 }
@@ -249,12 +357,21 @@ export interface CryptoToNgnQuoteResponse {
         quoteReference: string;
         rate: number;
         expiresAt: string;
-        sourceAmount: number;
+        expiresAtTimestamp?: string; // Added based on your quote response
+        targetAmount: number;
         sourceCurrency: string;
         targetCurrency: string;
         estimatedPayoutNgn: number;
         estimatedNgnBeforeFee: number;
         platformFeeNgn: number;
+        transactionFee?: number; // Added based on your quote response
+        exchangeRate?: number; // Added based on your quote response
+        amountIfFullCashbackApplied?: number; // Added based on your quote response
+        boltsEarnable?: number; // Added based on your quote response
+        bonusAvailable?: number; // Added based on your quote response
+        deductionAmount?: number; // Added based on your quote response
+        deductionCurrency?: string; // Added based on your quote response
+        maxCashbackApplicable?: number; // Added based on your quote response
     };
 }
 

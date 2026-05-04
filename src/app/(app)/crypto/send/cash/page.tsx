@@ -10,7 +10,7 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
-import { getCryptoToNgnQuote, executeTransfer, verifyAccountNumber, getBanksList, BankItem } from "@/services/transfer";
+import { getCryptoToNgnQuote, executeCryptoToNgnTransfer, verifyAccountNumber, getBanksList, BankItem } from "@/services/transfer";
 import { toast } from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 
@@ -420,16 +420,22 @@ export default function SendCryptoToCashPage() {
   };
 
   const handlePinComplete = async (pin: string) => {
-    if (!quote) return;
+    if (!quote || !selectedBank) return;
 
     try {
       const payload = {
         quoteReference: quote.quoteReference,
-        recipientIdentifier: accountNumber,
+        scope: "EXTERNAL_BANK" as const,
+        recipientAccountNumber: accountNumber,
+        bankCode: selectedBank.code,
+        reason: "Crypto to Cash Transfer",
         pin: pin,
       };
 
-      const response = await executeTransfer(payload);
+      console.log("📤 Executing crypto to NGN transfer with payload:", payload);
+
+      const response = await executeCryptoToNgnTransfer(payload);
+      
       if (response.success) {
         setTransactionToken(response.data?.transactionReference || generateTransactionToken());
         setTransactionResult("success");

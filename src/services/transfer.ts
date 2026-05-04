@@ -399,3 +399,80 @@ export const getCryptoToNgnQuote = async (
         throw error.response?.data || error.message;
     }
 };
+
+// ─── Crypto to NGN Execute Transfer
+
+export interface CryptoToNgnExecutePayload {
+    quoteReference: string;
+    scope: "INTERNAL" | "EXTERNAL_BANK";
+    recipientAccountNumber: string;
+    bankCode?: string; // Required for EXTERNAL_BANK
+    reason?: string;
+    pin: string;
+}
+
+export interface CryptoToNgnExecuteResponse {
+    success: boolean;
+    description: string;
+    data: {
+        transactionReference: string;
+        status: string;
+        amount?: number;
+        recipientAccountNumber?: string;
+        recipientAccountName?: string;
+        [key: string]: any; // Allow for additional fields
+    };
+}
+
+export const executeCryptoToNgnTransfer = async (
+    payload: CryptoToNgnExecutePayload
+): Promise<CryptoToNgnExecuteResponse> => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        console.log("📤 ===== CRYPTO TO NGN EXECUTE REQUEST =====");
+        console.log("📤 API Endpoint: /transfers/crypto-ngn/execute");
+        console.log("📤 Request Method: POST");
+        console.log("📤 Payload Details:");
+        console.log("  - quoteReference:", payload.quoteReference);
+        console.log("  - scope:", payload.scope);
+        console.log("  - recipientAccountNumber:", payload.recipientAccountNumber);
+        if (payload.bankCode) console.log("  - bankCode:", payload.bankCode);
+        if (payload.reason) console.log("  - reason:", payload.reason);
+        console.log("📤 Full JSON Payload:", JSON.stringify(payload, null, 2));
+        console.log("📤 Timestamp:", new Date().toISOString());
+
+        const response = await axios.post(`${API_URL}/crypto-ngn/execute`, payload, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        });
+
+        console.log("📥 ===== CRYPTO TO NGN EXECUTE RESPONSE =====");
+        console.log("📥 Success:", response.data.success);
+        console.log("📥 Description:", response.data.description);
+        console.log("📥 Response Timestamp:", new Date().toISOString());
+        console.log("📥 Full Response Object:", JSON.stringify(response.data, null, 2));
+
+        if (response.data.success && response.data.data) {
+            console.log("✅ ===== TRANSFER EXECUTED SUCCESSFULLY =====");
+            console.log("  - Transaction Reference:", response.data.data.transactionReference);
+            console.log("  - Status:", response.data.data.status);
+            if (response.data.data.amount) console.log("  - Amount:", response.data.data.amount);
+            if (response.data.data.recipientAccountName) console.log("  - Recipient:", response.data.data.recipientAccountName);
+        }
+
+        return response.data;
+    } catch (error: any) {
+        console.error("❌ ===== CRYPTO TO NGN EXECUTE FAILED =====");
+        console.error("❌ Error Type:", error.constructor.name);
+        console.error("❌ Error Message:", error?.message);
+        console.error("❌ Error Description:", error?.response?.data?.description);
+        console.error("❌ HTTP Status:", error?.response?.status);
+        console.error("❌ Response Data:", error?.response?.data);
+        console.error("❌ Full Error Object:", JSON.stringify(error, null, 2));
+        throw error.response?.data || error.message;
+    }
+};

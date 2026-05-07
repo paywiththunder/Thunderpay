@@ -39,6 +39,8 @@ interface TransactionDetail {
         quoteBill?: string;
         serviceIdentifier?: string;
         purchaseValueNgn?: number;
+        senderName?: string;
+        recipientName?: string;
         quoteProviderParams?: {
             variation_code?: string;
             [key: string]: any;
@@ -201,7 +203,9 @@ function ActivityReceipt({
                 {transaction.details && Object.keys(transaction.details).length > 0 && (
                     <div className="flex flex-col gap-2">
                         <span className="text-gray-400 text-xs uppercase font-semibold">
-                            {transaction.source.toLowerCase() === "bill" ? "Bill Details" : "Transaction Details"}
+                            {transaction.source.toLowerCase() === "bill" ? "Bill Details" : 
+                             transaction.source.toLowerCase() === "transfer" ? "Transfer Details" : 
+                             "Transaction Details"}
                         </span>
                         <div className="bg-white/5 rounded-lg p-3 border border-white/10 flex flex-col gap-3 text-sm">
                             {transaction.details.transactionType && (
@@ -209,6 +213,22 @@ function ActivityReceipt({
                                     <span className="text-gray-400">Transaction Type</span>
                                     <span className="text-white font-medium">
                                         {transaction.details.transactionType}
+                                    </span>
+                                </div>
+                            )}
+                            {transaction.details.senderName && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-400">Sender Name</span>
+                                    <span className="text-white font-medium">
+                                        {transaction.details.senderName}
+                                    </span>
+                                </div>
+                            )}
+                            {transaction.details.recipientName && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-400">Recipient Name</span>
+                                    <span className="text-white font-medium">
+                                        {transaction.details.recipientName}
                                     </span>
                                 </div>
                             )}
@@ -302,6 +322,35 @@ function ActivityReceipt({
                                     </span>
                                 </div>
                             )}
+                            
+                            {/* Display all other fields that haven't been explicitly handled */}
+                            {Object.entries(transaction.details)
+                                .filter(([key]) => !['transactionType', 'senderName', 'recipientName', 'productName', 'phone', 'price', 'quoteBill', 'serviceIdentifier', 'purchaseValueNgn', 'transactionId', 'requestId', 'quoteProviderParams'].includes(key))
+                                .map(([key, value]) => {
+                                    // Skip null, undefined, or empty values
+                                    if (value === null || value === undefined || value === '') return null;
+                                    
+                                    // Skip objects (we handle them separately)
+                                    if (typeof value === 'object') return null;
+                                    
+                                    // Format the key to be more readable
+                                    const formattedKey = key
+                                        .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+                                        .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
+                                        .trim();
+                                    
+                                    // Format the value
+                                    let formattedValue = String(value);
+                                    
+                                    return (
+                                        <div key={key} className="flex items-center justify-between">
+                                            <span className="text-gray-400">{formattedKey}</span>
+                                            <span className="text-white font-medium break-all text-right max-w-[60%]">
+                                                {formattedValue}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                         </div>
                     </div>
                 )}

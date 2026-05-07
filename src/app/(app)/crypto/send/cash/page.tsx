@@ -14,8 +14,6 @@ import { getCryptoToNgnQuote, executeCryptoToNgnTransfer, verifyAccountNumber, g
 import { toast } from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 import { parseISO, differenceInSeconds, isAfter } from "date-fns";
-import { toast } from "react-hot-toast";
-import { useQuery } from "@tanstack/react-query";
 
 interface RecentRecipient {
   id: string;

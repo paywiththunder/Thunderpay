@@ -84,6 +84,52 @@ export default function DataPage() {
   const [availablePlans, setAvailablePlans] = useState<DataPlan[]>([]);
   const [transactionDetails, setTransactionDetails] = useState<any>(null);
   const [quote, setQuote] = useState<any>(null);
+  const [countdown, setCountdown] = useState<string>("");
+
+  // Format expiration time as countdown with real-time updates using date-fns
+  const formatExpirationTime = (expiresAt: string | null): string => {
+    if (!expiresAt || expiresAt === null) return "";
+    
+    try {
+      const expirationDate = parseISO(expiresAt);
+      const now = new Date();
+      
+      if (!isAfter(expirationDate, now)) {
+        return "Expired";
+      }
+      
+      const totalSeconds = differenceInSeconds(expirationDate, now);
+      const diffMinutes = Math.floor(totalSeconds / 60);
+      const diffSeconds = totalSeconds % 60;
+      
+      if (diffMinutes > 0) {
+        return `${diffMinutes}m ${diffSeconds}s`;
+      } else {
+        return `${diffSeconds}s`;
+      }
+    } catch (error) {
+      console.error("Error formatting expiration time:", error);
+      return "Invalid date";
+    }
+  };
+
+  // Update countdown every second when quote has expiration
+  useEffect(() => {
+    if (!quote || !quote.expiresAtTimestamp || quote.expiresAtTimestamp === null) {
+      setCountdown("");
+      return;
+    }
+    
+    const updateCountdown = () => {
+      const newCountdown = formatExpirationTime(quote.expiresAtTimestamp);
+      setCountdown(newCountdown);
+    };
+    
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    
+    return () => clearInterval(interval);
+  }, [quote?.expiresAtTimestamp, quote?.quoteReference]);
 
   // Fetch Bolt Balance (Cashback)
   const { data: cashbackData } = useQuery({
@@ -139,6 +185,9 @@ export default function DataPage() {
   const quoteMutation = useMutation({
     mutationFn: (payload: DataQuotePayload) => getDataQuote(payload),
     onSuccess: (response) => {
+      console.log("📥 Quote Response:", response);
+      console.log("📊 Quote Data:", response.data);
+      
       if (response.success && response.data) {
         const quoteData = response.data;
         localStorage.setItem("currentDataQuote", JSON.stringify(quoteData));
@@ -420,6 +469,9 @@ export default function DataPage() {
           { label: "Amount", value: `₦${selectedPlan.price.toLocaleString()}.00` },
           { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
           { label: "Bolts to Earn", value: `${getCashback().toFixed(2)} Bolts` },
+          ...(quote?.expiresAtTimestamp && quote.expiresAtTimestamp !== null ? [
+            { label: "Quote Expires", value: countdown || "Loading..." }
+          ] : []),
         ]}
         availableBalance={getAvailableBalance()}
         boltBalance={boltBalance}

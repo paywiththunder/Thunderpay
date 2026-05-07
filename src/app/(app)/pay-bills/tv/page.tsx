@@ -23,6 +23,7 @@ import {
 import { getCashbackBalance } from "@/services/cashback";
 import { useCurrency } from "@/providers/CurrencyProvider";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { parseISO, differenceInSeconds, isAfter } from "date-fns";
 
 interface CableTVProvider {
   id: string;
@@ -79,6 +80,52 @@ export default function TVPage() {
 
   const [availablePlans, setAvailablePlans] = useState<TVPlan[]>(FALLBACK_PLANS);
   const [transactionDetails, setTransactionDetails] = useState<any>(null);
+  const [countdown, setCountdown] = useState<string>("");
+
+  // Format expiration time as countdown with real-time updates using date-fns
+  const formatExpirationTime = (expiresAt: string | null): string => {
+    if (!expiresAt || expiresAt === null) return "";
+    
+    try {
+      const expirationDate = parseISO(expiresAt);
+      const now = new Date();
+      
+      if (!isAfter(expirationDate, now)) {
+        return "Expired";
+      }
+      
+      const totalSeconds = differenceInSeconds(expirationDate, now);
+      const diffMinutes = Math.floor(totalSeconds / 60);
+      const diffSeconds = totalSeconds % 60;
+      
+      if (diffMinutes > 0) {
+        return `${diffMinutes}m ${diffSeconds}s`;
+      } else {
+        return `${diffSeconds}s`;
+      }
+    } catch (error) {
+      console.error("Error formatting expiration time:", error);
+      return "Invalid date";
+    }
+  };
+
+  // Update countdown every second when quote has expiration
+  useEffect(() => {
+    if (!quoteData || !quoteData.expiresAtTimestamp || quoteData.expiresAtTimestamp === null) {
+      setCountdown("");
+      return;
+    }
+    
+    const updateCountdown = () => {
+      const newCountdown = formatExpirationTime(quoteData.expiresAtTimestamp);
+      setCountdown(newCountdown);
+    };
+    
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    
+    return () => clearInterval(interval);
+  }, [quoteData?.expiresAtTimestamp, quoteData?.quoteReference]);
 
   // Fetch Bolt Balance (Cashback)
   const { data: cashbackData } = useQuery({
@@ -123,6 +170,9 @@ export default function TVPage() {
   const quoteMutation = useMutation({
     mutationFn: (payload: TvQuotePayload) => getTvQuote(payload),
     onSuccess: (response) => {
+      console.log("📥 Quote Response:", response);
+      console.log("📊 Quote Data:", response.data);
+      
       if (response.success && response.data) {
         localStorage.setItem("currentTvQuote", JSON.stringify(response.data));
         setQuoteData(response.data);
@@ -304,6 +354,9 @@ export default function TVPage() {
       { label: "Package", value: selectedPlan.name },
       { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
       ...(selectedPlan.cashback > 0 ? [{ label: "Bonus to Earn", value: `₦${selectedPlan.cashback.toFixed(2)} Cashback` }] : []),
+      ...(quoteData?.expiresAtTimestamp && quoteData.expiresAtTimestamp !== null ? [
+        { label: "Quote Expires", value: countdown || "Loading..." }
+      ] : []),
     ];
     if (quoteData?.transactionFee > 0) details.push({ label: "Transaction Fee", value: `₦${quoteData.transactionFee}` });
     let displayAmount = calculatePaymentAmount();

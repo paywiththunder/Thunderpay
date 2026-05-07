@@ -132,14 +132,46 @@ export default function Confirmation({
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
-  const isExpired = value === "Expired";
+  // Determine color based on countdown value
+  const getCountdownColor = (val: string): string => {
+    if (val === "Expired") {
+      return "text-red-500"; // Red for expired
+    }
+    
+    // Check if it's a countdown format (e.g., "2m 30s" or "45s")
+    const countdownMatch = val.match(/^(\d+)m\s+(\d+)s$|^(\d+)s$/);
+    
+    if (countdownMatch) {
+      let totalSeconds = 0;
+      
+      if (countdownMatch[1]) {
+        // Format: "Xm Ys"
+        totalSeconds = parseInt(countdownMatch[1]) * 60 + parseInt(countdownMatch[2]);
+      } else if (countdownMatch[3]) {
+        // Format: "Xs"
+        totalSeconds = parseInt(countdownMatch[3]);
+      }
+      
+      // Progressive color coding: Blue → Yellow → Red
+      if (totalSeconds <= 30) {
+        return "text-red-500"; // Red: 30 seconds or less
+      } else if (totalSeconds <= 60) {
+        return "text-yellow-500"; // Yellow: 31-60 seconds
+      } else {
+        return "text-blue-500"; // Blue: More than 1 minute
+      }
+    }
+    
+    // Default color for non-countdown values
+    return "text-white";
+  };
+  
+  const colorClass = label === "Quote Expires" ? getCountdownColor(value) : "text-white";
   
   return (
     <div className="flex justify-between items-start">
       <span className="text-gray-400 text-sm">{label}</span>
-      <span className={`text-sm font-medium text-right max-w-[60%] ${
-        isExpired ? "text-red-500" : "text-white"
-      }`}>
+      <span className={`text-sm font-medium text-right max-w-[60%] ${colorClass}`}>
         {value}
       </span>
     </div>

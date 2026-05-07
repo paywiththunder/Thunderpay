@@ -13,6 +13,9 @@ import PaymentFailure from "@/components/payment/PaymentFailure";
 import { getCryptoToNgnQuote, executeCryptoToNgnTransfer, verifyAccountNumber, getBanksList, BankItem } from "@/services/transfer";
 import { toast } from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
+import { parseISO, differenceInSeconds, isAfter } from "date-fns";
+import { toast } from "react-hot-toast";
+import { useQuery } from "@tanstack/react-query";
 
 interface RecentRecipient {
   id: string;
@@ -204,48 +207,30 @@ export default function SendCryptoToCashPage() {
       .padStart(2, "0")} ${ampm}`;
   };
 
-  // Format expiration time as countdown with real-time updates
+  // Format expiration time as countdown with real-time updates using date-fns
   const formatExpirationTime = (expiresAt: string): string => {
     try {
       console.log("🕒 Raw expiresAt:", expiresAt);
       
-      // Parse the timestamp more carefully
-      // Format: 2026-05-03T13:26:42.097126121
-      const timestampMatch = expiresAt.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
-      
-      if (!timestampMatch) {
-        console.error("🕒 Invalid timestamp format");
-        return "Invalid date";
-      }
-      
-      const [, year, month, day, hour, minute, second] = timestampMatch;
-      
-      // Create date using local timezone - add current timezone offset to match local time
-      const expirationDate = new Date(
-        parseInt(year),
-        parseInt(month) - 1, // Month is 0-indexed
-        parseInt(day),
-        parseInt(hour),
-        parseInt(minute),
-        parseInt(second)
-      );
-      
+      // Use date-fns parseISO to properly parse the ISO 8601 timestamp
+      const expirationDate = parseISO(expiresAt);
       const now = new Date();
       
-      console.log("🕒 Parsed components:", { year, month, day, hour, minute, second });
-      console.log("🕒 Expiration Date (local):", expirationDate.toLocaleString());
-      console.log("🕒 Current Date (local):", now.toLocaleString());
+      console.log("🕒 Expiration Date (parsed with date-fns):", expirationDate.toISOString());
+      console.log("🕒 Current Date:", now.toISOString());
+      console.log("🕒 Expiration Local:", expirationDate.toLocaleString());
+      console.log("🕒 Current Local:", now.toLocaleString());
       
-      const diffMs = expirationDate.getTime() - now.getTime();
-      console.log("🕒 Time difference (ms):", diffMs);
-      console.log("🕒 Time difference (seconds):", Math.floor(diffMs / 1000));
-      
-      if (diffMs <= 0) {
+      // Check if quote has expired using date-fns
+      if (!isAfter(expirationDate, now)) {
         console.log("🕒 Quote has expired");
         return "Expired";
       }
       
-      const totalSeconds = Math.floor(diffMs / 1000);
+      // Calculate difference in seconds using date-fns
+      const totalSeconds = differenceInSeconds(expirationDate, now);
+      console.log("🕒 Time difference (seconds):", totalSeconds);
+      
       const diffMinutes = Math.floor(totalSeconds / 60);
       const diffSeconds = totalSeconds % 60;
       

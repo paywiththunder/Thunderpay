@@ -77,7 +77,7 @@ export default function Home() {
         </button>
         <button
           onClick={() => router.push("/auth/login")}
-          className="w-11/12 py-3 md:w-1/2 md:py-4 rounded-full text-white font-medium text-lg bg-[#161616]"
+          className="w-11/12 py-3 md:w-1/2 md:py-4 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]"
         >
           Sign In
         </button>

@@ -13,6 +13,7 @@ import PaymentFailure from "@/components/payment/PaymentFailure";
 import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse, getDataPlans, DataPlan as ApiDataPlan, getDataQuote, DataQuotePayload, BillExecutionPayload } from "@/services/bills";
 import { getCashbackBalance, DEFAULT_CURRENCY_ID } from "@/services/cashback";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { parseISO, differenceInSeconds, isAfter } from "date-fns";
 
 interface NetworkProvider {
     id: string;
@@ -84,6 +85,50 @@ export default function DataPage() {
     const [availablePlans, setAvailablePlans] = useState<DataPlan[]>(FALLBACK_PLANS);
     const [transactionDetails, setTransactionDetails] = useState<any>(null);
     const [quote, setQuote] = useState<any>(null);
+    const [countdown, setCountdown] = useState<string>("");
+
+    // Format expiration time as countdown with real-time updates using date-fns
+    const formatExpirationTime = (expiresAt: string): string => {
+        try {
+            const expirationDate = parseISO(expiresAt);
+            const now = new Date();
+            
+            if (!isAfter(expirationDate, now)) {
+                return "Expired";
+            }
+            
+            const totalSeconds = differenceInSeconds(expirationDate, now);
+            const diffMinutes = Math.floor(totalSeconds / 60);
+            const diffSeconds = totalSeconds % 60;
+            
+            if (diffMinutes > 0) {
+                return `${diffMinutes}m ${diffSeconds}s`;
+            } else {
+                return `${diffSeconds}s`;
+            }
+        } catch (error) {
+            console.error("Error formatting expiration time:", error);
+            return "Invalid date";
+        }
+    };
+
+    // Update countdown every second when quote has expiration
+    useEffect(() => {
+        if (!quote || !quote.expiresAtTimestamp) {
+            setCountdown("");
+            return;
+        }
+        
+        const updateCountdown = () => {
+            const newCountdown = formatExpirationTime(quote.expiresAtTimestamp);
+            setCountdown(newCountdown);
+        };
+        
+        updateCountdown();
+        const interval = setInterval(updateCountdown, 1000);
+        
+        return () => clearInterval(interval);
+    }, [quote?.expiresAtTimestamp, quote?.quoteReference]);
 
     // Fetch Bolt Balance (Cashback)
     const { data: cashbackData } = useQuery({
@@ -124,6 +169,9 @@ export default function DataPage() {
     const quoteMutation = useMutation({
         mutationFn: (payload: DataQuotePayload) => getDataQuote(payload),
         onSuccess: (response) => {
+            console.log("📥 Data Quote Response:", response);
+            console.log("📊 Quote Data:", response.data);
+            
             if (response.success && response.data) {
                 const quoteData = response.data;
                 localStorage.setItem("currentDataQuote", JSON.stringify(quoteData));
@@ -148,11 +196,40 @@ export default function DataPage() {
         mutationFn: (payload: BillExecutionPayload) => executeBillPayment(payload),
         onSuccess: (response) => {
             const res = response as BillExecutionResponse;
+            console.log("📥 Bill Payment Response:", res);
+            
+            // Check both response.success AND response.data.status
+            // API returns success: true even when transaction fails, so we must check data.status
             if (res.success && res.data) {
-                setTransactionToken(res.data?.transactionReference || res.data?.quoteReference || "");
-                setTransactionDetails(res.data);
-                setTransactionResult("success");
-                setStep("result");
+                const transactionStatus = res.data.status?.toUpperCase();
+                console.log("📊 Transaction Status:", transactionStatus);
+                
+                if (transactionStatus === "SUCCESS") {
+                    setTransactionToken(res.data?.transactionReference || res.data?.quoteReference || "");
+                    setTransactionDetails(res.data);
+                    setTransactionResult("success");
+                    setStep("result");
+                } else if (transactionStatus === "FAILED") {
+                    // Transaction failed - show failure screen
+                    const reason = res.description || "Transaction failed";
+                    if (reason.toLowerCase().includes("pin")) {
+                        setPinError(reason);
+                    } else {
+                        setFailureReason(reason);
+                        setTransactionResult("failure");
+                        setStep("result");
+                    }
+                } else {
+                    // Unknown status - treat as failure
+                    const reason = res.description || "Transaction status unknown";
+                    if (reason.toLowerCase().includes("pin")) {
+                        setPinError(reason);
+                    } else {
+                        setFailureReason(reason);
+                        setTransactionResult("failure");
+                        setStep("result");
+                    }
+                }
             } else {
                 const reason = res.description || "Payment failed";
                 if (reason.toLowerCase().includes("pin")) {
@@ -373,6 +450,9 @@ export default function DataPage() {
                     { label: "Amount", value: `₦${selectedPlan.price.toLocaleString()}.00` },
                     { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
                     { label: "Bonus to Earn", value: `${getCashback().toFixed(2)} Cashback` },
+                    ...(quote?.expiresAtTimestamp ? [
+                        { label: "Quote Expires", value: countdown || "Loading..." }
+                    ] : []),
                 ]}
                 availableBalance={getAvailableBalance()}
                 boltBalance={boltBalance}

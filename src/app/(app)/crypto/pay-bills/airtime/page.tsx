@@ -12,6 +12,7 @@ import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
 import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse, AirtimeQuotePayload, BillExecutionPayload } from "@/services/bills";
 import { useMutation } from "@tanstack/react-query";
+import { parseISO, differenceInSeconds, isAfter } from "date-fns";
 
 interface NetworkProvider {
   id: string;
@@ -76,11 +77,70 @@ export default function AirtimePage() {
   const [quote, setQuote] = useState<AirtimeQuoteResponse | null>(null);
   const [quoteError, setQuoteError] = useState("");
   const [transactionDetails, setTransactionDetails] = useState<any>(null);
+  const [countdown, setCountdown] = useState<string>("");
+
+  // Format expiration time as countdown with real-time updates using date-fns
+  const formatExpirationTime = (expiresAt: string): string => {
+    try {
+      const expirationDate = parseISO(expiresAt);
+      const now = new Date();
+      
+      if (!isAfter(expirationDate, now)) {
+        return "Expired";
+      }
+      
+      const totalSeconds = differenceInSeconds(expirationDate, now);
+      const diffMinutes = Math.floor(totalSeconds / 60);
+      const diffSeconds = totalSeconds % 60;
+      
+      if (diffMinutes > 0) {
+        return `${diffMinutes}m ${diffSeconds}s`;
+      } else {
+        return `${diffSeconds}s`;
+      }
+    } catch (error) {
+      console.error("Error formatting expiration time:", error);
+      return "Invalid date";
+    }
+  };
+
+  // Update countdown every second when quote has expiration
+  useEffect(() => {
+    console.log("🕒 Countdown useEffect triggered", { 
+      quote, 
+      expiresAtTimestamp: quote?.expiresAtTimestamp,
+      quoteReference: quote?.quoteReference 
+    });
+    
+    // Check if quote exists and expiresAtTimestamp is not null/undefined
+    if (!quote || !quote.expiresAtTimestamp || quote.expiresAtTimestamp === null) {
+      console.log("🕒 No quote or expiresAtTimestamp is null, clearing countdown");
+      setCountdown("");
+      return;
+    }
+    
+    const updateCountdown = () => {
+      const newCountdown = formatExpirationTime(quote.expiresAtTimestamp);
+      console.log("🕒 Updating countdown:", newCountdown);
+      setCountdown(newCountdown);
+    };
+    
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    
+    return () => {
+      console.log("🕒 Clearing countdown interval");
+      clearInterval(interval);
+    };
+  }, [quote?.expiresAtTimestamp, quote?.quoteReference]);
 
   // Mutation for Getting Quote
   const quoteMutation = useMutation({
     mutationFn: (payload: AirtimeQuotePayload) => getAirtimeQuote(payload),
     onSuccess: (data) => {
+      console.log("📥 Crypto Airtime Quote Response:", data);
+      console.log("📊 Quote Data:", data.data || data);
+      
       const quoteData = data.data || data;
       setQuote(quoteData);
       // Persist for page reloads/step changes if needed, though state is better
@@ -348,7 +408,10 @@ export default function AirtimePage() {
           { label: "Phone Number", value: phoneNumber },
           { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
           { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-          { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+          { label: "Bolts to Earn", value: `${getCashback().toFixed(2)} Bolts` },
+          ...(quote?.expiresAtTimestamp && quote.expiresAtTimestamp !== null ? [
+            { label: "Quote Expires", value: countdown || "Loading..." }
+          ] : []),
         ]}
         availableBalance={getAvailableBalance()}
       />
@@ -382,7 +445,7 @@ export default function AirtimePage() {
       const successDetails = [
         ...commonDetails,
         { label: "Transaction Reference", value: transactionToken },
-        { label: "Bonus Earned", value: `₦${getCashback().toFixed(2)} Cashback` },
+        { label: "Bolts Earned", value: `${getCashback().toFixed(2)} Bolts` },
         { label: "Transaction Date", value: getTransactionDate() },
       ];
 

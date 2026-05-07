@@ -468,7 +468,7 @@ export default function DataPage() {
           { label: "Duration", value: selectedPlan.duration },
           { label: "Amount", value: `₦${selectedPlan.price.toLocaleString()}.00` },
           { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-          { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+          { label: "Bolts to Earn", value: `${getCashback().toFixed(2)} Bolts` },
         ]}
         availableBalance={getAvailableBalance()}
       />
@@ -504,7 +504,7 @@ export default function DataPage() {
       const successDetails = [
         ...commonDetails,
         { label: "Transaction Reference", value: transactionToken },
-        { label: "Bonus Earned", value: `₦${getCashback().toFixed(2)} Cashback` },
+        { label: "Bolts Earned", value: `${getCashback().toFixed(2)} Bolts` },
         { label: "Transaction Date", value: getTransactionDate() },
       ];
 

@@ -14,6 +14,7 @@ import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutio
 import { getCashbackBalance } from "@/services/cashback";
 import { useCurrency } from "@/providers/CurrencyProvider";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { parseISO, differenceInSeconds, isAfter } from "date-fns";
 
 interface NetworkProvider {
   id: string;
@@ -79,6 +80,50 @@ export default function AirtimePage() {
   const [quote, setQuote] = useState<AirtimeQuoteResponse | null>(null);
   const [quoteError, setQuoteError] = useState("");
   const [transactionDetails, setTransactionDetails] = useState<any>(null);
+  const [countdown, setCountdown] = useState<string>("");
+
+  // Format expiration time as countdown with real-time updates using date-fns
+  const formatExpirationTime = (expiresAt: string): string => {
+    try {
+      const expirationDate = parseISO(expiresAt);
+      const now = new Date();
+      
+      if (!isAfter(expirationDate, now)) {
+        return "Expired";
+      }
+      
+      const totalSeconds = differenceInSeconds(expirationDate, now);
+      const diffMinutes = Math.floor(totalSeconds / 60);
+      const diffSeconds = totalSeconds % 60;
+      
+      if (diffMinutes > 0) {
+        return `${diffMinutes}m ${diffSeconds}s`;
+      } else {
+        return `${diffSeconds}s`;
+      }
+    } catch (error) {
+      console.error("Error formatting expiration time:", error);
+      return "Invalid date";
+    }
+  };
+
+  // Update countdown every second when quote has expiration
+  useEffect(() => {
+    if (!quote || !quote.expiresAtTimestamp) {
+      setCountdown("");
+      return;
+    }
+    
+    const updateCountdown = () => {
+      const newCountdown = formatExpirationTime(quote.expiresAtTimestamp);
+      setCountdown(newCountdown);
+    };
+    
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    
+    return () => clearInterval(interval);
+  }, [quote?.expiresAtTimestamp, quote?.quoteReference]);
 
   // Fetch Bolt Balance (Cashback)
   const { data: cashbackData } = useQuery({
@@ -109,11 +154,30 @@ export default function AirtimePage() {
     mutationFn: (payload: BillExecutionPayload) => executeBillPayment(payload),
     onSuccess: (data) => {
       const response = data as BillExecutionResponse;
+      console.log("📥 Bill Payment Response:", response);
+      
+      // Check both response.success AND response.data.status
+      // API returns success: true even when transaction fails, so we must check data.status
       if (response.success && response.data) {
-        setTransactionToken(response.data.transactionReference || response.data.quoteReference || "");
-        setTransactionDetails(response.data);
-        setTransactionResult("success");
-        setStep("result");
+        const transactionStatus = response.data.status?.toUpperCase();
+        console.log("📊 Transaction Status:", transactionStatus);
+        
+        if (transactionStatus === "SUCCESS") {
+          setTransactionToken(response.data.transactionReference || response.data.quoteReference || "");
+          setTransactionDetails(response.data);
+          setTransactionResult("success");
+          setStep("result");
+        } else if (transactionStatus === "FAILED") {
+          // Transaction failed - show failure screen
+          setFailureReason(response.description || "Transaction failed");
+          setTransactionResult("failure");
+          setStep("result");
+        } else {
+          // Unknown status - treat as failure
+          setFailureReason(response.description || "Transaction status unknown");
+          setTransactionResult("failure");
+          setStep("result");
+        }
       } else {
         setFailureReason(response.description || "Payment failed");
         setTransactionResult("failure");
@@ -310,7 +374,10 @@ export default function AirtimePage() {
           { label: "Phone Number", value: phoneNumber },
           { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
           { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-          { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+          { label: "Bolts to Earn", value: `${getCashback().toFixed(2)} Bolts` },
+          ...(quote?.expiresAtTimestamp ? [
+            { label: "Quote Expires", value: countdown || "Loading..." }
+          ] : []),
         ]}
         availableBalance={getAvailableBalance()}
         boltBalance={boltBalance}

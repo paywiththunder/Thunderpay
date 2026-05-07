@@ -14,6 +14,7 @@ import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutio
 import { getCashbackBalance } from "@/services/cashback";
 import { useCurrency } from "@/providers/CurrencyProvider";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { parseISO, differenceInSeconds, isAfter } from "date-fns";
 
 interface NetworkProvider {
   id: string;
@@ -162,11 +163,40 @@ export default function DataPage() {
     mutationFn: (payload: BillExecutionPayload) => executeBillPayment(payload),
     onSuccess: (response) => {
       const res = response as BillExecutionResponse;
+      console.log("📥 Bill Payment Response:", res);
+      
+      // Check both response.success AND response.data.status
+      // API returns success: true even when transaction fails, so we must check data.status
       if (res.success && res.data) {
-        setTransactionToken(res.data?.transactionReference || res.data?.quoteReference || "");
-        setTransactionDetails(res.data);
-        setTransactionResult("success");
-        setStep("result");
+        const transactionStatus = res.data.status?.toUpperCase();
+        console.log("📊 Transaction Status:", transactionStatus);
+        
+        if (transactionStatus === "SUCCESS") {
+          setTransactionToken(res.data?.transactionReference || res.data?.quoteReference || "");
+          setTransactionDetails(res.data);
+          setTransactionResult("success");
+          setStep("result");
+        } else if (transactionStatus === "FAILED") {
+          // Transaction failed - show failure screen
+          const reason = res.description || "Transaction failed";
+          if (reason.toLowerCase().includes("pin")) {
+            setPinError(reason);
+          } else {
+            setFailureReason(reason);
+            setTransactionResult("failure");
+            setStep("result");
+          }
+        } else {
+          // Unknown status - treat as failure
+          const reason = res.description || "Transaction status unknown";
+          if (reason.toLowerCase().includes("pin")) {
+            setPinError(reason);
+          } else {
+            setFailureReason(reason);
+            setTransactionResult("failure");
+            setStep("result");
+          }
+        }
       } else {
         const reason = res.description || "Payment failed";
         if (reason.toLowerCase().includes("pin")) {
@@ -389,7 +419,7 @@ export default function DataPage() {
           ...(selectedPlan.duration ? [{ label: "Duration", value: selectedPlan.duration }] : []),
           { label: "Amount", value: `₦${selectedPlan.price.toLocaleString()}.00` },
           { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-          { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+          { label: "Bolts to Earn", value: `${getCashback().toFixed(2)} Bolts` },
         ]}
         availableBalance={getAvailableBalance()}
         boltBalance={boltBalance}

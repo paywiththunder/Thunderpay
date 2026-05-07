@@ -120,7 +120,7 @@ export default function PaymentSuccess({
                 {serviceAddress && <DetailRow label="Service Address" value={serviceAddress} />}
                 {unitsPurchased && <DetailRow label="Units Purchased" value={unitsPurchased} />}
                 {paymentMethod && <DetailRow label="Payment Method" value={paymentMethod} />}
-                {bonusEarned && <DetailRow label="Bonus Earned" value={bonusEarned} />}
+                {bonusEarned && <DetailRow label="Bolts Earned" value={bonusEarned} />}
                 {transactionDate && <DetailRow label="Transaction Date" value={transactionDate} />}
               </>
             )}

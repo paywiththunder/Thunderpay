@@ -132,11 +132,26 @@ export default function ElectricityPage() {
     const paymentMutation = useMutation({
         mutationFn: (data: { quoteReference: string, pin: string }) => executeBillPayment(data),
         onSuccess: (response) => {
+            console.log("📥 Bill Payment Response:", response);
+            
+            // Check both response.success AND response.data.status
+            // API returns success: true even when transaction fails, so we must check data.status
             if (response.success && response.data) {
-                setTransactionToken(response.data?.transactionReference || response.data?.quoteReference || "");
-                setTransactionDetails(response.data);
-                setTransactionResult("success");
-                setStep("result");
+                const transactionStatus = response.data.status?.toUpperCase();
+                console.log("📊 Transaction Status:", transactionStatus);
+                
+                if (transactionStatus === "SUCCESS") {
+                    setTransactionToken(response.data?.transactionReference || response.data?.quoteReference || "");
+                    setTransactionDetails(response.data);
+                    setTransactionResult("success");
+                    setStep("result");
+                } else if (transactionStatus === "FAILED") {
+                    // Transaction failed - show failure screen
+                    throw new Error(response.description || "Transaction failed");
+                } else {
+                    // Unknown status - treat as failure
+                    throw new Error(response.description || "Transaction status unknown");
+                }
             } else {
                 throw new Error(response.description || "Payment failed");
             }

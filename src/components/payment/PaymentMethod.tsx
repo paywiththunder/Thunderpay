@@ -207,7 +207,7 @@ export default function PaymentMethod({
   }
 
   return (
-    <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6">
+    <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6 mb-24">
       {/* Header */}
       <header className="relative flex items-center justify-center px-4 py-6">
         <button

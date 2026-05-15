@@ -206,34 +206,34 @@ export default function SendCryptoToCashPage() {
   };
 
   // Format expiration time as countdown with real-time updates using date-fns
-  const formatExpirationTime = (expiresAt: string): string => {
+  const formatExpirationTime = (expiresAt: string | null): string => {
+    if (!expiresAt) return "";
+
     try {
-      console.log("🕒 Raw expiresAt:", expiresAt);
-      
-      // Use date-fns parseISO to properly parse the ISO 8601 timestamp
-      const expirationDate = parseISO(expiresAt);
+      // Handle the case where the server might not include a timezone suffix (treat as UTC)
+      // and also handle high-precision fractional seconds that parseISO might struggle with
+      let sanitizedExpiresAt = expiresAt;
+      if (!sanitizedExpiresAt.endsWith("Z") && !sanitizedExpiresAt.includes("+")) {
+        // Trim nanoseconds to milliseconds (max 3 digits after dot)
+        const dotIndex = sanitizedExpiresAt.indexOf(".");
+        if (dotIndex !== -1) {
+          sanitizedExpiresAt = sanitizedExpiresAt.substring(0, dotIndex + 4) + "Z";
+        } else {
+          sanitizedExpiresAt += "Z";
+        }
+      }
+
+      const expirationDate = parseISO(sanitizedExpiresAt);
       const now = new Date();
-      
-      console.log("🕒 Expiration Date (parsed with date-fns):", expirationDate.toISOString());
-      console.log("🕒 Current Date:", now.toISOString());
-      console.log("🕒 Expiration Local:", expirationDate.toLocaleString());
-      console.log("🕒 Current Local:", now.toLocaleString());
-      
-      // Check if quote has expired using date-fns
+
       if (!isAfter(expirationDate, now)) {
-        console.log("🕒 Quote has expired");
         return "Expired";
       }
-      
-      // Calculate difference in seconds using date-fns
+
       const totalSeconds = differenceInSeconds(expirationDate, now);
-      console.log("🕒 Time difference (seconds):", totalSeconds);
-      
       const diffMinutes = Math.floor(totalSeconds / 60);
       const diffSeconds = totalSeconds % 60;
-      
-      console.log("🕒 Minutes:", diffMinutes, "Seconds:", diffSeconds);
-      
+
       if (diffMinutes > 0) {
         return `${diffMinutes}m ${diffSeconds}s`;
       } else {
@@ -249,32 +249,24 @@ export default function SendCryptoToCashPage() {
   const [countdown, setCountdown] = useState<string>("");
   
   // Update countdown every second when quote has expiration
+  // Update countdown every second when quote has expiration
   useEffect(() => {
-    console.log("🕒 Countdown useEffect triggered", { quote, expiresAt: quote?.expiresAt });
-    
-    if (!quote || !quote.expiresAt) {
-      console.log("🕒 No quote or expiresAt, clearing countdown");
+    const expirationTime = quote?.expiresAt || quote?.expiresAtTimestamp;
+    if (!quote || !expirationTime) {
       setCountdown("");
       return;
     }
-    
+
     const updateCountdown = () => {
-      const newCountdown = formatExpirationTime(quote.expiresAt);
-      console.log("🕒 Updating countdown:", newCountdown);
+      const newCountdown = formatExpirationTime(expirationTime);
       setCountdown(newCountdown);
     };
-    
-    // Update immediately when quote is received
+
     updateCountdown();
-    
-    // Update every second
     const interval = setInterval(updateCountdown, 1000);
-    
-    return () => {
-      console.log("🕒 Clearing countdown interval");
-      clearInterval(interval);
-    };
-  }, [quote?.expiresAt, quote?.quoteReference]); // Also depend on quoteReference to reset on new quotes
+
+    return () => clearInterval(interval);
+  }, [quote?.expiresAt, quote?.expiresAtTimestamp, quote?.quoteReference]);
 
   const handleAmountSelect = (selectedAmount: number) => {
     setAmount(selectedAmount.toString());
@@ -288,7 +280,7 @@ export default function SendCryptoToCashPage() {
 
   const handleAccountContinue = () => {
     if (selectedBank && accountNumber.length === 10 && accountName && !verificationError) {
-      if (!amount) {
+      if (!amount || parseFloat(amount) < 1000) {
         setStep("amount");
       } else {
         setStep("payment");
@@ -358,6 +350,8 @@ export default function SendCryptoToCashPage() {
       console.log("  - Timestamp:", new Date().toISOString());
 
       const response = await getCryptoToNgnQuote(payload);
+      console.log("📥 Quote Response:", response);
+      console.log("📊 Quote Data:", response.data);
       console.log("QUOTE API RESPONSE:", response);
 
       console.log("📥 ===== CRYPTO TO CASH QUOTE RESPONSE =====");
@@ -377,6 +371,7 @@ export default function SendCryptoToCashPage() {
         console.log("✅ Quote Data Set Successfully");
 
         setQuote(response.data);
+        localStorage.setItem("currentCryptoToCashQuote", JSON.stringify(response.data));
       } else {
         const errorMsg = response.description || "Failed to get quote";
         console.error("❌ ===== QUOTE FAILED =====");
@@ -403,11 +398,19 @@ export default function SendCryptoToCashPage() {
   };
 
   const handlePinComplete = async (pin: string) => {
-    if (!quote || !selectedBank) return;
+    let currentQuote = quote;
+    if (!currentQuote) {
+      const stored = localStorage.getItem("currentCryptoToCashQuote");
+      if (stored) {
+        currentQuote = JSON.parse(stored);
+      }
+    }
+
+    if (!currentQuote || !selectedBank) return;
 
     try {
       const payload = {
-        quoteReference: quote.quoteReference,
+        quoteReference: currentQuote.quoteReference,
         scope: "EXTERNAL_BANK" as const,
         recipientAccountNumber: accountNumber,
         bankCode: selectedBank.code,
@@ -493,29 +496,14 @@ export default function SendCryptoToCashPage() {
               value: countdown || "Loading..."
             }
           ] : []),
-          ...(quote.transactionFee !== undefined ? [
-            { label: "Transaction Fee", value: `${quote.transactionFee} ${quote.deductionCurrency || 'NGN'}` }
-          ] : []),
-          ...(quote.boltsEarnable !== undefined ? [
-            { label: "Bolts Earnable", value: `${quote.boltsEarnable} bolts` }
-          ] : []),
-          ...(quote.exchangeRate !== undefined ? [
-            { label: "Exchange Rate", value: `1 ${quote.sourceCurrency || 'USDT'} = ${quote.exchangeRate} NGN` }
+          ...(quote.rate !== undefined ? [
+            { label: "Exchange Rate", value: `1 ${quote.sourceCurrency || 'USDT'} = ${quote.rate} NGN` }
           ] : []),
           ...(quote.platformFeeNgn !== undefined ? [
             { label: "Platform Fee", value: `₦${quote.platformFeeNgn.toLocaleString()}` }
           ] : []),
-          ...(quote.amountIfFullCashbackApplied !== undefined ? [
-            { label: "Full Cashback Amount", value: `${quote.amountIfFullCashbackApplied} ${quote.deductionCurrency || 'USDT'}` }
-          ] : []),
-          ...(quote.bonusAvailable !== undefined ? [
-            { label: "Bonus Available", value: `${quote.bonusAvailable} ${quote.deductionCurrency || 'USDT'}` }
-          ] : []),
-          ...(quote.deductionAmount !== undefined ? [
-            { label: "Deduction Amount", value: `${quote.deductionAmount} ${quote.deductionCurrency || 'USDT'}` }
-          ] : []),
-          ...(quote.maxCashbackApplicable !== undefined ? [
-            { label: "Max Cashback", value: `${quote.maxCashbackApplicable} ${quote.deductionCurrency || 'USDT'}` }
+          ...(quote.estimatedNgnBeforeFee !== undefined ? [
+            { label: "Amount Before Fee", value: `₦${quote.estimatedNgnBeforeFee.toLocaleString()}` }
           ] : []),
           { label: "Quote Reference", value: quote.quoteReference || "N/A" },
         ] : [
@@ -666,13 +654,16 @@ export default function SendCryptoToCashPage() {
               placeholder="0"
               className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
             />
+            {amount && parseFloat(amount) < 1000 && (
+              <p className="text-red-500 text-xs text-right px-1">Minimum amount is ₦1,000</p>
+            )}
           </div>
 
           {/* Pay Button */}
           <button
             onClick={handleAmountContinue}
-            disabled={!amount}
-            className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!amount
+            disabled={!amount || parseFloat(amount) < 1000}
+            className={`w-full py-4 rounded-full font-bold text-white transition-all mt-4 mb-20 bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:bg-gray-800/50 ${!amount || parseFloat(amount) < 1000
               ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
               : ""
               }`}

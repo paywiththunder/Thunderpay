@@ -11,6 +11,8 @@ import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
 import { initiateThunderTransfer } from "@/services/transfer";
+import { getWallets } from "@/services/wallet";
+import { useQuery } from "@tanstack/react-query";
 
 interface RecentRecipient {
   id: string;
@@ -58,6 +60,44 @@ type Step = "account" | "amount" | "payment" | "confirmation" | "enterPin" | "re
 type TransactionResult = "success" | "failure" | null;
 type TabType = "recents" | "beneficiaries";
 
+interface WalletAccountNumber {
+  accountNumber?: string | null;
+  isActive?: boolean;
+}
+
+interface FiatWallet {
+  walletId?: number;
+  walletType?: string;
+  isActive?: boolean;
+  isPrimary?: boolean;
+  currency?: {
+    code?: string;
+    ticker?: string;
+  };
+  accountNumbers?: WalletAccountNumber[];
+}
+
+const getActiveSenderAccountNumber = (
+  wallets: FiatWallet[],
+  walletId: number
+) => {
+  const selectedWallet = wallets.find((wallet) => wallet.walletId === walletId);
+  const fallbackWallet = wallets.find(
+    (wallet) =>
+      wallet.walletType === "FIAT" &&
+      wallet.isActive &&
+      (wallet.isPrimary ||
+        wallet.currency?.code === "NGN" ||
+        wallet.currency?.ticker === "NGN")
+  );
+  const wallet = selectedWallet || fallbackWallet;
+  const activeAccount = wallet?.accountNumbers?.find(
+    (account) => account.isActive && account.accountNumber
+  );
+
+  return activeAccount?.accountNumber || "";
+};
+
 export default function SendToThunderPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("account");
@@ -71,6 +111,18 @@ export default function SendToThunderPage() {
   const [transactionResult, setTransactionResult] =
     useState<TransactionResult>(null);
   const [transactionToken, setTransactionToken] = useState("");
+  const [transferError, setTransferError] = useState("");
+
+  const { data: walletsResponse } = useQuery({
+    queryKey: ["wallets"],
+    queryFn: getWallets,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const wallets: FiatWallet[] =
+    walletsResponse?.success && Array.isArray(walletsResponse.data)
+      ? walletsResponse.data
+      : [];
 
   // Filter recipients based on account number input
   const filteredRecipients = recentRecipients.filter((recipient) =>
@@ -107,6 +159,17 @@ export default function SendToThunderPage() {
 
   const handleAmountSelect = (selectedAmount: number) => {
     setAmount(selectedAmount.toString());
+  };
+
+  const handleAmountChange = (value: string) => {
+    const sanitizedValue = value.replace(/[^0-9.]/g, "");
+    const [whole, ...decimalParts] = sanitizedValue.split(".");
+    const nextAmount =
+      decimalParts.length > 0
+        ? `${whole}.${decimalParts.join("").slice(0, 2)}`
+        : whole;
+
+    setAmount(nextAmount);
   };
 
   const handlePayClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -205,8 +268,19 @@ export default function SendToThunderPage() {
 
     try {
       const walletId = selectedPaymentMethod.walletId || selectedPaymentMethod.id;
+      const numericWalletId = typeof walletId === "string" ? parseInt(walletId) : walletId;
+      const senderAccountNumber = getActiveSenderAccountNumber(wallets, numericWalletId);
+
+      if (!senderAccountNumber) {
+        setTransferError("No active sender account number found.");
+        setTransactionResult("failure");
+        setStep("result");
+        return;
+      }
+
       const result = await initiateThunderTransfer({
-        walletId: typeof walletId === "string" ? parseInt(walletId) : walletId,
+        walletId: numericWalletId,
+        senderAccountNumber,
         recipientAccountNumber: accountNumber,
         amount: parseFloat(amount),
         pin: pin,
@@ -216,6 +290,11 @@ export default function SendToThunderPage() {
       setTransactionResult("success");
     } catch (error: any) {
       console.error("Thunder transfer error:", error);
+      setTransferError(
+        typeof error === "string"
+          ? error
+          : error?.description || error?.message || "Transfer failed"
+      );
       setTransactionResult("failure");
     }
     setStep("result");
@@ -229,6 +308,7 @@ export default function SendToThunderPage() {
     setStep("account");
     setTransactionResult(null);
     setTransactionToken("");
+    setTransferError("");
     setSelectedRecipient(null);
     setAccountNumber("");
     setAmount("");
@@ -309,7 +389,7 @@ export default function SendToThunderPage() {
         <PaymentFailure
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason="Service provider down"
+          failureReason={transferError || "Service provider down"}
           biller="Thunder Transfer"
           meterNumber={selectedRecipient.accountNumber}
           customerName={selectedRecipient.name}
@@ -387,6 +467,20 @@ export default function SendToThunderPage() {
                 </span>
               </button>
             ))}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-white text-sm font-medium">
+              Custom Amount
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => handleAmountChange(e.target.value)}
+              placeholder="enter amount"
+              className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
+            />
           </div>
 
           {/* Pay Button */}

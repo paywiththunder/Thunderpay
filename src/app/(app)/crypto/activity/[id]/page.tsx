@@ -16,19 +16,21 @@ import { IoCopyOutline } from "react-icons/io5";
 import { format, parseISO } from "date-fns";
 
 import { getWallets, getWalletActivity } from "@/services/wallet";
+import { getRecentTransactions } from "@/services/user";
 import { printReceipt } from "@/utils/printReceipt";
 
 interface TransactionDetail {
     id: number;
     source: string;
+    direction: "CREDIT" | "DEBIT" | string | null;
     amount: number;
-    fee: number;
+    fee: number | null;
     status: string;
     reference: string;
     walletId: number | null;
     fromAddress: string | null;
     toAddress: string | null;
-    createdAt: string;
+    createdAt: string | null;
     details?: {
         transactionType?: string;
         productName?: string;
@@ -57,11 +59,26 @@ interface ActivityReceiptProps {
     transaction: TransactionDetail;
 }
 
-function getIcon(source: string) {
+function getTransactionDirection(transaction: TransactionDetail) {
+    if (transaction.direction) return transaction.direction.toUpperCase();
+
+    return ["send", "withdrawal", "bill", "bill_payment", "electricity", "card", "transfer"].includes(
+        transaction.source.toLowerCase()
+    )
+        ? "DEBIT"
+        : "CREDIT";
+}
+
+function getIcon(source: string, direction: string | null) {
+    const normalizedDirection = direction?.toUpperCase();
+
     switch (source.toLowerCase()) {
         case "send":
         case "withdrawal":
-            return HiOutlineArrowUpRight;
+        case "transfer":
+            return normalizedDirection === "CREDIT"
+                ? HiOutlineArrowDownLeft
+                : HiOutlineArrowUpRight;
         case "receive":
         case "deposit":
             return HiOutlineArrowDownLeft;
@@ -69,25 +86,52 @@ function getIcon(source: string) {
         case "convert":
             return HiOutlineArrowPath;
         case "bill":
+        case "bill_payment":
         case "electricity":
             return HiOutlineLightBulb;
         case "card":
             return HiOutlineCreditCard;
         default:
+            if (normalizedDirection === "CREDIT") return HiOutlineArrowDownLeft;
+            if (normalizedDirection === "DEBIT") return HiOutlineArrowUpRight;
             return HiOutlineInbox;
     }
+}
+
+const getTransactionsFromResponse = (response: any): TransactionDetail[] => {
+    if (Array.isArray(response)) return response;
+    if (Array.isArray(response?.data?.items)) return response.data.items;
+    if (Array.isArray(response?.data)) return response.data;
+    return [];
+};
+
+function getTransactionDate(createdAt: string | null) {
+    if (!createdAt) return null;
+
+    const date = parseISO(createdAt);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getTransactionLabel(transaction: TransactionDetail) {
+    if (transaction.details?.transactionType) return transaction.details.transactionType;
+
+    return transaction.source
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function getStatusColor(status: string) {
     switch (status.toLowerCase()) {
         case "completed":
         case "success":
+        case "posted":
             return "bg-green-500/20 text-green-400 border border-green-500/30";
         case "pending":
         case "processing":
             return "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30";
         case "failed":
         case "cancelled":
+        case "reversed":
             return "bg-red-500/20 text-red-400 border border-red-500/30";
         default:
             return "bg-gray-500/20 text-gray-400 border border-gray-500/30";
@@ -101,7 +145,8 @@ function ActivityReceipt({
     onCopy,
     transaction,
 }: ActivityReceiptProps) {
-    const Icon = getIcon(transaction.source);
+    const Icon = getIcon(transaction.source, transaction.direction);
+    const fee = transaction.fee ?? 0;
 
     return (
         <div
@@ -114,7 +159,7 @@ function ActivityReceipt({
                 </div>
                 <div className="text-center">
                     <p className="text-gray-400 text-sm capitalize mb-2">
-                        {transaction.details?.transactionType || transaction.source}
+                        {getTransactionLabel(transaction)}
                     </p>
                     <p className={`text-3xl font-bold ${isNegative ? "text-red-500" : "text-green-500"}`}>
                         {isNegative ? "-" : "+"}
@@ -155,6 +200,14 @@ function ActivityReceipt({
                     <span className="text-gray-400 text-xs uppercase font-semibold">Amount Breakdown</span>
                     <div className="bg-white/5 rounded-lg p-3 border border-white/10 flex flex-col gap-2">
                         <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-400">Source</span>
+                            <span className="text-white font-medium">{getTransactionLabel(transaction)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-400">Direction</span>
+                            <span className="text-white font-medium">{getTransactionDirection(transaction)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
                             <span className="text-gray-400">Amount</span>
                             <span className="text-white font-medium">
                                 {transaction.amount.toLocaleString(undefined, {
@@ -165,14 +218,19 @@ function ActivityReceipt({
                         </div>
                         <div className="flex items-center justify-between text-sm">
                             <span className="text-gray-400">Fee</span>
-                            <span className="text-white font-medium">{transaction.fee}</span>
+                            <span className="text-white font-medium">
+                                {fee.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 8,
+                                })}
+                            </span>
                         </div>
-                        {transaction.fee > 0 && <div className="h-px bg-white/10 my-1"></div>}
-                        {transaction.fee > 0 && (
+                        {fee > 0 && <div className="h-px bg-white/10 my-1"></div>}
+                        {fee > 0 && (
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-300 font-medium">Total</span>
                                 <span className="text-white font-semibold">
-                                    {(transaction.amount + transaction.fee).toLocaleString(undefined, {
+                                    {(transaction.amount + fee).toLocaleString(undefined, {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 8,
                                     })}
@@ -203,7 +261,8 @@ function ActivityReceipt({
                 {transaction.details && Object.keys(transaction.details).length > 0 && (
                     <div className="flex flex-col gap-2">
                         <span className="text-gray-400 text-xs uppercase font-semibold">
-                            {transaction.source.toLowerCase() === "bill" ? "Bill Details" : 
+                            {transaction.source.toLowerCase() === "bill_payment" ? "Bill Details" :
+                             transaction.source.toLowerCase() === "bill" ? "Bill Details" : 
                              transaction.source.toLowerCase() === "transfer" ? "Transfer Details" : 
                              "Transaction Details"}
                         </span>
@@ -395,12 +454,23 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
                 let foundTransaction: TransactionDetail | null = null;
                 responses.forEach((response) => {
                     if (response && response.success && response.data && Array.isArray(response.data.items)) {
-                        const matchedTransaction = response.data.items.find((item: any) => item.reference === id);
+                        const matchedTransaction = response.data.items.find(
+                            (item: any) => item.reference === id || String(item.id) === id
+                        );
                         if (matchedTransaction) {
                             foundTransaction = matchedTransaction;
                         }
                     }
                 });
+
+                if (!foundTransaction) {
+                    const recentResponse = await getRecentTransactions();
+                    const recentTransactions = getTransactionsFromResponse(recentResponse);
+                    foundTransaction =
+                        recentTransactions.find(
+                            (item) => item.reference === id || String(item.id) === id
+                        ) || null;
+                }
 
                 if (foundTransaction) {
                     setTransaction(foundTransaction);
@@ -469,8 +539,11 @@ export default function ActivityDetailPage({ params }: { params: Promise<{ id: s
         );
     }
 
-    const formattedDate = format(parseISO(transaction.createdAt), "MMM dd, yyyy '|' HH:mm:ss");
-    const isNegative = ["send", "withdrawal", "bill", "electricity", "card"].includes(transaction.source.toLowerCase());
+    const transactionDate = getTransactionDate(transaction.createdAt);
+    const formattedDate = transactionDate
+        ? format(transactionDate, "MMM dd, yyyy '|' HH:mm:ss")
+        : "Unknown date";
+    const isNegative = getTransactionDirection(transaction) === "DEBIT";
 
     return (
         <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6 pb-24">

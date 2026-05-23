@@ -36,14 +36,15 @@ import { format, parseISO } from "date-fns";
 interface Transaction {
   id: number;
   source: string;
+  direction?: "CREDIT" | "DEBIT" | string;
   amount: number;
-  fee: number;
+  fee: number | null;
   status: string;
   reference: string;
   walletId: number | null;
   fromAddress: string | null;
   toAddress: string | null;
-  createdAt: string;
+  createdAt: string | null;
   details?: {
     transactionType?: string;
     productName?: string;
@@ -94,11 +95,29 @@ export default function HomePage() {
 
   const transactions = transactionsResponse?.success ? transactionsResponse.data.items : [];
 
-  const getIcon = (source: string) => {
+  const getTransactionDate = (createdAt: string | null) => {
+    if (!createdAt) return null;
+
+    const date = parseISO(createdAt);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const getTransactionLabel = (tx: Transaction) => {
+    if (tx.details?.transactionType) return tx.details.transactionType;
+
+    return tx.source
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  };
+
+  const getIcon = (source: string, direction?: string) => {
     switch (source.toLowerCase()) {
       case "send":
       case "withdrawal":
-        return HiOutlineArrowUpRight;
+      case "transfer":
+        return direction?.toUpperCase() === "CREDIT"
+          ? HiOutlineArrowDownLeft
+          : HiOutlineArrowUpRight;
       case "receive":
       case "deposit":
         return HiOutlineArrowDownLeft;
@@ -106,6 +125,7 @@ export default function HomePage() {
       case "convert":
         return HiOutlineArrowPath;
       case "bill":
+      case "bill_payment":
       case "electricity":
         return HiOutlineLightBulb;
       case "card":
@@ -119,12 +139,14 @@ export default function HomePage() {
     switch (status.toLowerCase()) {
       case "completed":
       case "success":
+      case "posted":
         return "text-green-500";
       case "pending":
       case "processing":
         return "text-yellow-500";
       case "failed":
       case "cancelled":
+      case "reversed":
         return "text-red-500";
       default:
         return "text-gray-400";
@@ -204,10 +226,11 @@ export default function HomePage() {
             ) : (
               <div className="flex flex-col gap-3">
                 {transactions.map((tx: Transaction) => {
-                  const Icon = getIcon(tx.source);
-                  const isNegative = ["send", "withdrawal", "bill", "electricity", "card"].includes(tx.source.toLowerCase());
-                  // Debug: Check what's in the transaction
-                  console.log('Transaction:', tx.source, 'Details:', tx.details, 'TransactionType:', tx.details?.transactionType);
+                  const Icon = getIcon(tx.source, tx.direction);
+                  const isNegative = tx.direction
+                    ? tx.direction.toUpperCase() === "DEBIT"
+                    : ["send", "withdrawal", "bill", "bill_payment", "electricity", "card"].includes(tx.source.toLowerCase());
+                  const transactionDate = getTransactionDate(tx.createdAt);
                   return (
                     <div
                       key={tx.reference}
@@ -220,10 +243,10 @@ export default function HomePage() {
                         </div>
                         <div className="flex flex-col">
                           <span className="text-white font-medium capitalize">
-                            {tx.details?.transactionType || tx.source}
+                            {getTransactionLabel(tx)}
                           </span>
                           <span className="text-gray-500 text-xs truncate max-w-[150px]">
-                            {tx.status} • {format(parseISO(tx.createdAt), "MMM dd, HH:mm")}
+                            {tx.status} • {transactionDate ? format(transactionDate, "MMM dd, HH:mm") : "No date"}
                           </span>
                         </div>
                       </div>

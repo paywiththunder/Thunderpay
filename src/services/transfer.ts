@@ -180,6 +180,7 @@ export const executeTransfer = async (payload: TransferExecutionPayload) => {
 
 export interface InitiateBankTransferPayload {
     walletId: number;
+    senderAccountNumber: string;
     recipientAccountNumber: string;
     bankCode: string;
     amount: number;
@@ -264,6 +265,7 @@ export const initiateBankTransfer = async (
 
 export interface InitiateThunderTransferPayload {
     walletId: number;
+    senderAccountNumber: string;
     recipientAccountNumber: string;
     amount: number;
     pin: string;
@@ -294,6 +296,7 @@ export const initiateThunderTransfer = async (
         console.log("📤 Request Method: POST");
         console.log("📤 Payload Details:");
         console.log("  - walletId:", payload.walletId, "(type:", typeof payload.walletId, ")");
+        console.log("  - senderAccountNumber:", payload.senderAccountNumber, "(type:", typeof payload.senderAccountNumber, ")");
         console.log("  - recipientAccountNumber:", payload.recipientAccountNumber, "(type:", typeof payload.recipientAccountNumber, ")");
         console.log("  - amount:", payload.amount, "(type:", typeof payload.amount, ")");
         if (payload.reason) console.log("  - reason:", payload.reason, "(type:", typeof payload.reason, ")");

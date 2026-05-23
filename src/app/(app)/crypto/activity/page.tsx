@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import {
     HiOutlineArrowUpRight,
@@ -10,20 +10,20 @@ import {
     HiOutlineInbox,
 } from "react-icons/hi2";
 import { getWallets, getWalletActivity } from "@/services/wallet";
-import { toast } from "react-hot-toast";
 import { format, isToday, isYesterday, parseISO } from "date-fns";
 
 interface Transaction {
     id: number;
     source: string;
+    direction: "CREDIT" | "DEBIT" | string | null;
     amount: number;
-    fee: number;
+    fee: number | null;
     status: string;
     reference: string;
     walletId: number | null;
     fromAddress: string | null;
     toAddress: string | null;
-    createdAt: string;
+    createdAt: string | null;
     details?: {
         transactionType?: string;
         productName?: string;
@@ -46,6 +46,13 @@ import { useQuery } from "@tanstack/react-query";
 
 export default function ActivityPage() {
     const router = useRouter();
+
+    const getTransactionDate = (createdAt: string | null) => {
+        if (!createdAt) return null;
+
+        const date = parseISO(createdAt);
+        return Number.isNaN(date.getTime()) ? null : date;
+    };
 
     const fetchAllActivities = async () => {
         // 1. Fetch all wallets
@@ -74,7 +81,11 @@ export default function ActivityPage() {
         );
 
         // 5. Sort by date (newest first)
-        uniqueTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        uniqueTransactions.sort((a, b) => {
+            const dateA = getTransactionDate(a.createdAt)?.getTime() ?? 0;
+            const dateB = getTransactionDate(b.createdAt)?.getTime() ?? 0;
+            return dateB - dateA;
+        });
 
         return uniqueTransactions;
     };
@@ -89,16 +100,31 @@ export default function ActivityPage() {
         switch (status.toLowerCase()) {
             case "completed":
             case "success":
+            case "posted":
                 return "text-green-500";
             case "pending":
             case "processing":
                 return "text-yellow-500";
             case "failed":
             case "cancelled":
+            case "reversed":
                 return "text-red-500";
             default:
                 return "text-gray-400";
         }
+    };
+
+    const getTransactionLabel = (tx: Transaction) => {
+        if (tx.details?.transactionType) return tx.details.transactionType;
+
+        return tx.source
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    };
+
+    const formatActivityMeta = (tx: Transaction) => {
+        const direction = getTransactionDirection(tx);
+        return tx.createdAt ? `${direction} • ${tx.createdAt}` : direction;
     };
 
     if (loading) {
@@ -112,10 +138,14 @@ export default function ActivityPage() {
     const groupTransactionsByDate = (txs: Transaction[]) => {
         const groups: { [key: string]: Transaction[] } = {};
         txs.forEach((tx) => {
-            const date = parseISO(tx.createdAt);
-            let dateKey = format(date, "MMM dd, yyyy");
-            if (isToday(date)) dateKey = "Today";
-            if (isYesterday(date)) dateKey = "Yesterday";
+            const date = getTransactionDate(tx.createdAt);
+            let dateKey = "Unknown date";
+
+            if (date) {
+                dateKey = format(date, "MMM dd, yyyy");
+                if (isToday(date)) dateKey = "Today";
+                if (isYesterday(date)) dateKey = "Yesterday";
+            }
 
             if (!groups[dateKey]) {
                 groups[dateKey] = [];
@@ -125,11 +155,26 @@ export default function ActivityPage() {
         return groups;
     };
 
-    const getIcon = (source: string) => {
+    const getTransactionDirection = (tx: Transaction) => {
+        if (tx.direction) return tx.direction.toUpperCase();
+
+        return ["send", "withdrawal", "bill", "bill_payment", "electricity", "card", "transfer"].includes(
+            tx.source.toLowerCase()
+        )
+            ? "DEBIT"
+            : "CREDIT";
+    };
+
+    const getIcon = (source: string, direction: string | null) => {
+        const normalizedDirection = direction?.toUpperCase();
+
         switch (source.toLowerCase()) {
             case "send":
             case "withdrawal":
-                return HiOutlineArrowUpRight;
+            case "transfer":
+                return normalizedDirection === "CREDIT"
+                    ? HiOutlineArrowDownLeft
+                    : HiOutlineArrowUpRight;
             case "receive":
             case "deposit":
                 return HiOutlineArrowDownLeft;
@@ -137,11 +182,14 @@ export default function ActivityPage() {
             case "convert":
                 return HiOutlineArrowPath;
             case "bill":
+            case "bill_payment":
             case "electricity":
                 return HiOutlineLightBulb;
             case "card":
                 return HiOutlineCreditCard;
             default:
+                if (normalizedDirection === "CREDIT") return HiOutlineArrowDownLeft;
+                if (normalizedDirection === "DEBIT") return HiOutlineArrowUpRight;
                 return HiOutlineInbox;
         }
     };
@@ -167,10 +215,8 @@ export default function ActivityPage() {
                         <div key={dateKey} className="flex flex-col gap-3">
                             <h2 className="text-white font-semibold text-lg">{dateKey}</h2>
                             {groupedTransactions[dateKey].map((tx) => {
-                                const Icon = getIcon(tx.source);
-                                const isNegative = ["send", "withdrawal", "bill", "electricity", "card"].includes(tx.source.toLowerCase());
-                                // Debug: Check what's in the transaction
-                                console.log('CryptoActivity Transaction:', tx.source, 'Details:', tx.details, 'TransactionType:', tx.details?.transactionType);
+                                const Icon = getIcon(tx.source, tx.direction);
+                                const isNegative = getTransactionDirection(tx) === "DEBIT";
                                 return (
                                     <div
                                         key={tx.reference}
@@ -183,10 +229,10 @@ export default function ActivityPage() {
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-white font-medium capitalize">
-                                                    {tx.details?.transactionType || tx.source}
+                                                    {getTransactionLabel(tx)}
                                                 </span>
                                                 <span className="text-gray-500 text-xs truncate max-w-[150px]">
-                                                    {tx.status} • {format(parseISO(tx.createdAt), "HH:mm")}
+                                                    {formatActivityMeta(tx)}
                                                 </span>
                                             </div>
                                         </div>

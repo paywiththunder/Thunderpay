@@ -29,7 +29,7 @@ export default function SendPage() {
     //   id: "thunder",
     //   name: "Thunder",
     //   description: "Send to Thunder account",
-    //   icon: "⚡",
+    //   icon: "T",
     //   iconBg: "bg-gradient-to-br from-yellow-400 to-orange-600",
     //   route: "/crypto/send/thunder",
     // },

@@ -11,6 +11,7 @@ import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
 import { getBanksList, verifyAccountNumber, BankItem, initiateBankTransfer } from "@/services/transfer";
+import { getWallets } from "@/services/wallet";
 import { useQuery } from "@tanstack/react-query";
 
 interface Bank {
@@ -69,6 +70,44 @@ type Step = "bank" | "account" | "amount" | "payment" | "confirmation" | "enterP
 type TransactionResult = "success" | "failure" | null;
 type TabType = "recents" | "beneficiaries";
 
+interface WalletAccountNumber {
+  accountNumber?: string | null;
+  isActive?: boolean;
+}
+
+interface FiatWallet {
+  walletId?: number;
+  walletType?: string;
+  isActive?: boolean;
+  isPrimary?: boolean;
+  currency?: {
+    code?: string;
+    ticker?: string;
+  };
+  accountNumbers?: WalletAccountNumber[];
+}
+
+const getActiveSenderAccountNumber = (
+  wallets: FiatWallet[],
+  walletId: number
+) => {
+  const selectedWallet = wallets.find((wallet) => wallet.walletId === walletId);
+  const fallbackWallet = wallets.find(
+    (wallet) =>
+      wallet.walletType === "FIAT" &&
+      wallet.isActive &&
+      (wallet.isPrimary ||
+        wallet.currency?.code === "NGN" ||
+        wallet.currency?.ticker === "NGN")
+  );
+  const wallet = selectedWallet || fallbackWallet;
+  const activeAccount = wallet?.accountNumbers?.find(
+    (account) => account.isActive && account.accountNumber
+  );
+
+  return activeAccount?.accountNumber || "";
+};
+
 export default function SendToBankPage() {
   const router = useRouter();
   const bankDropdownRef = useRef<HTMLDivElement>(null);
@@ -99,6 +138,17 @@ export default function SendToBankPage() {
     queryFn: getBanksList,
     staleTime: 1000 * 60 * 30, // 30 minutes
   });
+
+  const { data: walletsResponse } = useQuery({
+    queryKey: ["wallets"],
+    queryFn: getWallets,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const wallets: FiatWallet[] =
+    walletsResponse?.success && Array.isArray(walletsResponse.data)
+      ? walletsResponse.data
+      : [];
 
   const banks: Bank[] = (banksData ?? []).map((b) => ({
     id: b.id,
@@ -298,9 +348,20 @@ export default function SendToBankPage() {
     // Generate a reference (backend API likely has a strict length/format limit like "dev007")
     const reference = Math.random().toString(36).substring(2, 10);
     setTransactionToken(reference);
+    const senderAccountNumber = getActiveSenderAccountNumber(
+      wallets,
+      selectedPaymentMethod.walletId
+    );
+
+    if (!senderAccountNumber) {
+      setTransferError("No active sender account number found.");
+      setIsTransferring(false);
+      return;
+    }
 
     const payload = {
       walletId: selectedPaymentMethod.walletId,
+      senderAccountNumber,
       recipientAccountNumber: accountNumber,
       bankCode: selectedBank.code,
       amount: parseFloat(amount),
@@ -313,6 +374,7 @@ export default function SendToBankPage() {
     console.log("📤 ===== BANK TRANSFER PAYLOAD (BEFORE EXECUTE) =====");
     console.log("📤 Payload Details:");
     console.log("  - walletId:", payload.walletId, "(type:", typeof payload.walletId, ")");
+    console.log("  - senderAccountNumber:", payload.senderAccountNumber, "(type:", typeof payload.senderAccountNumber, ")");
     console.log("  - recipientAccountNumber:", payload.recipientAccountNumber, "(type:", typeof payload.recipientAccountNumber, ")");
     console.log("  - bankCode:", payload.bankCode, "(type:", typeof payload.bankCode, ")");
     console.log("  - amount:", payload.amount, "(type:", typeof payload.amount, ")");

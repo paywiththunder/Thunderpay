@@ -87,8 +87,15 @@ export default function MailVerification() {
 
       console.log("Verification successful:", data);
 
+      // ✅ Save authToken if available
+      if (data && data.token) {
+        localStorage.setItem("authToken", data.token);
+      } else if (res.data && res.data.token) {
+        localStorage.setItem("authToken", res.data.token);
+      }
+
       // 👉 redirect or continue flow here
-      router.push("/auth/login");
+      router.push("/auth/continue-signup");
     } catch (err: any) {
       setError(
         err?.response?.data?.description ||

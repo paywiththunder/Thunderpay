@@ -15,7 +15,7 @@ import { format, isToday, isYesterday, parseISO } from "date-fns";
 interface Transaction {
     id: number;
     source: string;
-    direction: "CREDIT" | "DEBIT" | string | null;
+    direction: "CREDIT" | "DEBIT" | string;
     amount: number;
     fee: number | null;
     status: string;
@@ -123,8 +123,7 @@ export default function ActivityPage() {
     };
 
     const formatActivityMeta = (tx: Transaction) => {
-        const direction = getTransactionDirection(tx);
-        return tx.createdAt ? `${direction} • ${tx.createdAt}` : direction;
+        return tx.createdAt ? `${tx.direction} • ${tx.createdAt}` : tx.direction;
     };
 
     if (loading) {
@@ -155,24 +154,12 @@ export default function ActivityPage() {
         return groups;
     };
 
-    const getTransactionDirection = (tx: Transaction) => {
-        if (tx.direction) return tx.direction.toUpperCase();
-
-        return ["send", "withdrawal", "bill", "bill_payment", "electricity", "card", "transfer"].includes(
-            tx.source.toLowerCase()
-        )
-            ? "DEBIT"
-            : "CREDIT";
-    };
-
-    const getIcon = (source: string, direction: string | null) => {
-        const normalizedDirection = direction?.toUpperCase();
-
+    const getIcon = (source: string, direction: string) => {
         switch (source.toLowerCase()) {
             case "send":
             case "withdrawal":
             case "transfer":
-                return normalizedDirection === "CREDIT"
+                return direction.toUpperCase() === "CREDIT"
                     ? HiOutlineArrowDownLeft
                     : HiOutlineArrowUpRight;
             case "receive":
@@ -188,8 +175,8 @@ export default function ActivityPage() {
             case "card":
                 return HiOutlineCreditCard;
             default:
-                if (normalizedDirection === "CREDIT") return HiOutlineArrowDownLeft;
-                if (normalizedDirection === "DEBIT") return HiOutlineArrowUpRight;
+                if (direction.toUpperCase() === "CREDIT") return HiOutlineArrowDownLeft;
+                if (direction.toUpperCase() === "DEBIT") return HiOutlineArrowUpRight;
                 return HiOutlineInbox;
         }
     };
@@ -216,7 +203,7 @@ export default function ActivityPage() {
                             <h2 className="text-white font-semibold text-lg">{dateKey}</h2>
                             {groupedTransactions[dateKey].map((tx) => {
                                 const Icon = getIcon(tx.source, tx.direction);
-                                const isNegative = getTransactionDirection(tx) === "DEBIT";
+                                const isNegative = tx.direction.toUpperCase() === "DEBIT";
                                 return (
                                     <div
                                         key={tx.reference}
@@ -224,7 +211,7 @@ export default function ActivityPage() {
                                         onClick={() => router.push(`/crypto/activity/${tx.reference}`)}
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-xl border border-white/20 flex items-center justify-center">
+                                            <div className="w-10 h-10 rounded-xl border border-white/20 flex items-center justify-center">w
                                                 <Icon className="w-5 h-5 text-gray-400" />
                                             </div>
                                             <div className="flex flex-col">

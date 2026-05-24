@@ -70,13 +70,25 @@ export default function ContinueSignup() {
 
       console.log("Signup continued successfully:", res.data);
 
+      // Safely store user data if available
+      if (data) {
+        localStorage.setItem("firstName", data.firstName || "");
+        localStorage.setItem("lastName", data.lastName || "");
+        localStorage.setItem("dob", data.dob || "");
+        localStorage.setItem("phone", data.phone || "");
+        localStorage.setItem("street", data.street || "");
+        localStorage.setItem("nin", data.nin || "");
+      } else if (res.data) {
+        // Fallback to res.data if data property is missing
+        localStorage.setItem("firstName", res.data.firstName || "");
+        localStorage.setItem("lastName", res.data.lastName || "");
+        localStorage.setItem("dob", res.data.dob || "");
+        localStorage.setItem("phone", res.data.phone || "");
+        localStorage.setItem("street", res.data.street || "");
+        localStorage.setItem("nin", res.data.nin || "");
+      }
+
       router.push("/auth/set-pin");
-      localStorage.setItem("firstName", data.firstName);
-      localStorage.setItem("lastName", data.lastName);
-      localStorage.setItem("dob", data.dob);
-      localStorage.setItem("phone", data.phone);
-      localStorage.setItem("street", data.street);
-      localStorage.setItem("nin", data.nin);
 
     } catch (err: any) {
       console.error('Signup error details:', err.response?.data);
@@ -94,7 +106,7 @@ export default function ContinueSignup() {
       }
 
       if (errorList.some(e => e.includes('Already completed signup'))) {
-        router.push("/home");
+        router.push("/crypto");
       }
 
       setErrors(errorList);

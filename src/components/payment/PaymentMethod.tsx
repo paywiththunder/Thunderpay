@@ -87,6 +87,10 @@ export default function PaymentMethod({
         maximumFractionDigits: 8,
       });
 
+      // Determine wallet type from the API response
+      const walletType = wallet.walletType ? wallet.walletType.toLowerCase() : "crypto";
+      const isFiat = walletType === "fiat" || currencyCode.toUpperCase() === "NGN";
+
       return {
         id: wallet.walletId?.toString() || "",
         name: currency?.name || currencyCode,
@@ -95,7 +99,7 @@ export default function PaymentMethod({
         balance: formattedBalance,
         cryptoAmount: `${formattedBalance} ${currencyCode}`,
         value: "---",
-        type: "crypto",
+        type: isFiat ? "fiat" : "crypto",
         currencyCode: currencyCode,
         currency: currencyCode,
         walletId: wallet.walletId,

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import { HiChevronRight, HiCheckCircle } from "react-icons/hi2";
@@ -10,7 +10,7 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
-import { initiateThunderTransfer } from "@/services/transfer";
+import { initiateThunderTransfer, verifyInternalAccountNumber } from "@/services/transfer";
 import { getWallets } from "@/services/wallet";
 import { useQuery } from "@tanstack/react-query";
 
@@ -23,29 +23,7 @@ interface RecentRecipient {
   initial?: string;
 }
 
-const recentRecipients: RecentRecipient[] = [
-  {
-    id: "1",
-    name: "Newton Afobaje Arowolo",
-    accountNumber: "9068233532",
-    type: "thunder",
-    initial: "N",
-  },
-  {
-    id: "2",
-    name: "Ugo Kyoshi Omotola",
-    accountNumber: "9068233532",
-    type: "thunder",
-    initial: "U",
-  },
-  {
-    id: "3",
-    name: "Hakeem Kyoshi Omotola",
-    accountNumber: "9068233532",
-    type: "thunder",
-    initial: "H",
-  },
-];
+const recentRecipients: RecentRecipient[] = [];
 
 const amountOptions = [
   { amount: 1000 },
@@ -112,6 +90,10 @@ export default function SendToThunderPage() {
     useState<TransactionResult>(null);
   const [transactionToken, setTransactionToken] = useState("");
   const [transferError, setTransferError] = useState("");
+  const [accountName, setAccountName] = useState<string | null>(null);
+  const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
+  const [verificationError, setVerificationError] = useState("");
+  const thunderInternalBankId = "16565854883910-anc_bk";
 
   const { data: walletsResponse } = useQuery({
     queryKey: ["wallets"],
@@ -131,25 +113,51 @@ export default function SendToThunderPage() {
 
   // Auto-select recipient if account number matches exactly
   useEffect(() => {
-    if (accountNumber.length >= 10) {
-      const match = recentRecipients.find(
-        (r) => r.accountNumber === accountNumber
-      );
-      if (match) {
-        setSelectedRecipient(match);
-      } else {
-        // If no exact match, create a new recipient object
+    const verifyAccount = async () => {
+      if (accountNumber.length < 10) {
+        setVerificationError("");
+        setAccountName(null);
+        setSelectedRecipient(null);
+        setIsVerifyingAccount(false);
+        return;
+      }
+
+      setIsVerifyingAccount(true);
+      setVerificationError("");
+
+      try {
+        const verificationResult = await verifyInternalAccountNumber({
+          bankId: thunderInternalBankId,
+          accountNumber,
+        });
+
+        const verifiedName =
+          typeof verificationResult === "string"
+            ? verificationResult
+            : verificationResult?.name || "Unknown User";
+
+        setAccountName(verifiedName);
         setSelectedRecipient({
           id: "new",
-          name: "Unknown User",
-          accountNumber: accountNumber,
+          name: verifiedName,
+          accountNumber,
           type: "thunder",
           initial: accountNumber.charAt(0),
         });
+      } catch (error: any) {
+        setVerificationError(
+          typeof error === "string"
+            ? error
+            : error?.description || error?.message || "Unable to verify account"
+        );
+        setSelectedRecipient(null);
+        setAccountName(null);
+      } finally {
+        setIsVerifyingAccount(false);
       }
-    } else {
-      setSelectedRecipient(null);
-    }
+    };
+
+    verifyAccount();
   }, [accountNumber]);
 
   const handleRecipientSelect = (recipient: RecentRecipient) => {
@@ -174,7 +182,7 @@ export default function SendToThunderPage() {
 
   const handlePayClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    if (selectedRecipient && accountNumber.length >= 10) {
+    if (selectedRecipient && accountNumber.length >= 10 && !verificationError) {
       if (!amount) {
         setStep("amount");
       } else {
@@ -522,10 +530,23 @@ export default function SendToThunderPage() {
           <input
             type="text"
             value={accountNumber}
-            onChange={(e) => setAccountNumber(e.target.value)}
+            onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))}
             placeholder="enter account number"
             className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
           />
+          {isVerifyingAccount && (
+            <p className="text-xs text-blue-300 mt-2">Verifying account number...</p>
+          )}
+          {accountName && !verificationError && (
+            <p className="text-xs text-green-400 mt-2">
+              Account verified: {accountName}
+            </p>
+          )}
+          {verificationError && (
+            <p className="text-xs text-red-400 mt-2">
+              {verificationError}
+            </p>
+          )}
         </div>
 
         {/* Tabs */}

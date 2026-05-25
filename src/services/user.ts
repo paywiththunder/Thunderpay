@@ -99,7 +99,13 @@ export const getUserProfile = async () => {
     }
 };
 
-export const getRecentTransactions = async () => {
+export interface GetRecentTransactionsParams {
+    walletType?: "FIAT" | "fiat" | "CRYPTO" | "crypto";
+    page?: string | number;
+    size?: string | number;
+}
+
+export const getRecentTransactions = async (params?: GetRecentTransactionsParams) => {
     const token = getAuthToken();
     if (!token) throw new Error("No auth token found");
 
@@ -108,6 +114,7 @@ export const getRecentTransactions = async () => {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
+            params: params,
         });
         console.log(response.data)
         return response.data;

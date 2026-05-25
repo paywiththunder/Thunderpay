@@ -51,6 +51,7 @@ const getAssetConfig = (symbol: string) => {
 interface Transaction {
     id: number;
     source: string;
+    direction?: "CREDIT" | "DEBIT" | string;
     amount: number;
     fee: number;
     status: string;
@@ -112,8 +113,8 @@ export default function CryptoPage() {
         data: transactionsResponse,
         isLoading: transactionsLoading
     } = useQuery({
-        queryKey: ['recentTransactions'],
-        queryFn: getRecentTransactions,
+        queryKey: ['recentTransactions', 'CRYPTO'],
+        queryFn: () => getRecentTransactions({ walletType: 'CRYPTO', page: '1', size: '10' }),
     });
 
     const loading = walletsLoading || transactionsLoading;
@@ -283,7 +284,7 @@ export default function CryptoPage() {
                     <div className="flex flex-col gap-3">
                         {transactions.map((tx: Transaction) => {
                             const Icon = getIcon(tx.source);
-                            const isNegative = ["send", "withdrawal", "bill", "electricity", "card"].includes(tx.source.toLowerCase());
+                            const isNegative = tx.direction?.toUpperCase() === "DEBIT" || ["send", "withdrawal", "bill", "bill_payment", "electricity", "card"].includes(tx.source.toLowerCase());
                             // Debug: Check what's in the transaction
                             console.log('CryptoPage Transaction:', tx.source, 'Details:', tx.details, 'TransactionType:', tx.details?.transactionType);
                             return (

@@ -29,7 +29,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import { useBalanceVisibility } from "@/hooks/useBalanceVisibility";
 import { useCurrency } from "@/providers/CurrencyProvider";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { format, parseISO } from "date-fns";
 
 // Transaction Interface
@@ -65,9 +65,15 @@ interface Transaction {
 
 export default function HomePage() {
   const router = useRouter();
+  const pathname = usePathname();
   const { showBalance, toggleBalance } = useBalanceVisibility();
   const { ngnCurrencyId, isLoading: currencyLoading } = useCurrency();
   const isComingSoon = false; // Simple toggle for later use
+
+  // Determine wallet type based on current page (default to CRYPTO for HomePage)
+  const walletType = pathname?.includes('cash') ? 'FIAT' : 'CRYPTO';
+  console.log('Current pathname:', pathname);
+  console.log('Wallet type:', walletType);
 
   // Fetch Bolts Balance
   const { data: cashbackResponse } = useQuery({
@@ -89,9 +95,11 @@ export default function HomePage() {
 
   // Fetch Recent Transactions
   const { data: transactionsResponse, isLoading: transactionsLoading } = useQuery({
-    queryKey: ['recentTransactions'],
-    queryFn: getRecentTransactions,
+    queryKey: ['recentTransactions', walletType],
+    queryFn: () => getRecentTransactions({ walletType, page: '1', size: '10' }),
   });
+
+  console.log('Transactions response:', transactionsResponse);
 
   const transactions = transactionsResponse?.success ? transactionsResponse.data.items : [];
 
@@ -227,9 +235,7 @@ export default function HomePage() {
               <div className="flex flex-col gap-3">
                 {transactions.map((tx: Transaction) => {
                   const Icon = getIcon(tx.source, tx.direction);
-                  const isNegative = tx.direction
-                    ? tx.direction.toUpperCase() === "DEBIT"
-                    : ["send", "withdrawal", "bill", "bill_payment", "electricity", "card"].includes(tx.source.toLowerCase());
+                  const isNegative = tx.direction?.toUpperCase() === "DEBIT" || ["send", "withdrawal", "bill", "bill_payment", "electricity", "card"].includes(tx.source.toLowerCase());
                   const transactionDate = getTransactionDate(tx.createdAt);
                   return (
                     <div

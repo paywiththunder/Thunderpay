@@ -65,6 +65,31 @@ export const verifyAccountNumber = async (payload: VerifyAccountPayload): Promis
     }
 };
 
+export interface VerifyInternalAccountPayload {
+    bankId: string;
+    accountNumber: string;
+}
+
+export const verifyInternalAccountNumber = async (payload: VerifyInternalAccountPayload): Promise<any> => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const response = await axios.post(`${API_URL}/verify-internal-account-number`, payload, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        });
+        if (response.data?.success) {
+            return response.data.data;
+        }
+        throw new Error(response.data?.description || "Internal account verification failed");
+    } catch (error: any) {
+        throw error.response?.data || error.message;
+    }
+};
+
 
 // Transfer Quotes and Excute Transfer
 

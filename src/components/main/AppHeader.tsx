@@ -1,5 +1,4 @@
 "use client";
-import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -10,9 +9,15 @@ import {
 
 import { getUserProfile } from "@/services/user";
 import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 
 export default function AppHeader() {
     const pathname = usePathname();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const { data: userProfile } = useQuery({
         queryKey: ['userProfile'],
@@ -31,7 +36,7 @@ export default function AppHeader() {
         }
     }
 
-    const isActive = (path: string) => pathname === path;
+    const isActive = (path: string) => mounted && pathname === path;
 
     return (
         <div className="flex flex-col gap-5 w-full">
@@ -64,7 +69,7 @@ export default function AppHeader() {
                 >
                     Crypto
                 </Link>
-                <Link
+                {/* <Link
                     href="/cash"
                     className={`${isActive("/cash")
                         ? "text-white border-b-2 border-[#3B82F6] pb-1"
@@ -81,7 +86,7 @@ export default function AppHeader() {
                         }`}
                 >
                     International
-                </Link>
+                </Link> */}
             </div>
         </div>
     );

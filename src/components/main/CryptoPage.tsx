@@ -191,9 +191,9 @@ export default function CryptoPage() {
             {/* Action Buttons Grid */}
             <div className="grid grid-cols-4 gap-3">
                 <ActionButton icon={GiPayMoney} label="Pay Bills" href="/crypto/pay-bills" />
-                <ActionButton icon={GiBanknote} label="Send" href="/crypto/send" />
                 <ActionButton icon={GiReceiveMoney} label="Receive" href="/crypto/receive" />
-                <ActionButton icon={MdCurrencyExchange} label="Convert" href="/crypto/convert" />
+                <ActionButton icon={GiBanknote} label="Send" href="/crypto/send" disabled />
+                <ActionButton icon={MdCurrencyExchange} label="Convert" href="/crypto/convert" disabled />
             </div>
 
             {/* Banner */}
@@ -354,11 +354,25 @@ function ActionButton({
     icon: Icon,
     label,
     href,
+    disabled = false,
 }: {
     icon: React.ElementType;
     label: string;
     href: string;
+    disabled?: boolean;
 }) {
+    if (disabled) {
+        return (
+            <div
+                className="flex flex-col items-center justify-center gap-2 bg-app-card py-4 rounded-2xl border border-white/5 bg-gradient-to-b from-[#1A1A1A] to-[#0F0F0F] opacity-50 cursor-not-allowed"
+                aria-disabled="true"
+            >
+                <Icon className="w-6 h-6 text-gray-500" />
+                <span className="text-[10px] text-gray-500 font-medium">{label}</span>
+            </div>
+        );
+    }
+
     return (
         <Link
             href={href}

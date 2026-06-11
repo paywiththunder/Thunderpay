@@ -6,14 +6,12 @@ import { FaBitcoin, FaEthereum, FaWallet } from "react-icons/fa";
 import { SiTether, SiSolana } from "react-icons/si";
 import Link from "next/link";
 import { getWallets } from "@/services/wallet";
-import { IoCopyOutline } from "react-icons/io5";
 
 interface CryptoAsset {
   id: string;
   symbol: string;
   name: string;
   balance: string;
-  address: string;
   fiatValue: string;
   icon: React.ElementType;
   color: string;
@@ -38,7 +36,6 @@ import { useQuery } from "@tanstack/react-query";
 
 export default function ReceivePage() {
   const router = useRouter();
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const { data: walletsResponse, isLoading: loading } = useQuery({
     queryKey: ['wallets'],
@@ -57,14 +54,11 @@ export default function ReceivePage() {
       const rawBalance = wallet.availableBalance ?? wallet.totalBalance ?? 0;
       const balance = Number(rawBalance).toLocaleString('en-US', { maximumFractionDigits: 8 });
 
-      const activeAddress = wallet.addresses?.find((a: any) => a.isActive)?.address || wallet.addresses?.[0]?.address || "";
-
       return {
         id: wallet.walletId?.toString() || Math.random().toString(),
         symbol: symbol,
         name: currency?.name || config.name,
         balance: `${balance} ${symbol}`,
-        address: activeAddress,
         fiatValue: "---",
         icon: config.icon,
         color: config.color,
@@ -72,18 +66,7 @@ export default function ReceivePage() {
     });
   }, [walletsResponse]);
 
-  const handleCopy = (address: string, id: string) => {
-    if (!address) return;
-    navigator.clipboard.writeText(address);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
 
-  const formatAddress = (addr: string) => {
-    if (!addr) return "No address";
-    if (addr.length <= 12) return addr;
-    return `${addr.slice(0, 6)}....${addr.slice(-4)}`;
-  };
 
   return (
     <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6 pb-24">
@@ -128,19 +111,9 @@ export default function ReceivePage() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-white font-bold text-lg">{asset.name}</span>
-                  {copiedId === asset.id ? (
-                    <span className="text-blue-500 text-sm font-medium animate-in fade-in duration-300">Copied</span>
-                  ) : (
-                    <span className="text-gray-400 text-sm font-mono">{formatAddress(asset.address)}</span>
-                  )}
+                  <span className="text-gray-400 text-sm">{asset.balance}</span>
                 </div>
               </Link>
-              <button
-                onClick={() => handleCopy(asset.address, asset.id)}
-                className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all active:scale-90"
-              >
-                <IoCopyOutline className="w-5 h-5" />
-              </button>
             </div>
           ))
         )}

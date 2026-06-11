@@ -138,10 +138,13 @@ export default function AirtimePage() {
   const quoteMutation = useMutation({
     mutationFn: (payload: AirtimeQuotePayload) => getAirtimeQuote(payload),
     onSuccess: (data) => {
-      console.log("📥 Crypto Airtime Quote Response:", data);
-      console.log("📊 Quote Data:", data.data || data);
+      // console.log("📥 [CRYPTO] Raw API response:", data);
+      // console.log("📊 [CRYPTO] Quote Data:", data.data || data);
       
       const quoteData = data.data || data;
+      // console.log("📊 [CRYPTO] boltsEarnable:", quoteData.boltsEarnable);
+      // console.log("📊 [CRYPTO] bonusAvailable:", quoteData.bonusAvailable);
+      
       setQuote(quoteData);
       // Persist for page reloads/step changes if needed, though state is better
       localStorage.setItem("currentAirtimeQuote", JSON.stringify(quoteData));
@@ -283,6 +286,13 @@ export default function AirtimePage() {
   };
 
   const getCashback = (): number => {
+    console.log("🎯 [CRYPTO] getCashback - Full quote object:", quote);
+    console.log("🎯 [CRYPTO] getCashback - boltsEarnable:", quote?.boltsEarnable);
+    console.log("🎯 [CRYPTO] getCashback - bonusAvailable:", quote?.bonusAvailable);
+    
+    if (quote?.boltsEarnable !== undefined) {
+      return quote.boltsEarnable;
+    }
     return 0;
   };
 

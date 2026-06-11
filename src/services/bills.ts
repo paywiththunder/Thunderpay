@@ -23,6 +23,8 @@ export interface AirtimeQuoteResponse {
     quoteReference: string;
     deductionAmount: number;
     deductionCurrency: string;
+    boltsEarnable: number;
+    bonusAvailable: number;
     exchangeRate: number;
     transactionFee: number;
     expiresAtTimestamp: string;

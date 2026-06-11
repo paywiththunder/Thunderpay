@@ -138,7 +138,11 @@ export default function AirtimePage() {
   const quoteMutation = useMutation({
     mutationFn: (payload: AirtimeQuotePayload) => getAirtimeQuote(payload),
     onSuccess: (data) => {
+      console.log("📥 Raw API response:", data);
       const quoteData = data.data || data;
+      console.log("📊 Extracted quote data:", quoteData);
+      console.log("📊 boltsEarnable:", quoteData.boltsEarnable);
+      console.log("📊 bonusAvailable:", quoteData.bonusAvailable);
       setQuote(quoteData);
       localStorage.setItem("currentAirtimeQuote", JSON.stringify(quoteData));
       setStep("confirmation");
@@ -270,6 +274,16 @@ export default function AirtimePage() {
   };
 
   const getCashback = (): number => {
+    // Use boltsEarnable from quote response if available
+    console.log("🎯 getCashback - Full quote object:", quote);
+    console.log("🎯 getCashback - boltsEarnable:", quote?.boltsEarnable);
+    console.log("🎯 getCashback - bonusAvailable:", quote?.bonusAvailable);
+    
+    if (quote?.boltsEarnable !== undefined) {
+      console.log(quote.boltsEarnable)
+      return quote.boltsEarnable;
+    }
+    // Fallback to 0 if no quote or no boltsEarnable
     return 0;
   };
 

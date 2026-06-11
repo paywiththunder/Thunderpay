@@ -156,7 +156,7 @@ export default function PaymentMethod({
           >
             <MdOutlineKeyboardDoubleArrowLeft className="text-white" />
           </button>
-          <h1 className="text-2xl font-bold text-white">Select Network</h1>
+          <h1 className="text-2xl font-bold text-white">Select Currency</h1>
         </header>
 
         <div className="px-4 mb-6">
@@ -172,7 +172,7 @@ export default function PaymentMethod({
         </div>
 
         <div className="flex flex-col gap-3 px-4 overflow-y-auto pb-6">
-          <p className="text-gray-400 text-sm px-1 mb-1">Choose a network for this transaction:</p>
+          <p className="text-gray-400 text-sm px-1 mb-1">Choose a currency for this transaction:</p>
           {selectedWallet.addresses?.map((addr: any, index: number) => (
             <button
               key={index}
@@ -220,7 +220,7 @@ export default function PaymentMethod({
         >
           <MdOutlineKeyboardDoubleArrowLeft className="text-white" />
         </button>
-        <h1 className="text-2xl font-bold text-white">Payment Method</h1>
+        <h1 className="text-2xl font-bold text-white">Select Currency</h1>
       </header>
 
       <div className="flex flex-col gap-3 px-4 overflow-y-auto pb-6">

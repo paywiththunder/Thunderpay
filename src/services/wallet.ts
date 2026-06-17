@@ -5,6 +5,8 @@ const API_URL = `${API_BASE_URL}/wallets`;
 
 const getAuthToken = () => {
     if (typeof window !== "undefined") {
+        console.log("Retrieving auth token from localStorage");
+        console.log("Auth Token:", localStorage.getItem("authToken"));
         return localStorage.getItem("authToken");
     }
     return null;
@@ -59,7 +61,7 @@ export const getWalletsUsd = async (type?: 'fiat' | 'crypto') => {
     if (!token) throw new Error("No auth token found");
 
     try {
-        const url = type ? `${API_URL}/usd?type=${type}` : `${API_URL}/usd`;
+        const url = type ? `${API_URL}/ngn?type=${type}` : `${API_URL}/ngn`;
         const response = await axios.get(url, {
             headers: {
                 Authorization: `Bearer ${token}`,

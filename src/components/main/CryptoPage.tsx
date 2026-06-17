@@ -29,7 +29,7 @@ import { SiTether, SiSolana } from "react-icons/si";
 import AppHeader from "./AppHeader";
 import Right from '../../../public/right.png'
 import Left from '../../../public/left.png'
-import { getWallets } from "@/services/wallet";
+import { getWallets, getWalletsUsd } from "@/services/wallet";
 
 // Helper to match icons (reused logic from ReceivePage)
 const getAssetConfig = (symbol: string) => {
@@ -98,14 +98,14 @@ export default function CryptoPage() {
         };
     }, [isAddWalletOpen]);
 
-    // Query for Wallets
+    // Query for Wallets with NGN equivalent
     const {
         data: walletsResponse,
         isLoading: walletsLoading,
         refetch: refetchWallets
     } = useQuery({
-        queryKey: ['wallets'],
-        queryFn: getWallets,
+        queryKey: ['walletsNgn', 'crypto'],
+        queryFn: () => getWalletsUsd('crypto'),
     });
 
     // Query for Recent Transactions
@@ -120,8 +120,8 @@ export default function CryptoPage() {
     const loading = walletsLoading || transactionsLoading;
 
     // Derived states
-    const wallets = walletsResponse?.success && walletsResponse?.data ? walletsResponse.data : [];
-    const totalAssets = 0; // Will need to calculate from individual wallets or use a different endpoint
+    const wallets = walletsResponse?.success && walletsResponse?.data?.wallets ? walletsResponse.data.wallets : [];
+    const totalAssets = walletsResponse?.success && walletsResponse?.data?.totalAssetsNGN ? walletsResponse.data.totalAssetsNGN : 0;
     const transactions = transactionsResponse?.success ? transactionsResponse.data.items : [];
 
     const fetchWallets = () => {
@@ -180,11 +180,11 @@ export default function CryptoPage() {
                     </button>
                 </div>
                 <h2 className="text-4xl font-bold mb-1">
-                    {showBalance ? totalAssets.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : "****"}
+                    {showBalance ? `₦${totalAssets.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "****"}
                 </h2>
                 <div className="flex items-center gap-2 text-sm">
                     {/* Change placeholder - unavailable in API currently */}
-                    <span className="text-green-500 font-medium">{showBalance ? "+$0.00 +0.00" : "****"}</span>
+                    <span className="text-green-500 font-medium">{showBalance ? "+₦0.00 +0.00%" : "****"}</span>
                 </div>
             </div>
 
@@ -246,8 +246,8 @@ export default function CryptoPage() {
                             const rawBalance = wallet.availableBalance ?? wallet.totalBalance ?? 0;
                             const balance = Number(rawBalance).toLocaleString('en-US', { maximumFractionDigits: 8 });
 
-                            // Format USD equivalent - will need to calculate or get from another source
-                            const usdValue = "$0.00"; // Placeholder since regular wallets endpoint doesn't include USD equivalent
+                            // Format NGN equivalent from API
+                            const ngnValue = wallet.ngnEquivalent ? `₦${Number(wallet.ngnEquivalent).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "₦0.00";
 
                             return (
                                 <TokenItem
@@ -257,7 +257,7 @@ export default function CryptoPage() {
                                     name={currency?.name || config.name}
                                     symbol={symbol}
                                     amount={showBalance ? `${balance} ${symbol}` : "****"}
-                                    value={showBalance ? usdValue : "****"}
+                                    value={showBalance ? ngnValue : "****"}
                                 />
                             );
                         })

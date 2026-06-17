@@ -236,7 +236,15 @@ export default function PaymentMethod({
               key={option.id}
               onClick={() => {
                 if (option.type === "crypto") {
-                  setSelectedWallet(option);
+                  // Auto-select first available network instead of showing network selection screen
+                  const firstAddress = option.addresses?.[0];
+                  const networkCode = firstAddress?.network || firstAddress?.chainCode;
+                  const mappedNetwork = getNetworkId(networkCode, option.currencyCode || "");
+                  
+                  onSelect({
+                    ...option,
+                    network: mappedNetwork,
+                  });
                 } else {
                   onSelect(option);
                 }

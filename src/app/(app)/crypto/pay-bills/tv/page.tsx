@@ -103,7 +103,7 @@ export default function TVPage() {
           name: p.name,
           price: parseFloat(p.variation_amount),
           duration: duration,
-          cashback: 0
+          cashback: (p.cashback ? Number(p.cashback) : 0) || 0
         };
       });
       setAvailablePlans(mappedPlans);
@@ -142,7 +142,7 @@ export default function TVPage() {
     onSuccess: (response) => {
       const res = response as BillExecutionResponse;
       if (res.success && res.data) {
-        setTransactionToken(res.data.transactionReference);
+        setTransactionToken(res.data?.transactionReference || res.data?.quoteReference || "");
         setTransactionDetails(res.data);
         setTransactionResult("success");
         setStep("result");

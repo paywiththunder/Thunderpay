@@ -5,6 +5,8 @@ const API_URL = `${API_BASE_URL}/wallets`;
 
 const getAuthToken = () => {
     if (typeof window !== "undefined") {
+        console.log("Retrieving auth token from localStorage");
+        console.log("Auth Token:", localStorage.getItem("authToken"));
         return localStorage.getItem("authToken");
     }
     return null;
@@ -12,8 +14,8 @@ const getAuthToken = () => {
 
 export const createWallet = async (currencyId: number, network: string) => {
     const token = getAuthToken();
-    console.log(token);
     if (!token) throw new Error("No auth token found");
+
 
     try {
         const response = await axios.post(
@@ -29,11 +31,9 @@ export const createWallet = async (currencyId: number, network: string) => {
                 },
             }
         );
-        console.log("Payload sent:", { currencyId, network });
-        console.log(response);
+        console.log("Create Wallet Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.log(error);
         throw error.response?.data || error.message;
     }
 };
@@ -49,19 +49,20 @@ export const getWallets = async () => {
                 "Content-Type": "application/json",
             },
         });
-        console.log(response.data);
+        console.log( 'Wallet', response.data);
         return response.data;
     } catch (error: any) {
         throw error.response?.data || error.message;
     }
 };
 
-export const getWalletsUsd = async () => {
+export const getWalletsUsd = async (type?: 'fiat' | 'crypto') => {
     const token = getAuthToken();
     if (!token) throw new Error("No auth token found");
 
     try {
-        const response = await axios.get(`${API_URL}/usd`, {
+        const url = type ? `${API_URL}/ngn?type=${type}` : `${API_URL}/ngn`;
+        const response = await axios.get(url, {
             headers: {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
@@ -85,6 +86,7 @@ export const getCurrencies = async () => {
                 "Content-Type": "application/json",
             },
         });
+        console.log("Currencies Response:", response.data);
         return response.data;
     } catch (error: any) {
         throw error.response?.data || error.message;
@@ -106,7 +108,7 @@ export const getWalletActivity = async (walletId: number) => {
         return response.data;
     } catch (error: any) {
         // Return null or empty representation on error to prevent failing all requests
-        console.error(`Failed to fetch activity for wallet ${walletId}:`, error);
+        console.error(`Failed to fetch activity for wallet ${walletId}:`, error.response?.data || error.message);
         return { success: false, data: { items: [] } };
     }
 };

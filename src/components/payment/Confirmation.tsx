@@ -15,12 +15,18 @@ interface ConfirmationProps {
   // Legacy props (optional for backward compatibility)
   paymentMethod?: string;
   biller?: string;
+  billerLabel?: string;
   meterNumber?: string;
+  meterNumberLabel?: string;
   customerName?: string;
+  customerNameLabel?: string;
   meterType?: string;
+  meterTypeLabel?: string;
   serviceAddress?: string;
   cashback?: number;
   availableBalance: string;
+  boltBalance?: number;
+  recipientAmount?: string; // e.g., "₦5,000"
   // New dynamic props
   details?: QuoteDetails[];
 }
@@ -32,16 +38,21 @@ export default function Confirmation({
   paymentAmount,
   paymentMethod,
   biller,
+  billerLabel = "Biller",
   meterNumber,
+  meterNumberLabel = "Meter Number",
   customerName,
+  customerNameLabel = "Customer Name",
   meterType,
+  meterTypeLabel = "Meter Type",
   serviceAddress,
   cashback,
   availableBalance,
+  boltBalance,
+  recipientAmount,
   details,
 }: ConfirmationProps) {
   const [useCashback, setUseCashback] = useState(false);
-  const cashbackBalance = 500;
 
   return (
     <div className="flex flex-col w-full flex-1 bg-black min-h-full py-6">
@@ -60,7 +71,9 @@ export default function Confirmation({
         {/* Amount Display */}
         <div className="flex flex-col items-center gap-2 py-4">
           <h2 className="text-3xl font-bold text-white">{paymentAmount}</h2>
-          <p className="text-gray-400 text-sm">≈ ₦{amount.toLocaleString()}.00</p>
+          <p className="text-gray-400 text-sm">
+            {recipientAmount || `≈ ₦${amount.toLocaleString()}.00`}
+          </p>
         </div>
 
         {/* Payment Details */}
@@ -72,40 +85,33 @@ export default function Confirmation({
               ))
             ) : (
               <>
-                {biller && <DetailRow label="Biller" value={biller} />}
-                {meterNumber && <DetailRow label="Meter Number" value={meterNumber} />}
-                {customerName && <DetailRow label="Customer Name" value={customerName} />}
-                {meterType && <DetailRow label="Meter Type" value={meterType} />}
+                {biller && <DetailRow label={billerLabel} value={biller} />}
+                {meterNumber && <DetailRow label={meterNumberLabel} value={meterNumber} />}
+                {customerName && <DetailRow label={customerNameLabel} value={customerName} />}
+                {meterType && <DetailRow label={meterTypeLabel} value={meterType} />}
                 {serviceAddress && <DetailRow label="Service Address" value={serviceAddress} />}
                 {paymentMethod && <DetailRow label="Payment Method" value={paymentMethod} />}
-                {cashback !== undefined && <DetailRow label="Bonus to Earn" value={`₦${cashback.toFixed(2)} Cashback`} />}
+                {cashback !== undefined && <DetailRow label="Bolt to Earn" value={`${cashback.toFixed(2)} bolts`} />}
               </>
             )}
           </div>
 
-          {/* Use Cashback Toggle */}
-          {/* <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between">
+          {/* Bolt Balance Display */}
+          <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-white font-medium">
-                Use Cashback (₦{cashbackBalance.toLocaleString()}.00)
+                Bolt Balance
               </span>
-              {useCashback && (
-                <span className="text-gray-400 text-sm mt-1">
-                  -₦{cashbackBalance.toLocaleString()}.00
-                </span>
-              )}
+              <span className="text-gray-400 text-sm mt-1">
+                {boltBalance?.toLocaleString() || "0.00"} Available
+              </span>
             </div>
-            <button
-              onClick={() => setUseCashback(!useCashback)}
-              className={`relative w-12 h-6 rounded-full transition-colors ${useCashback ? "bg-blue-500" : "bg-gray-600"
-                }`}
-            >
-              <span
-                className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${useCashback ? "translate-x-6" : "translate-x-0"
-                  }`}
-              />
-            </button>
-          </div> */}
+            <div className="flex items-center gap-2">
+              <span className="text-blue-500 text-xs font-bold uppercase tracking-wider bg-blue-500/10 px-2 py-1 rounded-md">
+                Thunder Bolts
+              </span>
+            </div>
+          </div>
 
           {/* Available Balance */}
           <div className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4">
@@ -126,10 +132,46 @@ export default function Confirmation({
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
+  // Determine color based on countdown value
+  const getCountdownColor = (val: string): string => {
+    if (val === "Expired") {
+      return "text-red-500"; // Red for expired
+    }
+    
+    // Check if it's a countdown format (e.g., "2m 30s" or "45s")
+    const countdownMatch = val.match(/^(\d+)m\s+(\d+)s$|^(\d+)s$/);
+    
+    if (countdownMatch) {
+      let totalSeconds = 0;
+      
+      if (countdownMatch[1]) {
+        // Format: "Xm Ys"
+        totalSeconds = parseInt(countdownMatch[1]) * 60 + parseInt(countdownMatch[2]);
+      } else if (countdownMatch[3]) {
+        // Format: "Xs"
+        totalSeconds = parseInt(countdownMatch[3]);
+      }
+      
+      // Progressive color coding: Blue → Yellow → Red
+      if (totalSeconds <= 30) {
+        return "text-red-500"; // Red: 30 seconds or less
+      } else if (totalSeconds <= 60) {
+        return "text-yellow-500"; // Yellow: 31-60 seconds
+      } else {
+        return "text-blue-500"; // Blue: More than 1 minute
+      }
+    }
+    
+    // Default color for non-countdown values
+    return "text-white";
+  };
+  
+  const colorClass = label === "Quote Expires" ? getCountdownColor(value) : "text-white";
+  
   return (
     <div className="flex justify-between items-start">
       <span className="text-gray-400 text-sm">{label}</span>
-      <span className="text-white text-sm font-medium text-right max-w-[60%]">
+      <span className={`text-sm font-medium text-right max-w-[60%] ${colorClass}`}>
         {value}
       </span>
     </div>

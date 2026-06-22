@@ -45,12 +45,12 @@ const banks: Bank[] = [
 ];
 
 const amountOptions = [
-  { amount: 1000, cashback: 10 },
-  { amount: 2000, cashback: 20 },
-  { amount: 5000, cashback: 50 },
-  { amount: 10000, cashback: 100 },
-  { amount: 20000, cashback: 200 },
-  { amount: 50000, cashback: 500 },
+  { amount: 1000 },
+  { amount: 2000 },
+  { amount: 5000 },
+  { amount: 10000 },
+  { amount: 20000 },
+  { amount: 50000 },
 ];
 
 const recentRecipients: RecentBankRecipient[] = [];
@@ -77,6 +77,7 @@ export default function SendToBankPage() {
     useState<TransactionResult>(null);
   const [transactionToken, setTransactionToken] = useState("");
   const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
+  const [failureReason, setFailureReason] = useState("");
 
   // Filter recipients based on selected bank and account number
   const filteredRecipients = recentRecipients.filter((recipient) => {
@@ -163,9 +164,7 @@ export default function SendToBankPage() {
   };
 
   const getCashback = (): number => {
-    const amountNum = parseFloat(amount);
-    const option = amountOptions.find((opt) => opt.amount === amountNum);
-    return option?.cashback || 0;
+    return 0;
   };
 
   const getTransactionDate = (): string => {
@@ -213,18 +212,22 @@ export default function SendToBankPage() {
     setIsQuoting(true);
     setStep("confirmation");
 
+    console.log("======", paymentMethod)
+    const payload = {
+      scope: "EXTERNAL_BANK" as const,
+      walletId: paymentMethod.walletId!,
+      amount: parseFloat(amount),
+      fixedSide: "SOURCE" as const,
+      recipientAddress: accountNumber, // Mapping account number to recipientAddress for bank
+      // For banks, we might need bank code etc, but the prompt's quote payload 
+      // didn't specify bank details. Usually EXTERNAL_BANK quote might need them.
+      // Assuming current simple payload for now or mapping bank details if needed.
+    };
+    console.log("CLICKED PAYLOAD:", payload);
+
     try {
-      const payload = {
-        scope: "EXTERNAL_BANK" as const,
-        walletId: paymentMethod.walletId!,
-        amount: parseFloat(amount),
-        fixedSide: "SOURCE" as const,
-        recipientAddress: accountNumber, // Mapping account number to recipientAddress for bank
-        // For banks, we might need bank code etc, but the prompt's quote payload 
-        // didn't specify bank details. Usually EXTERNAL_BANK quote might need them.
-        // Assuming current simple payload for now or mapping bank details if needed.
-      };
       const response = await getTransferQuote(payload);
+      console.log("QUOTE API RESPONSE:", response);
       if (response.success) {
         setQuote(response.data);
       } else {
@@ -239,6 +242,8 @@ export default function SendToBankPage() {
     }
   };
 
+  const [transferData, setTransferData] = useState<any>(null);
+
   const handlePinComplete = async (pin: string) => {
     if (!quote) return;
 
@@ -251,15 +256,19 @@ export default function SendToBankPage() {
 
       const response = await executeTransfer(payload);
       if (response.success) {
-        setTransactionToken(response.data?.transactionReference || generateTransactionToken());
+        setTransactionToken(response.data?.reference || generateTransactionToken());
+        setTransferData(response.data);
         setTransactionResult("success");
       } else {
-        toast.error(response.description || "Transfer failed");
-        setStep("confirmation");
-        return;
+        const errorMsg = response.description || "Transfer failed";
+        toast.error(errorMsg);
+        setFailureReason(errorMsg);
+        setTransactionResult("failure");
       }
     } catch (error: any) {
-      toast.error(error.description || "Transaction failed");
+      const errorMsg = error.description || error.message || "Transaction failed";
+      toast.error(errorMsg);
+      setFailureReason(errorMsg);
       setTransactionResult("failure");
     }
     setStep("result");
@@ -273,6 +282,7 @@ export default function SendToBankPage() {
     setStep("bank");
     setTransactionResult(null);
     setTransactionToken("");
+    setTransferData(null);
     setSelectedBank(null);
     setAccountNumber("");
     setAccountName("");
@@ -305,9 +315,13 @@ export default function SendToBankPage() {
             : `Crypto (${selectedPaymentMethod.name})`
         }
         biller={selectedBank.name}
+        billerLabel="Bank Name"
         meterNumber={accountNumber}
+        meterNumberLabel="Account Number"
         customerName={accountName}
+        customerNameLabel="Account Name"
         meterType="Bank Transfer"
+        meterTypeLabel="Transfer Type"
         serviceAddress=""
         cashback={getCashback()}
         availableBalance={selectedPaymentMethod.balance || "0.00"}
@@ -332,24 +346,29 @@ export default function SendToBankPage() {
     const amountEquivalent = `≈ ₦${amountNum.toLocaleString()}.00`;
     const transactionDate = getTransactionDate();
 
-    if (transactionResult === "success") {
+    if (transactionResult === "success" && transferData) {
+      // Build details array from transfer response data
+      const details = [
+        { label: "Reference", value: transferData.reference || transactionToken },
+        { label: "Status", value: transferData.status || "PENDING" },
+        { label: "Bank", value: selectedBank.name },
+        { label: "Account Number", value: transferData.recipientAccountNumber || accountNumber },
+        { label: "Account Name", value: transferData.recipientAccountName || accountName },
+        { label: "Amount", value: `₦${(transferData.amount || amountNum).toLocaleString()}.00` },
+        { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : selectedPaymentMethod.name },
+        { label: "Transaction Date", value: transactionDate },
+      ];
+
+      if (getCashback() > 0) {
+        details.push({ label: "Bonus Earned", value: `₦${getCashback().toFixed(2)} Cashback` });
+      }
+
       return (
         <PaymentSuccess
+          title="Transfer Successful"
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          token={transactionToken}
-          biller={selectedBank.name}
-          meterNumber={accountNumber}
-          customerName={accountName}
-          meterType="Bank Transfer"
-          serviceAddress=""
-          paymentMethod={
-            selectedPaymentMethod.type === "fiat"
-              ? "Fiat"
-              : selectedPaymentMethod.name
-          }
-          bonusEarned={`₦${getCashback().toFixed(2)} Cashback`}
-          transactionDate={transactionDate}
+          details={details}
           onAddToBeneficiary={handleAddToBeneficiary}
           onContinue={handleContinueFromResult}
         />
@@ -359,11 +378,15 @@ export default function SendToBankPage() {
         <PaymentFailure
           amount={paymentAmount}
           amountEquivalent={amountEquivalent}
-          failureReason="Transaction failed"
+          failureReason={failureReason || "Transaction failed"}
           biller={selectedBank.name}
+          billerLabel="Bank Name"
           meterNumber={accountNumber}
+          meterNumberLabel="Account Number"
           customerName={accountName}
+          customerNameLabel="Account Name"
           meterType="Bank Transfer"
+          meterTypeLabel="Transfer Type"
           serviceAddress=""
           paymentMethod={
             selectedPaymentMethod.type === "fiat"
@@ -432,7 +455,7 @@ export default function SendToBankPage() {
                   ₦{option.amount.toLocaleString()}
                 </span>
                 <span className="text-gray-400 text-xs mt-1">
-                  ₦{option.cashback} Cashback
+                  ₦0 Cashback
                 </span>
               </button>
             ))}

@@ -12,6 +12,7 @@ import {
   HiOutlineArrowRightOnRectangle,
   HiChevronRight,
   HiOutlineLockClosed,
+  HiOutlineUserGroup,
 } from "react-icons/hi2";
 import { useRouter } from "next/navigation";
 import { getUserProfile } from "@/services/user";
@@ -72,6 +73,18 @@ const menuItems: MenuItem[] = [
   //   link: "/profile/settings",
   // },
   {
+    id: 2,
+    icon: HiOutlineStar,
+    label: "Referrals",
+    link: "/profile/referrals",
+  },
+  {
+    id: 3,
+    icon: HiOutlineUserGroup,
+    label: "Ambassador",
+    link: "/profile/ambassador",
+  },
+  {
     id: 9,
     icon: HiOutlineLockClosed,
     label: "Reset PIN",   // Keep user's term 'Reset' for endpoint usage, or maybe "Forgot PIN" is better? User said 'reset pin and im done'. Let's keep both or clarification?
@@ -80,10 +93,10 @@ const menuItems: MenuItem[] = [
     link: "/profile/reset-pin",
   },
   {
-    id: 10,
+    id: 11,
     icon: HiOutlineLockClosed,
-    label: "Set New PIN",
-    link: "/profile/set-pin",
+    label: "Change Password",
+    link: "/profile/change-password",
   },
   {
     id: 8,

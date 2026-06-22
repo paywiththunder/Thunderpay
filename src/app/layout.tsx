@@ -1,18 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import QueryProvider from "@/providers/QueryProvider";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { CurrencyProvider } from "@/providers/CurrencyProvider";
 
 export const metadata: Metadata = {
   title: "Thunder",
@@ -27,11 +19,13 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-black h-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black h-full`}
+        className={`${GeistSans.variable} ${GeistMono.variable} antialiased bg-black h-full`}
       >
         <QueryProvider>
-          {children}
-          <Toaster position="top-center" />
+          <CurrencyProvider>
+            {children}
+            <Toaster position="top-center" />
+          </CurrencyProvider>
         </QueryProvider>
       </body>
     </html>

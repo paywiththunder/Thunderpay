@@ -74,8 +74,20 @@ export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
     // Mutation for Wallet Creation
     const createWalletMutation = useMutation({
         mutationFn: async () => {
-            if (!selectedCurrency || !selectedNetwork) throw new Error("Invalid selection");
-            return await createWallet(selectedCurrency.currencyId, selectedNetwork.chainCode);
+            if (!selectedCurrency) throw new Error("No currency selected");
+
+            const isNgn = selectedCurrency.code.toLowerCase() === 'ngn';
+
+            const hasNetworks = selectedCurrency.networks && selectedCurrency.networks.length > 0;
+            if (hasNetworks && !selectedNetwork && !isNgn) throw new Error("No network selected");
+
+            const networkCode = isNgn ? 'ngn' : (selectedNetwork?.chainCode ?? "");
+
+            console.log("Creating wallet with payload:", {
+                currencyId: selectedCurrency.currencyId,
+                network: networkCode
+            });
+            return await createWallet(selectedCurrency.currencyId, networkCode);
         },
         onSuccess: (data) => {
             if (data.success) {
@@ -201,8 +213,13 @@ export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
 
             <button
                 onClick={handleSubmit}
-                disabled={createWalletMutation.isPending || !selectedCurrency || !selectedNetwork}
-                className="w-full py-4 rounded-full font-bold text-lg transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]"
+                disabled={
+                    createWalletMutation.isPending ||
+                    !selectedCurrency ||
+                    selectedCurrency.code.toLowerCase() === 'ngn' ||
+                    (selectedCurrency.networks && selectedCurrency.networks.length > 0 && !selectedNetwork)
+                }
+                className="mb-16 w-full py-4 rounded-full font-bold text-lg transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] hover:shadow-[0_0_20px_-5px_rgba(255,255,255,0.1)]"
             >
                 {createWalletMutation.isPending ? (
                     <div className="flex items-center justify-center gap-2">

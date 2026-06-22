@@ -23,6 +23,8 @@ export interface AirtimeQuoteResponse {
     quoteReference: string;
     deductionAmount: number;
     deductionCurrency: string;
+    boltsEarnable: number;
+    bonusAvailable: number;
     exchangeRate: number;
     transactionFee: number;
     expiresAtTimestamp: string;
@@ -46,14 +48,15 @@ export const getAirtimeQuote = async (payload: AirtimeQuotePayload) => {
         console.log("Airtime Quote Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.error("Airtime Quote Error:", error);
+        console.error("Airtime Quote Error:", error.response?.data || error.message);
         throw error.response?.data || error.message;
     }
 };
 
 export interface BillExecutionPayload {
     quoteReference: string;
-    pin: string | number;
+    pin: string;
+    applyCashback?: boolean;
 }
 
 export interface BillExecutionResponse {
@@ -61,15 +64,15 @@ export interface BillExecutionResponse {
     success: boolean;
     description: string;
     data: {
-        transactionReference: string;
-        quoteReference: string;
-        baseAmount: number;
-        baseCurrency: string;
-        debitedAmount: number;
-        debitedCurrency: string;
-        status: string;
-        createdAt: string;
-        completedAt: string;
+        transactionReference?: string;
+        quoteReference?: string;
+        baseAmount?: number;
+        baseCurrency?: string;
+        debitedAmount?: number;
+        debitedCurrency?: string;
+        status?: string;
+        createdAt?: string;
+        completedAt?: string;
         metadata?: {
             customerAddress?: string;
             unit?: string;
@@ -77,6 +80,11 @@ export interface BillExecutionResponse {
             token?: string;
             [key: string]: any;
         };
+        boltsEarnable?: number;
+        bonusAvailable?: number;
+        maxCashbackApplicable?: number;
+        amountIfFullCashbackApplied?: number;
+        [key: string]: any;
     } | null;
     errors: any;
 }
@@ -87,7 +95,6 @@ export const executeBillPayment = async (payload: BillExecutionPayload) => {
 
     const url = `${API_URL}/execute`;
     try {
-        console.log(`Executing Bill Payment to ${url} with Payload:`, JSON.stringify(payload, null, 2));
         const response = await axios.post(
             url,
             payload,
@@ -101,17 +108,7 @@ export const executeBillPayment = async (payload: BillExecutionPayload) => {
         console.log("Bill Execution Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.error("Bill Execution Error Details:", {
-            message: error.message,
-            code: error.code,
-            url: url,
-            response: error.response ? {
-                status: error.response.status,
-                data: error.response.data,
-                headers: error.response.headers
-            } : "No response received",
-            request: error.request ? "Request was sent but no response" : "Request setup failed"
-        });
+        console.error("Bill Execution Error:", error.response?.data || error.message);
         throw error.response?.data || error.message;
     }
 };
@@ -121,6 +118,7 @@ export interface DataPlan {
     name: string;
     variation_amount: string;
     fixedPrice: string;
+    cashback?: number;
 }
 
 export interface DataPlansResponse {
@@ -159,7 +157,7 @@ export const getDataQuote = async (payload: DataQuotePayload) => {
         console.log("Data Quote Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.error("Data Quote Error:", error);
+        console.error("Data Quote Error:", error.response?.data || error.message);
         throw error.response?.data || error.message;
     }
 };
@@ -180,7 +178,7 @@ export const getDataPlans = async (provider: string) => {
         console.log("Data Plans Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.error("Fetch Data Plans Error:", error);
+        console.error("Fetch Data Plans Error:", error.response?.data || error.message);
         throw error.response?.data || error.message;
     }
 };
@@ -201,7 +199,7 @@ export const getTvPlans = async (provider: string) => {
         console.log("TV Plans Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.error("Fetch TV Plans Error:", error);
+        console.error("Fetch TV Plans Error:", error.response?.data || error.message);
         throw error.response?.data || error.message;
     }
 };
@@ -238,7 +236,7 @@ export const getTvQuote = async (payload: TvQuotePayload) => {
         console.log("TV Quote Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.error("TV Quote Error:", error);
+        console.error("TV Quote Error:", error.response?.data || error.message);
         throw error.response?.data || error.message;
     }
 };
@@ -281,7 +279,7 @@ export const getElectricityQuote = async (payload: ElectricityQuotePayload) => {
         console.log("Electricity Quote Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.error("Electricity Quote Error:", error);
+        console.error("Electricity Quote Error:", error.response?.data || error.message);
         throw error.response?.data || error.message;
     }
 };
@@ -324,7 +322,7 @@ export const verifyElectricity = async (payload: ElectricityVerificationPayload)
         console.log("Electricity Verify Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.error("Electricity Verify Error:", error);
+        console.error("Electricity Verify Error:", error.response?.data || error.message);
         throw error.response?.data || error.message;
     }
 };
@@ -366,7 +364,7 @@ export const verifyTv = async (payload: TvVerificationPayload) => {
         console.log("TV Verify Response:", response.data);
         return response.data;
     } catch (error: any) {
-        console.error("TV Verify Error:", error);
+        console.error("TV Verify Error:", error.response?.data || error.message);
         throw error.response?.data || error.message;
     }
 };

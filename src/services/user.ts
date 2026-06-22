@@ -2,8 +2,10 @@ import axios from "axios";
 import { API_BASE_URL } from "@/config";
 
 const API_URL = `${API_BASE_URL}/users`;
+const API_URL2 = `${API_BASE_URL}`;
 
-const getAuthToken = () => {
+
+export const getAuthToken = () => {
     if (typeof window !== "undefined") {
         return localStorage.getItem("authToken");
     }
@@ -38,11 +40,11 @@ export const resetPin = async (pin: string) => {
     if (!token) throw new Error("No auth token found");
 
     try {
+        const body = pin === "" ? {} : { pin };
+
         const response = await axios.post(
             `${API_URL}/reset-pin`,
-            {
-                pin,
-            },
+            body,
             {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -50,7 +52,7 @@ export const resetPin = async (pin: string) => {
                 },
             }
         );
-        console.log(response.data);
+        console.log('Reset PIN response:', response.data);
         return response.data;
     } catch (error: any) {
         throw error.response?.data || error.message;
@@ -74,6 +76,7 @@ export const verifyResetPin = async (code: string) => {
                 },
             }
         );
+        console.log('Verify Reset PIN response:', response.data);
         return response.data;
     } catch (error: any) {
         throw error.response?.data || error.message;
@@ -96,7 +99,13 @@ export const getUserProfile = async () => {
     }
 };
 
-export const getRecentTransactions = async () => {
+export interface GetRecentTransactionsParams {
+    walletType?: "FIAT" | "fiat" | "CRYPTO" | "crypto";
+    page?: string | number;
+    size?: string | number;
+}
+
+export const getRecentTransactions = async (params?: GetRecentTransactionsParams) => {
     const token = getAuthToken();
     if (!token) throw new Error("No auth token found");
 
@@ -105,9 +114,40 @@ export const getRecentTransactions = async () => {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
+            params: params,
         });
+        console.log(response.data)
         return response.data;
     } catch (error: any) {
         throw error.response?.data || error.message;
+    }
+};
+
+// --------------------------------------------------------------------
+// referrals
+// --------------------------------------------------------------------
+
+export interface Referral {
+    referredUserId: number;
+    name: string | null;
+    email: string | null;
+    qualified: boolean;
+    totalSpendUsd: number;
+    totalSpendNgn: number;
+    referredAt: string;
+    qualifiedAt: string | null;
+}
+
+export const getReferrals = async (): Promise<any> => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const res = await axios.get(`${API_URL2}/referrals`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return res.data as Referral[];
+    } catch (err: any) {
+        throw err.response?.data || err.message;
     }
 };

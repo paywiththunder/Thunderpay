@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import {
     HiOutlineEye,
+    HiOutlineEyeSlash,
     HiOutlineArrowUpRight,
     HiOutlineArrowDownLeft,
     HiOutlineArrowPath,
@@ -28,7 +29,7 @@ import { SiTether, SiSolana } from "react-icons/si";
 import AppHeader from "./AppHeader";
 import Right from '../../../public/right.png'
 import Left from '../../../public/left.png'
-import { getWalletsUsd } from "@/services/wallet";
+import { getWallets, getWalletsUsd } from "@/services/wallet";
 
 // Helper to match icons (reused logic from ReceivePage)
 const getAssetConfig = (symbol: string) => {
@@ -50,20 +51,39 @@ const getAssetConfig = (symbol: string) => {
 interface Transaction {
     id: number;
     source: string;
+    direction?: "CREDIT" | "DEBIT" | string;
     amount: number;
     fee: number;
     status: string;
     reference: string;
-    walletId: number;
+    walletId: number | null;
     fromAddress: string | null;
     toAddress: string | null;
     createdAt: string;
+    details?: {
+        transactionType?: string;
+        productName?: string;
+        phone?: string;
+        price?: string;
+        requestId?: string;
+        transactionId?: string;
+        quoteBill?: string;
+        serviceIdentifier?: string;
+        purchaseValueNgn?: number;
+        quoteProviderParams?: {
+            variation_code?: string;
+            [key: string]: any;
+        };
+        [key: string]: any;
+    };
 }
 
 import { useQuery } from "@tanstack/react-query";
+import { useBalanceVisibility } from "@/hooks/useBalanceVisibility";
 
 export default function CryptoPage() {
     const router = useRouter();
+    const { showBalance, toggleBalance } = useBalanceVisibility();
     const [isAddWalletOpen, setIsAddWalletOpen] = useState(false);
 
     // Lock body scroll when modal is open
@@ -78,14 +98,14 @@ export default function CryptoPage() {
         };
     }, [isAddWalletOpen]);
 
-    // Query for Wallets
+    // Query for Wallets with NGN equivalent
     const {
         data: walletsResponse,
         isLoading: walletsLoading,
         refetch: refetchWallets
     } = useQuery({
-        queryKey: ['walletsUsd'],
-        queryFn: getWalletsUsd,
+        queryKey: ['walletsNgn', 'crypto'],
+        queryFn: () => getWalletsUsd('crypto'),
     });
 
     // Query for Recent Transactions
@@ -93,15 +113,15 @@ export default function CryptoPage() {
         data: transactionsResponse,
         isLoading: transactionsLoading
     } = useQuery({
-        queryKey: ['recentTransactions'],
-        queryFn: getRecentTransactions,
+        queryKey: ['recentTransactions', 'CRYPTO'],
+        queryFn: () => getRecentTransactions({ walletType: 'CRYPTO', page: '1', size: '10' }),
     });
 
     const loading = walletsLoading || transactionsLoading;
 
     // Derived states
     const wallets = walletsResponse?.success && walletsResponse?.data?.wallets ? walletsResponse.data.wallets : [];
-    const totalAssets = walletsResponse?.success && walletsResponse?.data?.totalAssetsUsd ? walletsResponse.data.totalAssetsUsd : 0;
+    const totalAssets = walletsResponse?.success && walletsResponse?.data?.totalAssetsNGN ? walletsResponse.data.totalAssetsNGN : 0;
     const transactions = transactionsResponse?.success ? transactionsResponse.data.items : [];
 
     const fetchWallets = () => {
@@ -155,34 +175,36 @@ export default function CryptoPage() {
             <div className="flex flex-col items-center justify-center py-4">
                 <div className="flex items-center gap-2 text-gray-300 text-sm mb-2">
                     <span>Total assets</span>
-                    <HiOutlineEye className="text-gray-400" />
+                    <button onClick={toggleBalance} className="focus:outline-none transition-transform active:scale-90">
+                        {showBalance ? <HiOutlineEye className="text-gray-400 w-5 h-5" /> : <HiOutlineEyeSlash className="text-gray-400 w-5 h-5" />}
+                    </button>
                 </div>
                 <h2 className="text-4xl font-bold mb-1">
-                    {totalAssets.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                    {showBalance ? `₦${totalAssets.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "****"}
                 </h2>
                 <div className="flex items-center gap-2 text-sm">
                     {/* Change placeholder - unavailable in API currently */}
-                    <span className="text-green-500 font-medium">+$0.00 +0.00</span>
+                    <span className="text-green-500 font-medium">{showBalance ? "+₦0.00 +0.00%" : "****"}</span>
                 </div>
             </div>
 
             {/* Action Buttons Grid */}
             <div className="grid grid-cols-4 gap-3">
                 <ActionButton icon={GiPayMoney} label="Pay Bills" href="/crypto/pay-bills" />
-                <ActionButton icon={GiBanknote} label="Send" href="/crypto/send" />
                 <ActionButton icon={GiReceiveMoney} label="Receive" href="/crypto/receive" />
-                <ActionButton icon={MdCurrencyExchange} label="Convert" href="/crypto/convert" />
+                <ActionButton icon={GiBanknote} label="Send" href="/crypto/send" disabled />
+                <ActionButton icon={MdCurrencyExchange} label="Convert" href="/crypto/convert" disabled />
             </div>
 
             {/* Banner */}
             <div className="w-full h-24 rounded-xl overflow-hidden relative bg-gradient-to-r from-blue-500 to-purple-600 flex items-center px-4">
-                <Image src={Right} width={170} height={170} alt="Banner Pattern" className="absolute top-0 left-0 object-cover" />
+                <Image src={Right} width={170} height={170} alt="Banner Pattern" className="absolute top-0 left-0 object-cover" style={{ height: 'auto' }} priority loading="eager" />
                 {/* Decorative elements - simple simulated banner */}
                 <div className="flex-1 z-10">
                     <p className="font-bold text-lg leading-tight">Pay Smarter. Pay in Crypto.</p>
                     <p className="text-xs text-blue-100">No Banks. No Hassle. Just Crypto.</p>
                 </div>
-                <Image src={Left} width={170} height={170} alt="Banner Pattern" className="absolute top-0 right-0 object-cover" />
+                <Image src={Left} width={170} height={170} alt="Banner Pattern" className="absolute top-0 right-0 object-cover" style={{ height: 'auto' }} />
             </div>
 
             {/* Tokens Section */}
@@ -214,7 +236,7 @@ export default function CryptoPage() {
                             </Link>
                         </div>
                     ) : (
-                        wallets.map((wallet: any, index: number) => {
+                        wallets.filter((wallet: any) => wallet.walletType !== "FIAT").map((wallet: any, index: number) => {
                             const currency = wallet.currency;
                             const symbol = currency?.code || currency?.ticker || "UNKNOWN";
                             const config = getAssetConfig(symbol);
@@ -224,13 +246,8 @@ export default function CryptoPage() {
                             const rawBalance = wallet.availableBalance ?? wallet.totalBalance ?? 0;
                             const balance = Number(rawBalance).toLocaleString('en-US', { maximumFractionDigits: 8 });
 
-                            // Format USD equivalent
-                            const usdValue = wallet.usdEquivalent
-                                ? Number(wallet.usdEquivalent).toLocaleString('en-US', {
-                                    style: 'currency',
-                                    currency: 'USD'
-                                })
-                                : "$0.00";
+                            // Format NGN equivalent from API
+                            const ngnValue = wallet.ngnEquivalent ? `₦${Number(wallet.ngnEquivalent).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "₦0.00";
 
                             return (
                                 <TokenItem
@@ -239,8 +256,8 @@ export default function CryptoPage() {
                                     icon={<div className={`w-8 h-8 rounded-full ${config.bg} flex items-center justify-center`}>{config.icon}</div>}
                                     name={currency?.name || config.name}
                                     symbol={symbol}
-                                    amount={`${balance} ${symbol}`}
-                                    value={usdValue}
+                                    amount={showBalance ? `${balance} ${symbol}` : "****"}
+                                    value={showBalance ? ngnValue : "****"}
                                 />
                             );
                         })
@@ -260,17 +277,19 @@ export default function CryptoPage() {
                 {transactions.length === 0 ? (
                     <div className="flex flex-col items-center justify-center">
                         {/* Placeholder illustration for wallet */}
-                        <Image src={NoTransaction} className="mb-3" alt="No Transaction" width={200} height={200} />
+                        <Image src={NoTransaction} className="mb-3" alt="No Transaction" width={200} height={200} style={{ height: 'auto' }} />
                         <p className="text-gray-500 font-[600] text-[2rem] -mt-18 mb-16">No Transaction Yet</p>
                     </div>
                 ) : (
                     <div className="flex flex-col gap-3">
                         {transactions.map((tx: Transaction) => {
                             const Icon = getIcon(tx.source);
-                            const isNegative = ["send", "withdrawal", "bill", "electricity", "card"].includes(tx.source.toLowerCase());
+                            const isNegative = tx.direction?.toUpperCase() === "DEBIT" || ["send", "withdrawal", "bill", "bill_payment", "electricity", "card"].includes(tx.source.toLowerCase());
+                            // Debug: Check what's in the transaction
+                            console.log('CryptoPage Transaction:', tx.source, 'Details:', tx.details, 'TransactionType:', tx.details?.transactionType);
                             return (
                                 <div
-                                    key={tx.id}
+                                    key={tx.reference}
                                     className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-xl p-4 flex items-center justify-between active:bg-white/5 transition-colors cursor-pointer"
                                     onClick={() => router.push(`/crypto/activity/${tx.reference}`)}
                                 >
@@ -279,7 +298,9 @@ export default function CryptoPage() {
                                             <Icon className="w-5 h-5 text-gray-400" />
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-white font-medium capitalize">{tx.source}</span>
+                                            <span className="text-white font-medium capitalize">
+                                                {tx.details?.transactionType || tx.source}
+                                            </span>
                                             <span className="text-gray-500 text-xs truncate max-w-[150px]">
                                                 {tx.status} • {format(parseISO(tx.createdAt), "MMM dd, HH:mm")}
                                             </span>
@@ -304,7 +325,7 @@ export default function CryptoPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-[#111] w-full max-w-md rounded-3xl border border-white/10 relative shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden">
                         {/* Fixed Header with Close Button */}
-                        <div className="p-8 pb-0 relative">
+                        <div className="p-8 relative">
                             <button
                                 onClick={() => setIsAddWalletOpen(false)}
                                 className="absolute top-8 right-8 text-gray-400 hover:text-white transition-all hover:rotate-90 p-1.5 rounded-full hover:bg-white/10 border border-transparent hover:border-white/10 z-20"
@@ -333,11 +354,25 @@ function ActionButton({
     icon: Icon,
     label,
     href,
+    disabled = false,
 }: {
     icon: React.ElementType;
     label: string;
     href: string;
+    disabled?: boolean;
 }) {
+    if (disabled) {
+        return (
+            <div
+                className="flex flex-col items-center justify-center gap-2 bg-app-card py-4 rounded-2xl border border-white/5 bg-gradient-to-b from-[#1A1A1A] to-[#0F0F0F] opacity-50 cursor-not-allowed"
+                aria-disabled="true"
+            >
+                <Icon className="w-6 h-6 text-gray-500" />
+                <span className="text-[10px] text-gray-500 font-medium">{label}</span>
+            </div>
+        );
+    }
+
     return (
         <Link
             href={href}

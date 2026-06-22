@@ -3,7 +3,15 @@ import React from "react";
 import Link from "next/link";
 import {
   HiOutlineEye,
+  HiOutlineEyeSlash,
   HiOutlineDocumentDuplicate,
+  HiMiniBolt,
+  HiOutlineArrowUpRight,
+  HiOutlineArrowDownLeft,
+  HiOutlineArrowPath,
+  HiOutlineLightBulb,
+  HiOutlineCreditCard,
+  HiOutlineInbox,
 } from "react-icons/hi2";
 import {
   GiReceiveMoney,
@@ -11,54 +19,256 @@ import {
   GiBanknote,
   GiWallet,
 } from "react-icons/gi";
-import Wlcomemessages from "./Wlcomemessages";
 import Image from "next/image";
 import NoTransaction from "../../../public/walletimg.png";
 import AppHeader from "./AppHeader";
+import { getCashbackBalance } from "@/services/cashback";
+import { getWallets } from "@/services/wallet";
+import { getRecentTransactions } from "@/services/user";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "react-hot-toast";
+import { useBalanceVisibility } from "@/hooks/useBalanceVisibility";
+import { useCurrency } from "@/providers/CurrencyProvider";
+import { useRouter, usePathname } from "next/navigation";
+import { format, parseISO } from "date-fns";
+
+// Transaction Interface
+interface Transaction {
+  id: number;
+  source: string;
+  direction?: "CREDIT" | "DEBIT" | string;
+  amount: number;
+  fee: number | null;
+  status: string;
+  reference: string;
+  walletId: number | null;
+  fromAddress: string | null;
+  toAddress: string | null;
+  createdAt: string | null;
+  details?: {
+    transactionType?: string;
+    productName?: string;
+    phone?: string;
+    price?: string;
+    requestId?: string;
+    transactionId?: string;
+    quoteBill?: string;
+    serviceIdentifier?: string;
+    purchaseValueNgn?: number;
+    quoteProviderParams?: {
+      variation_code?: string;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  };
+}
 
 export default function HomePage() {
-  const isComingSoon = true; // Simple toggle for later use
+  const router = useRouter();
+  const pathname = usePathname();
+  const { showBalance, toggleBalance } = useBalanceVisibility();
+  const { ngnCurrencyId, isLoading: currencyLoading } = useCurrency();
+  const isComingSoon = false; // Simple toggle for later use
+
+  // Determine wallet type based on current page (default to CRYPTO for HomePage)
+  const walletType = pathname?.includes('cash') ? 'FIAT' : 'CRYPTO';
+  console.log('Current pathname:', pathname);
+  console.log('Wallet type:', walletType);
+
+  // Fetch Bolts Balance
+  const { data: cashbackResponse } = useQuery({
+    queryKey: ['cashbackBalance', ngnCurrencyId],
+    queryFn: () => getCashbackBalance(ngnCurrencyId!),
+    enabled: ngnCurrencyId !== null && !currencyLoading,
+  });
+  const boltsBalance = cashbackResponse?.success ? cashbackResponse.data.availableBolts : null;
+
+  // Fetch Fiat Wallet
+  const { data: walletsResponse } = useQuery({
+    queryKey: ['wallets'],
+    queryFn: getWallets,
+  });
+  console.log('Wallet response', walletsResponse)
+  const fiatWallet = walletsResponse?.success && walletsResponse?.data
+    ? walletsResponse.data.find((w: any) => w.walletType === "FIAT")
+    : null;
+
+  // Fetch Recent Transactions
+  const { data: transactionsResponse, isLoading: transactionsLoading } = useQuery({
+    queryKey: ['recentTransactions', walletType],
+    queryFn: () => getRecentTransactions({ walletType, page: '1', size: '10' }),
+  });
+
+  console.log('Transactions response:', transactionsResponse);
+
+  const transactions = transactionsResponse?.success ? transactionsResponse.data.items : [];
+
+  const getTransactionDate = (createdAt: string | null) => {
+    if (!createdAt) return null;
+
+    const date = parseISO(createdAt);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const getTransactionLabel = (tx: Transaction) => {
+    if (tx.details?.transactionType) return tx.details.transactionType;
+
+    return tx.source
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  };
+
+  const getIcon = (source: string, direction?: string) => {
+    switch (source.toLowerCase()) {
+      case "send":
+      case "withdrawal":
+      case "transfer":
+        return direction?.toUpperCase() === "CREDIT"
+          ? HiOutlineArrowDownLeft
+          : HiOutlineArrowUpRight;
+      case "receive":
+      case "deposit":
+        return HiOutlineArrowDownLeft;
+      case "swap":
+      case "convert":
+        return HiOutlineArrowPath;
+      case "bill":
+      case "bill_payment":
+      case "electricity":
+        return HiOutlineLightBulb;
+      case "card":
+        return HiOutlineCreditCard;
+      default:
+        return HiOutlineInbox;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "completed":
+      case "success":
+      case "posted":
+        return "text-green-500";
+      case "pending":
+      case "processing":
+        return "text-yellow-500";
+      case "failed":
+      case "cancelled":
+      case "reversed":
+        return "text-red-500";
+      default:
+        return "text-gray-400";
+    }
+  };
 
   return (
-    <div className="flex flex-col gap-3 w-full">
+    <div className="flex flex-col gap-3 w-full pb-20">
       <AppHeader />
 
       <div className="relative">
         {/* Content with optional blur */}
         <div className={`flex flex-col gap-3 transition-all duration-500 ${isComingSoon ? "blur-[2px] pointer-events-none opacity-60" : ""}`}>
           {/* Total Assets Card */}
-          <div className="assets p-4 rounded-2xl flex flex-col gap-3 relative overflow-hidden">
-            {/* Background swirls decorative elements */}
-            <div>
-              <div className="flex items-center gap-2 text-blue-100 text-sm">
-                <span>Total assets</span>
-                <HiOutlineEye />
+          <div className="assets p-4 rounded-2xl flex flex-col gap-3 relative overflow-hidden group">
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="flex items-center gap-2 text-blue-100 text-sm">
+                  <span>Total assets</span>
+                  <button onClick={toggleBalance} className="focus:outline-none transition-transform active:scale-90">
+                    {showBalance ? <HiOutlineEye className="w-5 h-5" /> : <HiOutlineEyeSlash className="w-5 h-5" />}
+                  </button>
+                </div>
+                <h2 className="text-3xl font-bold mt-1">
+                  {showBalance ? `₦${fiatWallet ? Number(fiatWallet.availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}` : "****"}
+                </h2>
               </div>
-              <h2 className="text-3xl font-bold mt-1">₦0.00</h2>
+
+              {/* Bolts Badge */}
+              <Link href="/rewards" className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 hover:bg-white/20 transition-all active:scale-95 shadow-lg group">
+                <HiMiniBolt className="text-yellow-400 w-4 h-4 group-hover:animate-bounce" />
+                <span className="text-white text-xs font-bold">{boltsBalance !== null ? boltsBalance : "..."} Bolts</span>
+              </Link>
             </div>
-            <div className="flex items-center gap-2 text-sm text-blue-100 bg-white/10 w-fit px-3 py-1 rounded-full">
-              <span>Account Number: 9068233532</span>
-              <HiOutlineDocumentDuplicate className="cursor-pointer" />
+
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 text-sm text-blue-100 bg-white/10 w-fit px-3 py-1 rounded-full">
+                <span>Account Number: {fiatWallet?.accountNumbers?.[0]?.accountNumber || '...'}</span>
+                <HiOutlineDocumentDuplicate className="cursor-pointer" onClick={() => {
+                  if (fiatWallet?.accountNumbers?.[0]?.accountNumber) {
+                    navigator.clipboard.writeText(fiatWallet.accountNumbers[0].accountNumber);
+                    toast.success("Account number copied!");
+                  }
+                }} />
+              </div>
+              {fiatWallet?.accountNumbers?.[0]?.bankName && (
+                <span className="text-xs text-blue-200 ml-2 font-medium">{fiatWallet.accountNumbers[0].bankName}</span>
+              )}
             </div>
+
+            {/* Background Decoration */}
+            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
           </div>
 
           {/* Action Buttons Grid */}
           <div className="grid grid-cols-4 gap-4">
-            <ActionButton icon={GiPayMoney} label="Pay Bills" href="/pay-bills" />
-            <ActionButton icon={GiBanknote} label="Send" href="/send" />
-            <ActionButton icon={GiReceiveMoney} label="Receive" href="/receive" />
-            <ActionButton icon={GiWallet} label="Convert" href="/convert" />
+            <ActionButton icon={GiPayMoney} label="Pay Bills" href="cash/pay-bills" />
+            <ActionButton icon={GiBanknote} label="Send" href="cash/send" />
+            <ActionButton icon={GiReceiveMoney} label="Receive" href="cash/receive" />
+            <ActionButton icon={GiWallet} label="Convert" href="cash/convert" />
           </div>
 
-          <Wlcomemessages />
+          {/* <Wlcomemessages /> */}
 
           {/* Recent Transactions */}
           <div>
             <h3 className="font-semibold mb-4">Recent transactions</h3>
-            <div className="flex flex-col items-center justify-center">
-              <Image src={NoTransaction} className="mb-3" alt="No Transaction" width={200} height={200} />
-              <p className="text-gray-500 font-[600] text-[2rem] -mt-18 mb-16">No Transaction Yet</p>
-            </div>
+            {transactionsLoading ? (
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+              </div>
+            ) : transactions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center">
+                <Image src={NoTransaction} className="mb-3" alt="No Transaction" width={200} height={200} />
+                <p className="text-gray-500 font-[600] text-[2rem] -mt-18 mb-16">No Transaction Yet</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {transactions.map((tx: Transaction) => {
+                  const Icon = getIcon(tx.source, tx.direction);
+                  const isNegative = tx.direction?.toUpperCase() === "DEBIT" || ["send", "withdrawal", "bill", "bill_payment", "electricity", "card"].includes(tx.source.toLowerCase());
+                  const transactionDate = getTransactionDate(tx.createdAt);
+                  return (
+                    <div
+                      key={tx.reference}
+                      className="bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)] rounded-xl p-4 flex items-center justify-between active:bg-white/5 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/crypto/activity/${tx.reference}`)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl border border-white/20 flex items-center justify-center">
+                          <Icon className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-white font-medium capitalize">
+                            {getTransactionLabel(tx)}
+                          </span>
+                          <span className="text-gray-500 text-xs truncate max-w-[150px]">
+                            {tx.status} • {transactionDate ? format(transactionDate, "MMM dd, HH:mm") : "No date"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className={`font-medium ${isNegative ? "text-red-500" : "text-green-500"}`}>
+                          {isNegative ? "-" : "+"}₦{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className={`text-[10px] uppercase font-bold ${getStatusColor(tx.status)}`}>
+                          {tx.status}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 

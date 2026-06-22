@@ -24,10 +24,10 @@ const networks = [
 ];
 
 const amountOptions = [
-    { amount: 1000, cashback: 10 },
-    { amount: 5000, cashback: 50 },
-    { amount: 10000, cashback: 100 },
-    { amount: 50000, cashback: 500 },
+    { amount: 1000 },
+    { amount: 5000 },
+    { amount: 10000 },
+    { amount: 50000 },
 ];
 
 export default function SendToWalletPage() {
@@ -52,9 +52,7 @@ export default function SendToWalletPage() {
     };
 
     const getCashback = (): number => {
-        const amountNum = parseFloat(amount);
-        const option = amountOptions.find((opt) => opt.amount === amountNum);
-        return option?.cashback || 0;
+        return 0;
     };
 
     const getTransactionDate = (): string => {
@@ -246,7 +244,7 @@ export default function SendToWalletPage() {
                                 className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-gray-800/50 transition-colors ${amount === option.amount.toString() ? "ring-2 ring-blue-500" : ""}`}
                             >
                                 <span className="text-white font-bold">₦{option.amount.toLocaleString()}</span>
-                                <span className="text-gray-400 text-xs">₦{option.cashback} Cashback</span>
+                                <span className="text-gray-400 text-xs">₦0 Cashback</span>
                             </button>
                         ))}
                     </div>

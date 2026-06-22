@@ -25,12 +25,12 @@ interface RecentRecipient {
 const recentRecipients: RecentRecipient[] = [];
 
 const amountOptions = [
-  { amount: 1000, cashback: 10 },
-  { amount: 2000, cashback: 20 },
-  { amount: 3000, cashback: 30 },
-  { amount: 5000, cashback: 50 },
-  { amount: 10000, cashback: 100 },
-  { amount: 20000, cashback: 200 },
+  { amount: 1000 },
+  { amount: 2000 },
+  { amount: 3000 },
+  { amount: 5000 },
+  { amount: 10000 },
+  { amount: 20000 },
 ];
 
 type Step = "account" | "amount" | "payment" | "confirmation" | "enterPin" | "result";
@@ -163,9 +163,7 @@ export default function SendToThunderPage() {
   };
 
   const getCashback = (): number => {
-    const amountNum = parseFloat(amount);
-    const option = amountOptions.find((opt) => opt.amount === amountNum);
-    return option?.cashback || 0;
+    return 0;
   };
 
   const generateTransactionToken = (): string => {
@@ -368,7 +366,7 @@ export default function SendToThunderPage() {
                   ₦{option.amount.toLocaleString()}
                 </span>
                 <span className="text-gray-400 text-xs mt-1">
-                  ₦{option.cashback} Cashback
+                  ₦0 Cashback
                 </span>
               </button>
             ))}

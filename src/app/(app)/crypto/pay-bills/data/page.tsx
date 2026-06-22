@@ -170,7 +170,7 @@ export default function DataPage() {
     onSuccess: (response) => {
       const res = response as BillExecutionResponse;
       if (res.success && res.data) {
-        setTransactionToken(res.data.transactionReference);
+        setTransactionToken(res.data?.transactionReference || res.data?.quoteReference || "");
         setTransactionDetails(res.data);
         setTransactionResult("success");
         setStep("result");
@@ -403,7 +403,7 @@ export default function DataPage() {
 
     const payload: BillExecutionPayload = {
       quoteReference: quoteReference,
-      pin: parseInt(pin, 10) // or string if your API expects string, interface says string | number
+      pin: pin
     };
 
     paymentMutation.mutate(payload);
@@ -468,7 +468,7 @@ export default function DataPage() {
           { label: "Duration", value: selectedPlan.duration },
           { label: "Amount", value: `₦${selectedPlan.price.toLocaleString()}.00` },
           { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-          { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+          { label: "Bolts to Earn", value: `${getCashback().toFixed(2)} Bolts` },
         ]}
         availableBalance={getAvailableBalance()}
       />
@@ -504,7 +504,7 @@ export default function DataPage() {
       const successDetails = [
         ...commonDetails,
         { label: "Transaction Reference", value: transactionToken },
-        { label: "Bonus Earned", value: `₦${getCashback().toFixed(2)} Cashback` },
+        { label: "Bolts Earned", value: `${getCashback().toFixed(2)} Bolts` },
         { label: "Transaction Date", value: getTransactionDate() },
       ];
 

@@ -1,5 +1,4 @@
 "use client";
-import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,18 +7,36 @@ import {
     HiOutlineBell,
 } from "react-icons/hi2";
 
+import { getUserProfile } from "@/services/user";
+import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+
 export default function AppHeader() {
-    const [firstName, setFirstName] = useState("");
     const pathname = usePathname();
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        const savedName = localStorage.getItem("firstName");
-        if (savedName) {
-            setFirstName(savedName);
-        }
+        setMounted(true);
     }, []);
 
-    const isActive = (path: string) => pathname === path;
+    const { data: userProfile } = useQuery({
+        queryKey: ['userProfile'],
+        queryFn: getUserProfile,
+        staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    });
+
+    const fName = userProfile?.success && userProfile?.data ? userProfile.data.firstName || "" : "";
+    const lName = userProfile?.success && userProfile?.data ? userProfile.data.lastName || "" : "";
+
+    let displayName = "";
+    if (fName) {
+        displayName = fName;
+        if (lName) {
+            displayName += ` ${lName.charAt(0).toUpperCase()}.`;
+        }
+    }
+
+    const isActive = (path: string) => mounted && pathname === path;
 
     return (
         <div className="flex flex-col gap-5 w-full">
@@ -30,7 +47,9 @@ export default function AppHeader() {
                         {/* Placeholder for avatar */}
                         <div className="w-full h-full bg-gradient-to-br from-gray-400 to-gray-600"></div>
                     </div>
-                    <h1 className="font-semibold text-lg">Hi {firstName}</h1>
+                    <h1 className="font-semibold text-lg">
+                        Hi {displayName ? displayName : "User"}
+                    </h1>
                 </div>
                 <div className="flex gap-4 text-white">
                     <HiOutlineQrCode className="w-6 h-6" />
@@ -50,9 +69,9 @@ export default function AppHeader() {
                 >
                     Crypto
                 </Link>
-                <Link
-                    href="/home"
-                    className={`${isActive("/home")
+                {/* <Link
+                    href="/cash"
+                    className={`${isActive("/cash")
                         ? "text-white border-b-2 border-[#3B82F6] pb-1"
                         : "text-gray-400 hover:text-white transition-colors"
                         }`}
@@ -67,7 +86,7 @@ export default function AppHeader() {
                         }`}
                 >
                     International
-                </Link>
+                </Link> */}
             </div>
         </div>
     );

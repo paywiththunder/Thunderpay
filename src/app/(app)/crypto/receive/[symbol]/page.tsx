@@ -10,7 +10,7 @@ import { getWallets } from "@/services/wallet";
 export default function ReceiveAssetPage({ params }: { params: Promise<{ symbol: string }> }) {
     const router = useRouter();
     const { symbol } = React.use(params);
-    const [copied, setCopied] = useState(false);
+    const [copied, setCopied] = useState<string | null>(null);
     const [wallet, setWallet] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -43,30 +43,37 @@ export default function ReceiveAssetPage({ params }: { params: Promise<{ symbol:
     }, [symbol]);
 
     const displaySymbol = symbol.toUpperCase();
-    // API returns addresses array. We take the first active one or just the first one.
-    // The sample JSON showed "address": null, so we must handle that case gracefully.
-    const activeAddress = wallet?.addresses?.find((a: any) => a.isActive)?.address || wallet?.addresses?.[0]?.address;
-    const address = activeAddress || "Address not generated";
+    // Get all active addresses
+    const allAddresses = wallet?.addresses?.filter((a: any) => a.isActive && a.address) || [];
+    // If no addresses at all, show empty state
+    const hasAddresses = allAddresses.length > 0;
+    
     // Check if the API provides a QR Code URL, otherwise fallback to the static one
     // Note: If the backend doesn't provide a specific QR code, this static one is used as a placeholder.
     // Ideally, we should use a QR code library to generate it from the address.
     const qrCodeSrc = wallet?.qrCodeUrl || QrCodeImg;
 
-    const handleCopy = () => {
-        if (address && address !== "Address not available") {
-            navigator.clipboard.writeText(address);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+    const handleCopy = (addressToCopy: string, addressId: string) => {
+        if (addressToCopy && addressToCopy !== "Address not available") {
+            navigator.clipboard.writeText(addressToCopy);
+            setCopied(addressId);
+            setTimeout(() => setCopied(null), 2000);
         }
     };
 
-    const handleShare = () => {
-        if (navigator.share && address && address !== "Address not available") {
+    const handleShare = (addressToShare: string) => {
+        if (navigator.share && addressToShare && addressToShare !== "Address not available") {
             navigator.share({
                 title: `Receive ${displaySymbol}`,
-                text: `My ${displaySymbol} address: ${address}`,
+                text: `My ${displaySymbol} address: ${addressToShare}`,
             });
         }
+    };
+
+    const formatAddress = (addr: string) => {
+        if (!addr) return "Not available";
+        if (addr.length <= 20) return addr;
+        return `${addr.slice(0, 10)}...${addr.slice(-10)}`;
     };
 
     if (loading) {
@@ -115,44 +122,61 @@ export default function ReceiveAssetPage({ params }: { params: Promise<{ symbol:
 
             <div className="flex flex-col items-center px-6 gap-8">
                 {/* QR Code Container */}
-                <div className="bg-white p-4 rounded-3xl">
+                <div className="bg-white p-4 rounded-3xl flex items-center justify-center w-48 h-48">
                     <Image
                         src={qrCodeSrc}
                         alt={`${displaySymbol} QR Code`}
                         width={200}
                         height={200}
-                        className="w-48 h-48"
+                        className="w-48 h-48 hidden"
                     />
+                    <span className="text-black text-lg font-semibold">QR Code</span>
                 </div>
 
-                {/* Address Container */}
-                <div className="w-full flex flex-col gap-2">
-                    <span className="text-gray-400 text-sm text-center">Wallet Address ({displaySymbol})</span>
-                    <div className="bg-[#1C1C1E] border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-3">
-                        <span className="text-white font-mono text-sm break-all">{address}</span>
-                        <button
-                            onClick={handleCopy}
-                            className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors flex-shrink-0"
-                            disabled={address === "Address not available"}
-                        >
-                            <IoCopyOutline className="text-white w-5 h-5" />
-                        </button>
+                {/* Addresses List */}
+                {hasAddresses ? (
+                    <div className="w-full flex flex-col gap-4">
+                        {allAddresses.map((addr: any, idx: number) => (
+                            <div key={idx} className="w-full flex flex-col gap-2">
+                                <span className="text-gray-400 text-sm">{addr.network || "Network"}</span>
+                                <div className="bg-[#1C1C1E] border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-3">
+                                    <span className="text-white font-mono text-sm break-all flex-1">{addr.address}</span>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleCopy(addr.address, `addr-${idx}`)}
+                                            className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors flex-shrink-0"
+                                        >
+                                            <IoCopyOutline className="text-white w-5 h-5" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleShare(addr.address)}
+                                            className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors flex-shrink-0"
+                                            disabled={!addr.address || addr.address === "Address not available"}
+                                        >
+                                            <IoShareOutline className="text-white w-5 h-5" />
+                                        </button>
+                                    </div>
+                                </div>
+                                {copied === `addr-${idx}` && <p className="text-green-500 text-xs text-center animate-fade-in">Address copied!</p>}
+                            </div>
+                        ))}
                     </div>
-                    {copied && <p className="text-green-500 text-xs text-center animate-fade-in">Address copied!</p>}
-                </div>
-
-                {/* Share Button */}
-                <button
-                    onClick={handleShare}
-                    className="w-full py-4 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white font-medium flex items-center justify-center gap-2 hover:bg-white/5 transition-colors disabled:opacity-50"
-                    disabled={!address || address === "Address not available"}
-                >
-                    <IoShareOutline className="w-5 h-5" />
-                    Share Address
-                </button>
+                ) : (
+                    <div className="w-full flex flex-col gap-2">
+                        <div className="bg-[#1C1C1E] border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-3">
+                            <span className="text-white font-mono text-sm break-all">Address not generated</span>
+                            <button
+                                className="p-2 rounded-full bg-white/10 opacity-50 cursor-not-allowed flex-shrink-0"
+                                disabled
+                            >
+                                <IoCopyOutline className="text-white w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Warning */}
-                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-10">
                     <p className="text-yellow-500 text-xs text-center leading-relaxed">
                         Send only <strong>{displaySymbol}</strong> to this address. Sending any other asset may result in permanent loss.
                     </p>

@@ -12,6 +12,7 @@ import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
 import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse, AirtimeQuotePayload, BillExecutionPayload } from "@/services/bills";
 import { useMutation } from "@tanstack/react-query";
+import { parseISO, differenceInSeconds, isAfter } from "date-fns";
 
 interface NetworkProvider {
   id: string;
@@ -76,12 +77,74 @@ export default function AirtimePage() {
   const [quote, setQuote] = useState<AirtimeQuoteResponse | null>(null);
   const [quoteError, setQuoteError] = useState("");
   const [transactionDetails, setTransactionDetails] = useState<any>(null);
+  const [countdown, setCountdown] = useState<string>("");
+
+  // Format expiration time as countdown with real-time updates using date-fns
+  const formatExpirationTime = (expiresAt: string): string => {
+    try {
+      const expirationDate = parseISO(expiresAt);
+      const now = new Date();
+      
+      if (!isAfter(expirationDate, now)) {
+        return "Expired";
+      }
+      
+      const totalSeconds = differenceInSeconds(expirationDate, now);
+      const diffMinutes = Math.floor(totalSeconds / 60);
+      const diffSeconds = totalSeconds % 60;
+      
+      if (diffMinutes > 0) {
+        return `${diffMinutes}m ${diffSeconds}s`;
+      } else {
+        return `${diffSeconds}s`;
+      }
+    } catch (error) {
+      console.error("Error formatting expiration time:", error);
+      return "Invalid date";
+    }
+  };
+
+  // Update countdown every second when quote has expiration
+  useEffect(() => {
+    console.log("🕒 Countdown useEffect triggered", { 
+      quote, 
+      expiresAtTimestamp: quote?.expiresAtTimestamp,
+      quoteReference: quote?.quoteReference 
+    });
+    
+    // Check if quote exists and expiresAtTimestamp is not null/undefined
+    if (!quote || !quote.expiresAtTimestamp || quote.expiresAtTimestamp === null) {
+      console.log("🕒 No quote or expiresAtTimestamp is null, clearing countdown");
+      setCountdown("");
+      return;
+    }
+    
+    const updateCountdown = () => {
+      const newCountdown = formatExpirationTime(quote.expiresAtTimestamp);
+      console.log("🕒 Updating countdown:", newCountdown);
+      setCountdown(newCountdown);
+    };
+    
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    
+    return () => {
+      console.log("🕒 Clearing countdown interval");
+      clearInterval(interval);
+    };
+  }, [quote?.expiresAtTimestamp, quote?.quoteReference]);
 
   // Mutation for Getting Quote
   const quoteMutation = useMutation({
     mutationFn: (payload: AirtimeQuotePayload) => getAirtimeQuote(payload),
     onSuccess: (data) => {
+      // console.log("📥 [CRYPTO] Raw API response:", data);
+      // console.log("📊 [CRYPTO] Quote Data:", data.data || data);
+      
       const quoteData = data.data || data;
+      // console.log("📊 [CRYPTO] boltsEarnable:", quoteData.boltsEarnable);
+      // console.log("📊 [CRYPTO] bonusAvailable:", quoteData.bonusAvailable);
+      
       setQuote(quoteData);
       // Persist for page reloads/step changes if needed, though state is better
       localStorage.setItem("currentAirtimeQuote", JSON.stringify(quoteData));
@@ -100,7 +163,7 @@ export default function AirtimePage() {
     onSuccess: (data) => {
       const response = data as BillExecutionResponse;
       if (response.success && response.data) {
-        setTransactionToken(response.data.transactionReference);
+        setTransactionToken(response.data?.transactionReference || response.data?.quoteReference || "");
         setTransactionDetails(response.data);
         setTransactionResult("success");
         setStep("result");
@@ -223,9 +286,14 @@ export default function AirtimePage() {
   };
 
   const getCashback = (): number => {
-    const amountNum = parseFloat(amount);
-    const option = amountOptions.find((opt) => opt.amount === amountNum);
-    return option?.cashback || 0;
+    console.log("🎯 [CRYPTO] getCashback - Full quote object:", quote);
+    console.log("🎯 [CRYPTO] getCashback - boltsEarnable:", quote?.boltsEarnable);
+    console.log("🎯 [CRYPTO] getCashback - bonusAvailable:", quote?.bonusAvailable);
+    
+    if (quote?.boltsEarnable !== undefined) {
+      return quote.boltsEarnable;
+    }
+    return 0;
   };
 
   const getAvailableBalance = (): string => {
@@ -277,7 +345,7 @@ export default function AirtimePage() {
 
     const payload: BillExecutionPayload = {
       quoteReference: currentQuote.quoteReference,
-      pin: parseInt(pin, 10)
+      pin: pin
     };
 
     paymentMutation.mutate(payload);
@@ -350,7 +418,10 @@ export default function AirtimePage() {
           { label: "Phone Number", value: phoneNumber },
           { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
           { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-          { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+          { label: "Bolts to Earn", value: `${getCashback().toFixed(2)} Bolts` },
+          ...(quote?.expiresAtTimestamp && quote.expiresAtTimestamp !== null ? [
+            { label: "Quote Expires", value: countdown || "Loading..." }
+          ] : []),
         ]}
         availableBalance={getAvailableBalance()}
       />
@@ -384,7 +455,7 @@ export default function AirtimePage() {
       const successDetails = [
         ...commonDetails,
         { label: "Transaction Reference", value: transactionToken },
-        { label: "Bonus Earned", value: `₦${getCashback().toFixed(2)} Cashback` },
+        { label: "Bolts Earned", value: `${getCashback().toFixed(2)} Bolts` },
         { label: "Transaction Date", value: getTransactionDate() },
       ];
 
@@ -566,7 +637,7 @@ export default function AirtimePage() {
                   ₦{option.amount.toLocaleString()}
                 </span>
                 <span className="text-gray-400 text-xs mt-1">
-                  ₦{option.cashback} Cashback
+                  ₦0 Cashback
                 </span>
               </button>
             ))}

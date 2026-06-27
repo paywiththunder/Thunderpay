@@ -13,6 +13,8 @@ import {
   HiChevronRight,
   HiOutlineLockClosed,
   HiOutlineUserGroup,
+  HiOutlineShieldCheck,
+  HiOutlineDocumentText,
 } from "react-icons/hi2";
 import { useRouter } from "next/navigation";
 import { getUserProfile } from "@/services/user";
@@ -85,6 +87,24 @@ const menuItems: MenuItem[] = [
     link: "/profile/ambassador",
   },
   {
+    id: 6,
+    icon: HiOutlineCog6Tooth,
+    label: "KYC Verification",
+    link: "/profile/kyc",
+  },
+  {
+    id: 4,
+    icon: HiOutlineShieldCheck,
+    label: "Privacy Policy",
+    link: "https://www.paywiththunder.com/legal.html",
+  },
+  {
+    id: 5,
+    icon: HiOutlineDocumentText,
+    label: "Terms of Service",
+    link: "https://www.paywiththunder.com/legal.html",
+  },
+  {
     id: 9,
     icon: HiOutlineLockClosed,
     label: "Reset PIN",   // Keep user's term 'Reset' for endpoint usage, or maybe "Forgot PIN" is better? User said 'reset pin and im done'. Let's keep both or clarification?
@@ -120,7 +140,12 @@ export default function ProfilePage() {
   const user = userResponse?.success ? userResponse.data : null;
 
   const handleClick = (link: string) => {
-    router.push(link);
+    // Check if it's an external link
+    if (link.startsWith('http://') || link.startsWith('https://')) {
+      window.open(link, '_blank', 'noopener,noreferrer');
+    } else {
+      router.push(link);
+    }
   };
 
   const getInitials = (firstName: string, lastName: string) => {

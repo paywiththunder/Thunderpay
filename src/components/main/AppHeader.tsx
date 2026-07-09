@@ -69,7 +69,7 @@ export default function AppHeader() {
                 >
                     Crypto
                 </Link>
-                {/* <Link
+                <Link
                     href="/cash"
                     className={`${isActive("/cash")
                         ? "text-white border-b-2 border-[#3B82F6] pb-1"
@@ -78,7 +78,7 @@ export default function AppHeader() {
                 >
                     Cash
                 </Link>
-                <Link
+                {/* <Link
                     href="/international"
                     className={`${isActive("/international")
                         ? "text-white border-b-2 border-[#3B82F6] pb-1"

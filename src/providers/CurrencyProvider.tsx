@@ -32,9 +32,13 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
           console.warn("NGN currency not found in response");
         }
       } catch (err) {
-        const error = err instanceof Error ? err : new Error("Failed to fetch currencies");
-        setError(error);
-        console.error("Failed to fetch currencies:", error);
+        // Don't log error if it's just "No auth token found" (user not logged in)
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        if (!errorMessage.includes("No auth token found")) {
+          const error = err instanceof Error ? err : new Error("Failed to fetch currencies");
+          setError(error);
+          console.error("Failed to fetch currencies:", error);
+        }
       } finally {
         setIsLoading(false);
       }

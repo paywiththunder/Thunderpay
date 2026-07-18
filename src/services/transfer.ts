@@ -41,8 +41,11 @@ export const getBanksList = async (): Promise<BankItem[]> => {
 // Bank account verification
 
 export interface VerifyAccountPayload {
-    bankId: string;
-    accountNumber: string;
+    currency: string;
+    account: {
+        code: string;
+        number: string;
+    };
 }
 
 export const verifyAccountNumber = async (payload: VerifyAccountPayload): Promise<string> => {
@@ -57,7 +60,7 @@ export const verifyAccountNumber = async (payload: VerifyAccountPayload): Promis
             },
         });
         if (response.data?.success) {
-            return response.data.data as string; // account name
+            return response.data.data?.accountName || ""; // Extract accountName from data
         }
         throw new Error(response.data?.description || "Account verification failed");
     } catch (error: any) {
@@ -70,7 +73,7 @@ export interface VerifyInternalAccountPayload {
     accountNumber: string;
 }
 
-export const verifyInternalAccountNumber = async (payload: VerifyInternalAccountPayload): Promise<any> => {
+export const verifyInternalAccountNumber = async (payload: VerifyInternalAccountPayload): Promise<string> => {
     const token = getAuthToken();
     if (!token) throw new Error("No auth token found");
 
@@ -82,7 +85,7 @@ export const verifyInternalAccountNumber = async (payload: VerifyInternalAccount
             },
         });
         if (response.data?.success) {
-            return response.data.data;
+            return response.data.data?.accountName || ""; // Extract accountName from data
         }
         throw new Error(response.data?.description || "Internal account verification failed");
     } catch (error: any) {
@@ -432,8 +435,8 @@ export const getCryptoToNgnQuote = async (
 
 export interface CryptoToNgnExecutePayload {
     quoteReference: string;
-    scope: "INTERNAL" | "EXTERNAL_BANK";
-    recipientAccountNumber: string;
+    // scope: "INTERNAL" | "EXTERNAL_BANK";
+    // recipientAccountNumber: string;
     bankCode?: string; // Required for EXTERNAL_BANK
     reason?: string;
     pin: string;
@@ -464,8 +467,8 @@ export const executeCryptoToNgnTransfer = async (
         console.log("📤 Request Method: POST");
         console.log("📤 Payload Details:");
         console.log("  - quoteReference:", payload.quoteReference);
-        console.log("  - scope:", payload.scope);
-        console.log("  - recipientAccountNumber:", payload.recipientAccountNumber);
+        // console.log("  - scope:", payload.scope);
+        // console.log("  - recipientAccountNumber:", payload.recipientAccountNumber);
         if (payload.bankCode) console.log("  - bankCode:", payload.bankCode);
         if (payload.reason) console.log("  - reason:", payload.reason);
         console.log("📤 Full JSON Payload:", JSON.stringify(payload, null, 2));

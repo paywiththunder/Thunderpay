@@ -176,7 +176,13 @@ export default function SendToBankPage() {
       setAccountVerifyError("");
 
       // Call real API
-      verifyAccountNumber({ bankId: selectedBank.id, accountNumber })
+      verifyAccountNumber({ 
+        currency: "NGN",
+        account: {
+          code: selectedBank.id,
+          number: accountNumber
+        }
+      })
         .then((name) => {
           setAccountName(name);
           setAccountVerifyError("");

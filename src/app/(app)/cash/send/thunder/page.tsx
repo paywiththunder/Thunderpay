@@ -126,20 +126,15 @@ export default function SendToThunderPage() {
       setVerificationError("");
 
       try {
-        const verificationResult = await verifyInternalAccountNumber({
+        const accountName = await verifyInternalAccountNumber({
           bankId: thunderInternalBankId,
           accountNumber,
         });
 
-        const verifiedName =
-          typeof verificationResult === "string"
-            ? verificationResult
-            : verificationResult?.name || "Unknown User";
-
-        setAccountName(verifiedName);
+        setAccountName(accountName);
         setSelectedRecipient({
           id: "new",
-          name: verifiedName,
+          name: accountName,
           accountNumber,
           type: "thunder",
           initial: accountNumber.charAt(0),

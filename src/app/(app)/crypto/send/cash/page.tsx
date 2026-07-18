@@ -113,7 +113,13 @@ export default function SendCryptoToCashPage() {
         setIsVerifyingAccount(false);
       } else {
         // Call API to verify account
-        verifyAccountNumber({ bankId: selectedBank.id, accountNumber })
+        verifyAccountNumber({ 
+          currency: "NGN",
+          account: {
+            code: selectedBank.id,
+            number: accountNumber
+          }
+        })
           .then((name) => {
             setAccountName(name);
             setSelectedRecipient(null);

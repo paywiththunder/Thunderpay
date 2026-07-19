@@ -54,7 +54,7 @@ export default function CardsPage() {
               {cards.map((card) => (
                 <div
                   key={card.id}
-                  className={`min-w-[280px] h-[400px] rounded-2xl bg-gradient-to-br ${card.gradient} p-6 flex flex-col justify-between relative snap-center ${card.rotation} ${card.scale} transition-all flex-shrink-0`}
+                  className={`min-w-70 h-100 rounded-2xl bg-linear-to-br ${card.gradient} p-6 flex flex-col justify-between relative snap-center ${card.rotation} ${card.scale} transition-all flex-shrink-0`}
                   style={{ zIndex: card.zIndex }}
                 >
                   {/* Card Chip/NFC Symbol - only on center card */}

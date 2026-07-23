@@ -192,7 +192,7 @@ export default function CryptoPage() {
             <div className="grid grid-cols-4 gap-3">
                 <ActionButton icon={GiPayMoney} label="Pay Bills" href="/crypto/pay-bills" />
                 <ActionButton icon={GiReceiveMoney} label="Receive" href="/crypto/receive" />
-                <ActionButton icon={GiBanknote} label="Send" href="/crypto/send" disabled />
+                <ActionButton icon={GiBanknote} label="Send" href="/crypto/send" />
                 <ActionButton icon={MdCurrencyExchange} label="Convert" href="/crypto/convert" disabled />
             </div>
 

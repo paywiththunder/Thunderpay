@@ -108,6 +108,43 @@ const getActiveSenderAccountNumber = (
   return activeAccount?.accountNumber || "";
 };
 
+// Backend validation failures can come back as a plain string, a single
+// `description`/`message`, or an array of field-level constraint messages
+// (e.g. NestJS class-validator: `{ message: ["reference must be shorter
+// than or equal to 12 characters"] }`). Surface whatever detail is present
+// instead of collapsing everything to a generic "Transfer failed".
+const extractTransferErrorMessage = (error: any): string => {
+  if (!error) return "Transfer failed";
+  if (typeof error === "string") return error;
+
+  const formatArray = (arr: any[]): string =>
+    arr
+      .map((item) =>
+        typeof item === "string"
+          ? item
+          : item?.message || item?.description || JSON.stringify(item)
+      )
+      .filter(Boolean)
+      .join(", ");
+
+  // Prefer the specific field-level detail (usually in `errors`) over the
+  // generic top-level `description`/`message` like "Validation failed".
+  const arrayCandidates = [error.errors, error.message, error.error];
+  for (const candidate of arrayCandidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      const formatted = formatArray(candidate);
+      if (formatted) return formatted;
+    }
+  }
+
+  const stringCandidates = [error.description, error.message, error.error];
+  for (const candidate of stringCandidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate;
+  }
+
+  return "Transfer failed";
+};
+
 export default function SendToBankPage() {
   const router = useRouter();
   const bankDropdownRef = useRef<HTMLDivElement>(null);
@@ -351,8 +388,9 @@ export default function SendToBankPage() {
     setIsTransferring(true);
     setTransferError("");
 
-    // Generate a reference (backend API likely has a strict length/format limit like "dev007")
-    const reference = Math.random().toString(36).substring(2, 10);
+    // Generate a reference. Backend requires the reference to be at least 12 characters,
+    // so combine a timestamp with a random segment to guarantee the minimum length.
+    const reference = `txn${Date.now().toString(36)}${Math.random().toString(36).substring(2, 6)}`;
     setTransactionToken(reference);
     const senderAccountNumber = getActiveSenderAccountNumber(
       wallets,
@@ -376,30 +414,13 @@ export default function SendToBankPage() {
       reference: reference
     };
 
-    // Log the payload before executing transfer
-    console.log("📤 ===== BANK TRANSFER PAYLOAD (BEFORE EXECUTE) =====");
-    console.log("📤 Payload Details:");
-    console.log("  - walletId:", payload.walletId, "(type:", typeof payload.walletId, ")");
-    console.log("  - senderAccountNumber:", payload.senderAccountNumber, "(type:", typeof payload.senderAccountNumber, ")");
-    console.log("  - recipientAccountNumber:", payload.recipientAccountNumber, "(type:", typeof payload.recipientAccountNumber, ")");
-    console.log("  - bankCode:", payload.bankCode, "(type:", typeof payload.bankCode, ")");
-    console.log("  - amount:", payload.amount, "(type:", typeof payload.amount, ")");
-    console.log("  - pin:", "[REDACTED]");
-    console.log("  - reason:", payload.reason, "(type:", typeof payload.reason, ")");
-    console.log("  - reference:", payload.reference, "(type:", typeof payload.reference, ")");
-    console.log("📤 Full JSON Payload (pin redacted):", JSON.stringify({...payload, pin: "[REDACTED]"}, null, 2));
-    console.log("📤 Timestamp:", new Date().toISOString());
-
     try {
       const result = await initiateBankTransfer(payload);
-      console.log("📥 Transfer Response:", result);
       setTransferData(result);
       setTransactionResult("success");
       setStep("result");
     } catch (error: any) {
-      console.error("Transfer Error:", error);
-      const errorMessage = typeof error === "string" ? error : error?.description || error?.message || "Transfer failed";
-      setTransferError(errorMessage);
+      setTransferError(extractTransferErrorMessage(error));
     } finally {
       setIsTransferring(false);
     }

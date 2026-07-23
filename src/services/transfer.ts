@@ -29,6 +29,7 @@ export const getBanksList = async (): Promise<BankItem[]> => {
             },
         });
         if (response.data?.success) {
+            console.log("Banks list fetched successfully:", response.data.data);
             return response.data.data as BankItem[];
         }
         throw new Error(response.data?.description || "Failed to fetch banks list");
@@ -221,7 +222,7 @@ export interface InitiateThunderTransferPayload {
     amount: number;
     pin: string;
     reason?: string;
-    reference?: string;
+    reference: string;
 }
 
 export interface InitiateThunderTransferResponse {

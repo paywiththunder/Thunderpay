@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Routes that are temporarily disabled
-const DISABLED_ROUTES = ["/international", "/crypto/send", "/crypto/convert"];
+const DISABLED_ROUTES = ["/international", "/crypto/convert"];
 
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;

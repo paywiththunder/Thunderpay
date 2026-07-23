@@ -185,6 +185,9 @@ export default function RewardsPage() {
                       Conversion info unavailable.
                     </p>
                   )}
+                  <p className="text-yellow-400/80 text-[10px] mt-1">
+                    Minimum 100 Bolts required to convert to cash.
+                  </p>
                 </>
               )}
             </div>

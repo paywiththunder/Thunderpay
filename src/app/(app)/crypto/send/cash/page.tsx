@@ -116,7 +116,7 @@ export default function SendCryptoToCashPage() {
         verifyAccountNumber({ 
           currency: "NGN",
           account: {
-            code: selectedBank.id,
+            code: selectedBank.code,
             number: accountNumber
           }
         })

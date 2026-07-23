@@ -216,7 +216,7 @@ export default function SendToBankPage() {
       verifyAccountNumber({ 
         currency: "NGN",
         account: {
-          code: selectedBank.id,
+          code: selectedBank.code,
           number: accountNumber
         }
       })

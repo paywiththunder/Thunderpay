@@ -12,6 +12,7 @@ import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getCashbackBalance } from "@/services/cashback";
+import { boltQuoteRows } from "@/utils/bolts";
 import { useCurrency } from "@/providers/CurrencyProvider";
 import {
     getElectricityQuote,
@@ -270,6 +271,7 @@ export default function ElectricityPage() {
             { label: "Meter Type", value: paymentType === "prepaid" ? "Prepaid" : "Postpaid" }, 
             { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` }, 
             { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
+            ...boltQuoteRows(quoteData),
             ...(quoteData?.expiresAtTimestamp && quoteData.expiresAtTimestamp !== null ? [
                 { label: "Quote Expires", value: countdown || "Loading..." }
             ] : []),

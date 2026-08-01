@@ -433,7 +433,7 @@ export default function TVPage() {
 
     const cashback = getCashback();
     if (cashback > 0) {
-      details.push({ label: "Bonus to Earn", value: `₦${cashback.toFixed(2)} Cashback` });
+      details.push({ label: "Bolts to Earn", value: `₦${cashback.toFixed(2)} Bolts` });
     }
 
     let displayAmount = calculatePaymentAmount();

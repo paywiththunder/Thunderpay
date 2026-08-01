@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import {
@@ -15,51 +15,21 @@ import {
 import { IoCopyOutline } from "react-icons/io5";
 import { format, parseISO } from "date-fns";
 
-import { getWallets, getWalletActivity } from "@/services/wallet";
+import { useQuery } from "@tanstack/react-query";
+
+import { fetchAllActivities, type ActivityItem } from "@/services/activity";
 import { getRecentTransactions } from "@/services/user";
 import { printReceipt } from "@/utils/printReceipt";
-
-interface TransactionDetail {
-    id: number;
-    source: string;
-    direction: "CREDIT" | "DEBIT" | string | null;
-    amount: number;
-    fee: number | null;
-    status: string;
-    reference: string;
-    walletId: number | null;
-    fromAddress: string | null;
-    toAddress: string | null;
-    createdAt: string | null;
-    details?: {
-        transactionType?: string;
-        productName?: string;
-        phone?: string;
-        price?: string;
-        requestId?: string;
-        transactionId?: string;
-        quoteBill?: string;
-        serviceIdentifier?: string;
-        purchaseValueNgn?: number;
-        senderName?: string;
-        recipientName?: string;
-        quoteProviderParams?: {
-            variation_code?: string;
-            [key: string]: any;
-        };
-        [key: string]: any;
-    };
-}
 
 interface ActivityReceiptProps {
     copied: boolean;
     formattedDate: string;
     isNegative: boolean;
     onCopy: (text: string) => void;
-    transaction: TransactionDetail;
+    transaction: ActivityItem;
 }
 
-function getTransactionDirection(transaction: TransactionDetail) {
+function getTransactionDirection(transaction: ActivityItem) {
     if (transaction.direction) return transaction.direction.toUpperCase();
 
     return ["send", "withdrawal", "bill", "bill_payment", "electricity", "card", "transfer"].includes(
@@ -98,7 +68,7 @@ function getIcon(source: string, direction: string | null) {
     }
 }
 
-const getTransactionsFromResponse = (response: any): TransactionDetail[] => {
+const getTransactionsFromResponse = (response: any): ActivityItem[] => {
     if (Array.isArray(response)) return response;
     if (Array.isArray(response?.data?.items)) return response.data.items;
     if (Array.isArray(response?.data)) return response.data;
@@ -112,7 +82,7 @@ function getTransactionDate(createdAt: string | null) {
     return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function getTransactionLabel(transaction: TransactionDetail) {
+function getTransactionLabel(transaction: ActivityItem) {
     if (transaction.details?.transactionType) return transaction.details.transactionType;
 
     return transaction.source
@@ -120,10 +90,23 @@ function getTransactionLabel(transaction: TransactionDetail) {
         .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function getDetailsHeading(source: string) {
+    switch (source.toLowerCase()) {
+        case "bill":
+        case "bill_payment":
+            return "Bill Details";
+        case "transfer":
+            return "Transfer Details";
+        default:
+            return "Transaction Details";
+    }
+}
+
 function getStatusColor(status: string) {
     switch (status.toLowerCase()) {
         case "completed":
         case "success":
+        case "successful": // what the API actually returns
         case "posted":
             return "bg-green-500/20 text-green-400 border border-green-500/30";
         case "pending":
@@ -258,13 +241,10 @@ function ActivityReceipt({
                     </div>
                 )}
 
-                {transaction.details && Object.keys(transaction.details).length > 0 && (
+                {transaction.details && Object.keys(transaction.details).length > 0 ? (
                     <div className="flex flex-col gap-2">
                         <span className="text-gray-400 text-xs uppercase font-semibold">
-                            {transaction.source.toLowerCase() === "bill_payment" ? "Bill Details" :
-                             transaction.source.toLowerCase() === "bill" ? "Bill Details" : 
-                             transaction.source.toLowerCase() === "transfer" ? "Transfer Details" : 
-                             "Transaction Details"}
+                            {getDetailsHeading(transaction.source)}
                         </span>
                         <div className="bg-white/5 rounded-lg p-3 border border-white/10 flex flex-col gap-3 text-sm">
                             {transaction.details.transactionType && (
@@ -412,6 +392,18 @@ function ActivityReceipt({
                                 })}
                         </div>
                     </div>
+                ) : (
+                    // The API sends `details: {}` for some rows (transfers in
+                    // particular), so say so rather than rendering nothing and
+                    // leaving the receipt looking broken.
+                    <div className="flex flex-col gap-2">
+                        <span className="text-gray-400 text-xs uppercase font-semibold">
+                            {getDetailsHeading(transaction.source)}
+                        </span>
+                        <p className="text-gray-500 text-sm bg-white/5 rounded-lg p-3 border border-white/10">
+                            No further details were recorded for this transaction.
+                        </p>
+                    </div>
                 )}
             </div>
 
@@ -429,64 +421,45 @@ function ActivityReceipt({
 export default function ActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter();
     const { id } = React.use(params);
-    const [transaction, setTransaction] = useState<TransactionDetail | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
     const [copied, setCopied] = useState(false);
     const receiptRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const fetchTransaction = async () => {
-            try {
-                const walletsResponse = await getWallets();
-                const wallets = Array.isArray(walletsResponse) ? walletsResponse : walletsResponse.data || [];
+    const matches = (item: ActivityItem) =>
+        item.reference === id || String(item.id) === id;
 
-                if (wallets.length === 0) {
-                    setError("No wallets found");
-                    setLoading(false);
-                    return;
-                }
+    // Same key and fetcher as the activity list, so arriving from there is served
+    // straight from cache instead of refetching every wallet's activity again.
+    const {
+        data: activities = [],
+        isLoading: activitiesLoading,
+        isError: activitiesError,
+    } = useQuery({
+        queryKey: ['allActivities'],
+        queryFn: fetchAllActivities,
+    });
 
-                const validWallets = wallets.filter((wallet: any) => wallet.walletId);
-                const activityPromises = validWallets.map((wallet: any) => getWalletActivity(wallet.walletId));
-                const responses = await Promise.all(activityPromises);
+    const fromActivities = activities.find(matches) ?? null;
 
-                let foundTransaction: TransactionDetail | null = null;
-                responses.forEach((response) => {
-                    if (response && response.success && response.data && Array.isArray(response.data.items)) {
-                        const matchedTransaction = response.data.items.find(
-                            (item: any) => item.reference === id || String(item.id) === id
-                        );
-                        if (matchedTransaction) {
-                            foundTransaction = matchedTransaction;
-                        }
-                    }
-                });
+    // HomePage and CryptoPage link here using their own recent-transactions data,
+    // which can hold references that wallet activity doesn't, so fall back to it
+    // only when the lookup above comes up empty.
+    const {
+        data: recentTransactions = [],
+        isLoading: recentLoading,
+        isError: recentError,
+    } = useQuery({
+        queryKey: ['recentTransactions', 'activityFallback'],
+        queryFn: async () => getTransactionsFromResponse(await getRecentTransactions()),
+        enabled: !activitiesLoading && !fromActivities,
+    });
 
-                if (!foundTransaction) {
-                    const recentResponse = await getRecentTransactions();
-                    const recentTransactions = getTransactionsFromResponse(recentResponse);
-                    foundTransaction =
-                        recentTransactions.find(
-                            (item) => item.reference === id || String(item.id) === id
-                        ) || null;
-                }
-
-                if (foundTransaction) {
-                    setTransaction(foundTransaction);
-                } else {
-                    setError("Transaction not found");
-                }
-            } catch (err) {
-                console.error("Error fetching transaction:", err);
-                setError("Failed to load transaction details");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchTransaction();
-    }, [id]);
+    const transaction = fromActivities ?? recentTransactions.find(matches) ?? null;
+    const loading = activitiesLoading || recentLoading;
+    const error = !loading && !transaction
+        ? activitiesError || recentError
+            ? "Failed to load transaction details"
+            : "Transaction not found"
+        : "";
 
     const handleCopy = (text: string) => {
         navigator.clipboard.writeText(text);

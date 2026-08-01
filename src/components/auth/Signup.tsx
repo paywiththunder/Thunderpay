@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { Eye, EyeOff } from "lucide-react";
 import { API_BASE_URL } from "@/config";
+import { setPendingVerificationEmail } from "@/utils/authFlow";
+import { isPasswordValid, passwordRules } from "@/utils/passwordRules";
 
 export default function SignupForm() {
   const router = useRouter();
@@ -15,23 +17,21 @@ export default function SignupForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordRules, setShowPasswordRules] = useState(false);
   const [error, setError] = useState("");
+
+  // Recomputed each render, so the list turns green as the user types.
+  const rules = passwordRules(password);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     // --- Password Validation ---
-    const hasLowercase = /[a-z]/.test(password);
-    const hasUppercase = /[A-Z]/.test(password);
-    const hasDigit = /\d/.test(password);
-    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-    const hasMinLength = password.length >= 8;
-
-    if (!hasMinLength || !hasLowercase || !hasUppercase || !hasDigit || !hasSpecial) {
-      setError(
-        "Password must contain at least one lowercase, one uppercase, one special character, one digit and be at least 8 characters long."
-      );
+    // The checklist below the field already spells out which rule is unmet, so
+    // there's no lumped error string to set here.
+    if (!isPasswordValid(password)) {
+      setShowPasswordRules(true);
       return;
     }
 
@@ -60,7 +60,7 @@ export default function SignupForm() {
       }
 
       // ✅ Save user info to localStorage
-      localStorage.setItem("signupEmail", data.email);
+      setPendingVerificationEmail(data.email);
       localStorage.setItem("signupUserId", data.id.toString());
 
       // ✅ Redirect to OTP page
@@ -134,6 +134,24 @@ export default function SignupForm() {
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
+
+            {(showPasswordRules || password.length > 0) && (
+              <ul className="mt-3 space-y-1.5 text-sm">
+                {rules.map((rule) => (
+                  <li
+                    key={rule.text}
+                    className={rule.ok ? "text-[#BFF1C0]" : "text-[#E64C4C]"}
+                  >
+                    {rule.text}
+                    {!rule.ok && rule.hint && (
+                      <span className="block text-xs text-[#98A0A8]">
+                        {rule.hint}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {error && (

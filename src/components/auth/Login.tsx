@@ -6,6 +6,10 @@ import Link from "next/link";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import { API_BASE_URL } from "@/config";
+import {
+  isEmailNotVerifiedError,
+  setPendingVerificationEmail,
+} from "@/utils/authFlow";
 
 // --- Types ---
 type PhoneStepProps = {
@@ -232,19 +236,9 @@ export default function Login() {
   const handleLogin = async () => {
     if (!email || !password) return;
 
-    // Password Enforcement Rules
-    const hasLowercase = /[a-z]/.test(password);
-    const hasUppercase = /[A-Z]/.test(password);
-    const hasDigit = /\d/.test(password);
-    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-    const hasMinLength = password.length >= 8;
-
-    if (!hasMinLength || !hasLowercase || !hasUppercase || !hasDigit || !hasSpecial) {
-      setError(
-        "Password must contain at least one lowercase, one uppercase, one special character, one digit and be at least 8 characters long."
-      );
-      return;
-    }
+    // No composition rules here on purpose. This password already exists on the
+    // server — re-checking its shape would lock out any account whose password
+    // predates the current rules, and blame the user's formatting for it.
 
     setLoading(true);
     setError("");
@@ -285,6 +279,16 @@ export default function Login() {
         router.push("/crypto");
       }
     } catch (err: any) {
+      // The account exists but never confirmed its email. Stash the address the
+      // user just typed — the verify page has no other way to know it — and send
+      // them to the OTP page. It routes back here, and the hasCompletedSignup
+      // branch above then picks continue-signup vs /crypto.
+      if (isEmailNotVerifiedError(err)) {
+        setPendingVerificationEmail(email);
+        router.push("/auth/verify-number");
+        return;
+      }
+
       setError(
         err?.response?.data?.description ||
         err?.message ||

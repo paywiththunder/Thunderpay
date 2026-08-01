@@ -114,7 +114,7 @@ export default function CryptoPage() {
         isLoading: transactionsLoading
     } = useQuery({
         queryKey: ['recentTransactions', 'CRYPTO'],
-        queryFn: () => getRecentTransactions({ walletType: 'CRYPTO', page: '1', size: '10' }),
+        queryFn: () => getRecentTransactions({ walletType: 'CRYPTO', page: '0', size: '10' }),
     });
 
     const loading = walletsLoading || transactionsLoading;
@@ -192,19 +192,19 @@ export default function CryptoPage() {
             <div className="grid grid-cols-4 gap-3">
                 <ActionButton icon={GiPayMoney} label="Pay Bills" href="/crypto/pay-bills" />
                 <ActionButton icon={GiReceiveMoney} label="Receive" href="/crypto/receive" />
-                <ActionButton icon={GiBanknote} label="Send" href="/crypto/send" disabled />
+                <ActionButton icon={GiBanknote} label="Send" href="/crypto/send" />
                 <ActionButton icon={MdCurrencyExchange} label="Convert" href="/crypto/convert" disabled />
             </div>
 
             {/* Banner */}
             <div className="w-full h-24 rounded-xl overflow-hidden relative bg-gradient-to-r from-blue-500 to-purple-600 flex items-center px-4">
-                <Image src={Right} width={170} height={170} alt="Banner Pattern" className="absolute top-0 left-0 object-cover" style={{ height: 'auto' }} priority loading="eager" />
+                <Image src={Right} width={170} height={170} alt="Banner Pattern" className="absolute top-0 left-0 object-cover" style={{ width: 'auto', height: 'auto' }} priority loading="eager" />
                 {/* Decorative elements - simple simulated banner */}
                 <div className="flex-1 z-10">
                     <p className="font-bold text-lg leading-tight">Pay Smarter. Pay in Crypto.</p>
                     <p className="text-xs text-blue-100">No Banks. No Hassle. Just Crypto.</p>
                 </div>
-                <Image src={Left} width={170} height={170} alt="Banner Pattern" className="absolute top-0 right-0 object-cover" style={{ height: 'auto' }} />
+                <Image src={Left} width={170} height={170} alt="Banner Pattern" className="absolute top-0 right-0 object-cover" style={{ width: 'auto', height: 'auto' }} />
             </div>
 
             {/* Tokens Section */}
@@ -277,7 +277,7 @@ export default function CryptoPage() {
                 {transactions.length === 0 ? (
                     <div className="flex flex-col items-center justify-center">
                         {/* Placeholder illustration for wallet */}
-                        <Image src={NoTransaction} className="mb-3" alt="No Transaction" width={200} height={200} style={{ height: 'auto' }} />
+                        <Image src={NoTransaction} className="mb-3" alt="No Transaction" width={200} height={200} style={{ width: 'auto', height: 'auto' }} />
                         <p className="text-gray-500 font-[600] text-[2rem] -mt-18 mb-16">No Transaction Yet</p>
                     </div>
                 ) : (

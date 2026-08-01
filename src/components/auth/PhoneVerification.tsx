@@ -6,6 +6,10 @@ import axios from "axios";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import { useRouter } from "next/navigation";
 import { API_BASE_URL } from "@/config";
+import {
+  clearPendingVerificationEmail,
+  readPendingVerificationEmail,
+} from "@/utils/authFlow";
 
 export default function MailVerification() {
   const [codes, setCodes] = useState<string[]>(["", "", "", "", "", ""]);
@@ -53,10 +57,10 @@ export default function MailVerification() {
     setLoading(true);
 
     const otp = codes.join("");
-    const email = localStorage.getItem("signupEmail");
+    const email = readPendingVerificationEmail();
 
     if (!email) {
-      setError("Email not found. Please restart signup.");
+      setError("Email not found. Please sign in or sign up again.");
       setLoading(false);
       return;
     }
@@ -82,8 +86,10 @@ export default function MailVerification() {
 
       /* --------------------------------------------------
        CLEAN UP (IMPORTANT)
+       Drop the pending email so a later unverified login on this browser
+       can't submit its OTP against a previous account's address.
       -------------------------------------------------- */
-      // localStorage.removeItem("signupEmail");
+      clearPendingVerificationEmail();
 
       console.log("Verification successful:", data);
 
@@ -94,8 +100,9 @@ export default function MailVerification() {
         localStorage.setItem("authToken", res.data.token);
       }
 
-      // 👉 redirect or continue flow here
-      router.push("/auth/continue-signup");
+      // 👉 both entry points come back through login, which then branches on
+      //    hasCompletedSignup to pick /auth/continue-signup or /crypto
+      router.push("/auth/login");
     } catch (err: any) {
       setError(
         err?.response?.data?.description ||

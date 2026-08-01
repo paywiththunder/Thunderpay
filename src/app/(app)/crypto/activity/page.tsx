@@ -9,38 +9,8 @@ import {
     HiOutlineCreditCard,
     HiOutlineInbox,
 } from "react-icons/hi2";
-import { getWallets, getWalletActivity } from "@/services/wallet";
+import { fetchAllActivities, type ActivityItem } from "@/services/activity";
 import { format, isToday, isYesterday, parseISO } from "date-fns";
-
-interface Transaction {
-    id: number;
-    source: string;
-    direction: "CREDIT" | "DEBIT" | string;
-    amount: number;
-    fee: number | null;
-    status: string;
-    reference: string;
-    walletId: number | null;
-    fromAddress: string | null;
-    toAddress: string | null;
-    createdAt: string | null;
-    details?: {
-        transactionType?: string;
-        productName?: string;
-        phone?: string;
-        price?: string;
-        requestId?: string;
-        transactionId?: string;
-        quoteBill?: string;
-        serviceIdentifier?: string;
-        purchaseValueNgn?: number;
-        quoteProviderParams?: {
-            variation_code?: string;
-            [key: string]: any;
-        };
-        [key: string]: any;
-    };
-}
 
 import { useQuery } from "@tanstack/react-query";
 
@@ -54,52 +24,16 @@ export default function ActivityPage() {
         return Number.isNaN(date.getTime()) ? null : date;
     };
 
-    const fetchAllActivities = async () => {
-        // 1. Fetch all wallets
-        const walletsResponse = await getWallets();
-        const wallets = Array.isArray(walletsResponse) ? walletsResponse : walletsResponse.data || [];
-
-        if (wallets.length === 0) return [];
-
-        // 2. Fetch activity for each wallet in parallel
-        const validWallets = wallets.filter((w: any) => w.walletId);
-        const activityPromises = validWallets.map((wallet: any) => getWalletActivity(wallet.walletId));
-
-        const responses = await Promise.all(activityPromises);
-
-        // 3. Aggregate all transactions
-        let allTransactions: Transaction[] = [];
-        responses.forEach((res) => {
-            if (res && res.success && res.data && Array.isArray(res.data.items)) {
-                allTransactions = [...allTransactions, ...res.data.items];
-            }
-        });
-
-        // 4. Deduplicate transactions by reference
-        const uniqueTransactions = Array.from(
-            new Map(allTransactions.map((tx) => [tx.reference, tx])).values()
-        );
-
-        // 5. Sort by date (newest first)
-        uniqueTransactions.sort((a, b) => {
-            const dateA = getTransactionDate(a.createdAt)?.getTime() ?? 0;
-            const dateB = getTransactionDate(b.createdAt)?.getTime() ?? 0;
-            return dateB - dateA;
-        });
-
-        return uniqueTransactions;
-    };
-
     const { data: transactions = [], isLoading: loading } = useQuery({
         queryKey: ['allActivities'],
         queryFn: fetchAllActivities,
-        staleTime: 1000 * 60, // 1 minute
     });
 
     const getStatusColor = (status: string) => {
         switch (status.toLowerCase()) {
             case "completed":
             case "success":
+            case "successful": // what the API actually returns
             case "posted":
                 return "text-green-500";
             case "pending":
@@ -114,7 +48,7 @@ export default function ActivityPage() {
         }
     };
 
-    const getTransactionLabel = (tx: Transaction) => {
+    const getTransactionLabel = (tx: ActivityItem) => {
         if (tx.details?.transactionType) return tx.details.transactionType;
 
         return tx.source
@@ -122,7 +56,7 @@ export default function ActivityPage() {
             .replace(/\b\w/g, (letter) => letter.toUpperCase());
     };
 
-    const formatActivityMeta = (tx: Transaction) => {
+    const formatActivityMeta = (tx: ActivityItem) => {
         return tx.createdAt ? `${tx.direction} • ${tx.createdAt}` : tx.direction;
     };
 
@@ -134,8 +68,8 @@ export default function ActivityPage() {
         );
     }
 
-    const groupTransactionsByDate = (txs: Transaction[]) => {
-        const groups: { [key: string]: Transaction[] } = {};
+    const groupTransactionsByDate = (txs: ActivityItem[]) => {
+        const groups: { [key: string]: ActivityItem[] } = {};
         txs.forEach((tx) => {
             const date = getTransactionDate(tx.createdAt);
             let dateKey = "Unknown date";
@@ -211,7 +145,7 @@ export default function ActivityPage() {
                                         onClick={() => router.push(`/crypto/activity/${tx.reference}`)}
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-xl border border-white/20 flex items-center justify-center">w
+                                            <div className="w-10 h-10 rounded-xl border border-white/20 flex items-center justify-center">
                                                 <Icon className="w-5 h-5 text-gray-400" />
                                             </div>
                                             <div className="flex flex-col">

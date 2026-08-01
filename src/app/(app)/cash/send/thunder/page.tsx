@@ -10,7 +10,10 @@ import Confirmation from "@/components/payment/Confirmation";
 import EnterPin from "@/components/payment/EnterPin";
 import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
-import { initiateThunderTransfer, verifyInternalAccountNumber } from "@/services/transfer";
+import {
+  initiateThunderTransfer,
+  verifyInternalAccountNumber,
+} from "@/services/transfer";
 import { getWallets } from "@/services/wallet";
 import { useQuery } from "@tanstack/react-query";
 
@@ -34,7 +37,13 @@ const amountOptions = [
   { amount: 20000 },
 ];
 
-type Step = "account" | "amount" | "payment" | "confirmation" | "enterPin" | "result";
+type Step =
+  | "account"
+  | "amount"
+  | "payment"
+  | "confirmation"
+  | "enterPin"
+  | "result";
 type TransactionResult = "success" | "failure" | null;
 type TabType = "recents" | "beneficiaries";
 
@@ -57,7 +66,7 @@ interface FiatWallet {
 
 const getActiveSenderAccountNumber = (
   wallets: FiatWallet[],
-  walletId: number
+  walletId: number,
 ) => {
   const selectedWallet = wallets.find((wallet) => wallet.walletId === walletId);
   const fallbackWallet = wallets.find(
@@ -66,11 +75,11 @@ const getActiveSenderAccountNumber = (
       wallet.isActive &&
       (wallet.isPrimary ||
         wallet.currency?.code === "NGN" ||
-        wallet.currency?.ticker === "NGN")
+        wallet.currency?.ticker === "NGN"),
   );
   const wallet = selectedWallet || fallbackWallet;
   const activeAccount = wallet?.accountNumbers?.find(
-    (account) => account.isActive && account.accountNumber
+    (account) => account.isActive && account.accountNumber,
   );
 
   return activeAccount?.accountNumber || "";
@@ -108,7 +117,7 @@ export default function SendToThunderPage() {
 
   // Filter recipients based on account number input
   const filteredRecipients = recentRecipients.filter((recipient) =>
-    recipient.accountNumber.includes(accountNumber)
+    recipient.accountNumber.includes(accountNumber),
   );
 
   // Auto-select recipient if account number matches exactly
@@ -126,20 +135,15 @@ export default function SendToThunderPage() {
       setVerificationError("");
 
       try {
-        const verificationResult = await verifyInternalAccountNumber({
+        const accountName = await verifyInternalAccountNumber({
           bankId: thunderInternalBankId,
           accountNumber,
         });
 
-        const verifiedName =
-          typeof verificationResult === "string"
-            ? verificationResult
-            : verificationResult?.name || "Unknown User";
-
-        setAccountName(verifiedName);
+        setAccountName(accountName);
         setSelectedRecipient({
           id: "new",
-          name: verifiedName,
+          name: accountName,
           accountNumber,
           type: "thunder",
           initial: accountNumber.charAt(0),
@@ -148,7 +152,9 @@ export default function SendToThunderPage() {
         setVerificationError(
           typeof error === "string"
             ? error
-            : error?.description || error?.message || "Unable to verify account"
+            : error?.description ||
+                error?.message ||
+                "Unable to verify account",
         );
         setSelectedRecipient(null);
         setAccountName(null);
@@ -234,8 +240,8 @@ export default function SendToThunderPage() {
   };
 
   const getCashback = (): number => {
-        return 0;
-    };
+    return 0;
+  };
 
   const getAvailableBalance = (): string => {
     if (!selectedPaymentMethod) return "₦0.00";
@@ -245,16 +251,31 @@ export default function SendToThunderPage() {
 
   const generateTransactionToken = (): string => {
     const segments = Array.from({ length: 5 }, () =>
-      Math.floor(1000 + Math.random() * 9000).toString()
+      Math.floor(1000 + Math.random() * 9000).toString(),
     );
     return segments.join("-");
   };
 
+     // Generate a reference. Backend requires the reference to be at least 12 characters,
+    // so combine a timestamp with a random segment to guarantee the minimum length.
+    const reference = `txn${Date.now().toString(36)}${Math.random().toString(36).substring(2, 6)}`;
+    // setTransactionToken(reference);
+
   const getTransactionDate = (): string => {
     const now = new Date();
     const months = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
     ];
     const month = months[now.getMonth()];
     const day = now.getDate();
@@ -275,9 +296,14 @@ export default function SendToThunderPage() {
     }
 
     try {
-      const walletId = selectedPaymentMethod.walletId || selectedPaymentMethod.id;
-      const numericWalletId = typeof walletId === "string" ? parseInt(walletId) : walletId;
-      const senderAccountNumber = getActiveSenderAccountNumber(wallets, numericWalletId);
+      const walletId =
+        selectedPaymentMethod.walletId || selectedPaymentMethod.id;
+      const numericWalletId =
+        typeof walletId === "string" ? parseInt(walletId) : walletId;
+      const senderAccountNumber = getActiveSenderAccountNumber(
+        wallets,
+        numericWalletId,
+      );
 
       if (!senderAccountNumber) {
         setTransferError("No active sender account number found.");
@@ -292,16 +318,17 @@ export default function SendToThunderPage() {
         recipientAccountNumber: accountNumber,
         amount: parseFloat(amount),
         pin: pin,
+        reference: reference, // Use the generated reference
       });
 
-      setTransactionToken(result.reference);
+      // setTransactionToken(result.reference);
       setTransactionResult("success");
     } catch (error: any) {
       console.error("Thunder transfer error:", error);
       setTransferError(
         typeof error === "string"
           ? error
-          : error?.description || error?.message || "Transfer failed"
+          : error?.description || error?.message || "Transfer failed",
       );
       setTransactionResult("failure");
     }
@@ -470,9 +497,7 @@ export default function SendToThunderPage() {
                 <span className="text-white font-bold text-base">
                   ₦{option.amount.toLocaleString()}
                 </span>
-                <span className="text-gray-400 text-xs mt-1">
-                  ₦0 Cashback
-                </span>
+                <span className="text-gray-400 text-xs mt-1">₦0 Cashback</span>
               </button>
             ))}
           </div>
@@ -530,22 +555,27 @@ export default function SendToThunderPage() {
           <input
             type="text"
             value={accountNumber}
-            onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))}
+            onChange={(e) =>
+              setAccountNumber(e.target.value.replace(/\D/g, ""))
+            }
             placeholder="enter account number"
             className="w-full bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white placeholder-gray-500 px-4 py-3.5 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm"
           />
           {isVerifyingAccount && (
-            <p className="text-xs text-blue-300 mt-2">Verifying account number...</p>
+            <p className="text-xs text-blue-300 mt-2">
+              Verifying account number...
+            </p>
           )}
           {accountName && !verificationError && (
-            <p className="text-xs text-green-400 mt-2">
-              Account verified: {accountName}
-            </p>
+            <div className="bg-blue-500 rounded-2xl p-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-white font-medium">{accountName}</span>
+              </div>
+              <HiCheckCircle className="w-5 h-5 text-white flex-shrink-0" />
+            </div>
           )}
           {verificationError && (
-            <p className="text-xs text-red-400 mt-2">
-              {verificationError}
-            </p>
+            <p className="text-xs text-red-400 mt-2">{verificationError}</p>
           )}
         </div>
 
@@ -576,38 +606,39 @@ export default function SendToThunderPage() {
 
         {/* Recipients List */}
         <div className="flex flex-col gap-3">
-          {(activeTab === "recents" ? filteredRecipients : recentRecipients).map(
-            (recipient) => (
-              <button
-                key={recipient.id}
-                onClick={() => handleRecipientSelect(recipient)}
-                className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors ${
-                  selectedRecipient?.id === recipient.id
-                    ? "bg-blue-500/20 border-blue-500"
-                    : ""
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-lg font-bold">
-                      {recipient.initial || recipient.name.charAt(0)}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-white font-medium">
-                      {recipient.name}
-                    </span>
-                    <span className="text-gray-400 text-sm">
-                      {recipient.accountNumber} Thunder
-                    </span>
-                  </div>
+          {(activeTab === "recents"
+            ? filteredRecipients
+            : recentRecipients
+          ).map((recipient) => (
+            <button
+              key={recipient.id}
+              onClick={() => handleRecipientSelect(recipient)}
+              className={`bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-gray-800/50 transition-colors ${
+                selectedRecipient?.id === recipient.id
+                  ? "bg-blue-500/20 border-blue-500"
+                  : ""
+              }`}
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-lg font-bold">
+                    {recipient.initial || recipient.name.charAt(0)}
+                  </span>
                 </div>
-                {selectedRecipient?.id === recipient.id && (
-                  <HiCheckCircle className="w-6 h-6 text-blue-500 flex-shrink-0" />
-                )}
-              </button>
-            )
-          )}
+                <div className="flex flex-col">
+                  <span className="text-white font-medium">
+                    {recipient.name}
+                  </span>
+                  <span className="text-gray-400 text-sm">
+                    {recipient.accountNumber} Thunder
+                  </span>
+                </div>
+              </div>
+              {selectedRecipient?.id === recipient.id && (
+                <HiCheckCircle className="w-6 h-6 text-blue-500 flex-shrink-0" />
+              )}
+            </button>
+          ))}
         </div>
 
         {/* See more button */}
@@ -631,4 +662,3 @@ export default function SendToThunderPage() {
     </div>
   );
 }
-

@@ -3,34 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
+import { passwordRules } from "@/utils/passwordRules";
 
 export default function SecureAccount() {
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [show, setShow] = useState(false);
 
-  const rules = [
-    {
-      text: "At least 8 characters long",
-      ok: pw.length >= 8,
-    },
-    {
-      text: "At least one lowercase letter",
-      ok: /[a-z]/.test(pw),
-    },
-    {
-      text: "At least one uppercase letter",
-      ok: /[A-Z]/.test(pw),
-    },
-    {
-      text: "At least one number",
-      ok: /\d/.test(pw),
-    },
-    {
-      text: "At least one special character",
-      ok: /[!@#$%^&*(),.?":{}|<>]/.test(pw),
-    },
-  ];
+  const rules = passwordRules(pw);
 
   return (
     <div className="min-h-screen bg-[#0b0b0c] text-white flex items-start justify-center p-6">
@@ -81,6 +61,9 @@ export default function SecureAccount() {
               className={`mb-2 ${r.ok ? "text-[#BFF1C0]" : "text-[#E64C4C]"}`}
             >
               {r.text}
+              {!r.ok && r.hint && (
+                <span className="block text-xs text-[#98A0A8]">{r.hint}</span>
+              )}
             </div>
           ))}
         </div>

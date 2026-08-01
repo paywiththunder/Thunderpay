@@ -346,7 +346,7 @@ export default function ElectricityPage() {
           { label: "Meter Type", value: paymentType === "prepaid" ? "Prepaid" : "Postpaid" },
           { label: "Amount", value: `₦${parseFloat(amount).toLocaleString()}.00` },
           { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-          { label: "Bonus to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
+          { label: "Bolts to Earn", value: `₦${getCashback().toFixed(2)} Cashback` },
         ]}
         availableBalance={getAvailableBalance()}
       />

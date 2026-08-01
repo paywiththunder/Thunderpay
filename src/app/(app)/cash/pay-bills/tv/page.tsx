@@ -21,6 +21,7 @@ import {
     BillExecutionPayload
 } from "@/services/bills";
 import { getCashbackBalance } from "@/services/cashback";
+import { boltQuoteRows } from "@/utils/bolts";
 import { useCurrency } from "@/providers/CurrencyProvider";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { parseISO, differenceInSeconds, isAfter } from "date-fns";
@@ -353,7 +354,7 @@ export default function TVPage() {
             { label: "Account Name", value: customerName || "N/A" },
             { label: "Package", value: selectedPlan.name },
             { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-            ...(selectedPlan.cashback > 0 ? [{ label: "Bonus to Earn", value: `${selectedPlan.cashback.toFixed(2)} Cashback` }] : []),
+            ...boltQuoteRows(quoteData),
             ...(quoteData?.expiresAtTimestamp && quoteData.expiresAtTimestamp !== null ? [
                 { label: "Quote Expires", value: countdown || "Loading..." }
             ] : []),

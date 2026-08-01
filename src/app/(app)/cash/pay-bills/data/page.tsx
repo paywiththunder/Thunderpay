@@ -12,6 +12,7 @@ import PaymentSuccess from "@/components/payment/PaymentSuccess";
 import PaymentFailure from "@/components/payment/PaymentFailure";
 import { getAirtimeQuote, AirtimeQuoteResponse, executeBillPayment, BillExecutionResponse, getDataPlans, DataPlan as ApiDataPlan, getDataQuote, DataQuotePayload, BillExecutionPayload } from "@/services/bills";
 import { getCashbackBalance, DEFAULT_CURRENCY_ID } from "@/services/cashback";
+import { boltQuoteRows } from "@/utils/bolts";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { parseISO, differenceInSeconds, isAfter } from "date-fns";
 
@@ -449,7 +450,7 @@ export default function DataPage() {
                     { label: "Duration", value: selectedPlan.duration },
                     { label: "Amount", value: `₦${selectedPlan.price.toLocaleString()}.00` },
                     { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-                    { label: "Bonus to Earn", value: `${getCashback().toFixed(2)} Cashback` },
+                    ...boltQuoteRows(quote),
                     ...(quote?.expiresAtTimestamp ? [
                         { label: "Quote Expires", value: countdown || "Loading..." }
                     ] : []),

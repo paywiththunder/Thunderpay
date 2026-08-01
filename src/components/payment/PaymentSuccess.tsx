@@ -1,8 +1,10 @@
 "use client";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { HiCheckCircle, HiOutlineInformationCircle } from "react-icons/hi2";
 
 import { printReceipt } from "@/utils/printReceipt";
+import { invalidateMoneyQueries } from "@/utils/moneyQueries";
 
 interface DetailItem {
   label: string;
@@ -59,6 +61,14 @@ export default function PaymentSuccess({
   onContinue,
 }: PaymentSuccessProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
+  // Reaching this screen means a transaction just completed, so every cached
+  // balance and history list is now out of date. Every payment and transfer flow
+  // renders this component, which makes it the one place to say so.
+  useEffect(() => {
+    invalidateMoneyQueries(queryClient);
+  }, [queryClient]);
 
   const handleDownload = () => {
     if (!receiptRef.current) {

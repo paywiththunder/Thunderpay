@@ -1,21 +1,43 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { MdOutlineKeyboardDoubleArrowLeft } from "react-icons/md";
 import Link from "next/link";
 
 interface EnterPinProps {
   onBack: () => void;
-  onComplete: (pin: string) => void;
+  onComplete: (pin: string) => void | Promise<void>;
   isLoading?: boolean;
   error?: string;
 }
 
 export default function EnterPin({ onBack, onComplete, isLoading = false, error }: EnterPinProps) {
   const [codes, setCodes] = useState(["", "", "", ""]);
+  const [submitting, setSubmitting] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // Submission is tracked here as well as via `isLoading` because most flows
+  // never pass that prop. Without a local guard, editing a digit while the
+  // payment is in flight re-runs auto-submit and charges the user twice.
+  const busy = isLoading || submitting;
+
+  // A rejected PIN leaves the user on this screen, so let them try again.
+  useEffect(() => {
+    if (error) setSubmitting(false);
+  }, [error]);
+
+  const submit = async (pin: string) => {
+    setSubmitting(true);
+    try {
+      await onComplete(pin);
+    } finally {
+      // A no-op once the flow has moved on and unmounted this screen; it only
+      // matters when the handler bailed out early and left us mounted.
+      setSubmitting(false);
+    }
+  };
+
   const handleChange = (index: number, value: string) => {
-    if (isLoading) return;
+    if (busy) return;
     if (value.length > 1) return;
     if (!/^[0-9]?$/.test(value)) return;
 
@@ -30,7 +52,7 @@ export default function EnterPin({ onBack, onComplete, isLoading = false, error 
 
     // Auto-submit when all 4 digits are entered
     if (newCodes.every((code) => code !== "") && index === 3) {
-      onComplete(newCodes.join(""));
+      void submit(newCodes.join(""));
     }
   };
 
@@ -38,7 +60,7 @@ export default function EnterPin({ onBack, onComplete, isLoading = false, error 
     index: number,
     e: React.KeyboardEvent<HTMLInputElement>
   ) => {
-    if (isLoading) return;
+    if (busy) return;
     if (e.key === "Backspace" && !codes[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
@@ -50,7 +72,7 @@ export default function EnterPin({ onBack, onComplete, isLoading = false, error 
       <header className="relative flex items-center justify-center px-4 py-6">
         <button
           onClick={onBack}
-          disabled={isLoading}
+          disabled={busy}
           className="absolute left-4 p-3 rounded-full bg-linear-to-b from-[#161616] to-[#0F0F0F] text-[1.2rem] border border-white/20 disabled:opacity-50"
         >
           <MdOutlineKeyboardDoubleArrowLeft className="text-white" />
@@ -68,7 +90,7 @@ export default function EnterPin({ onBack, onComplete, isLoading = false, error 
                 ref={(el) => {
                   inputRefs.current[i] = el;
                 }}
-                disabled={isLoading}
+                disabled={busy}
                 type="password"
                 inputMode="numeric"
                 pattern="[0-9]*"
@@ -84,7 +106,7 @@ export default function EnterPin({ onBack, onComplete, isLoading = false, error 
                   : digit
                     ? "border-blue-500/50 text-white ring-blue-500 shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]"
                     : "border-[#2B2F33] text-gray-400 focus:border-blue-500 focus:ring-blue-500"
-                  } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                  } ${busy ? "opacity-50 cursor-not-allowed" : ""}`}
               />
             ))}
           </div>
@@ -95,14 +117,14 @@ export default function EnterPin({ onBack, onComplete, isLoading = false, error 
             </p>
           )}
 
-          {isLoading && (
+          {busy && (
             <div className="flex flex-col items-center gap-2">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
               <p className="text-blue-500 text-sm font-medium">Processing Payment...</p>
             </div>
           )}
 
-          {!isLoading && !error && (
+          {!busy && !error && (
             <Link
               href="/profile/reset-pin"
               className="text-blue-500 text-sm font-medium hover:text-blue-400"

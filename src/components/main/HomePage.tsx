@@ -96,7 +96,7 @@ export default function HomePage() {
   // Fetch Recent Transactions
   const { data: transactionsResponse, isLoading: transactionsLoading } = useQuery({
     queryKey: ['recentTransactions', walletType],
-    queryFn: () => getRecentTransactions({ walletType, page: '1', size: '10' }),
+    queryFn: () => getRecentTransactions({ walletType, page: '0', size: '10' }),
   });
 
   console.log('Transactions response:', transactionsResponse);
@@ -213,8 +213,8 @@ export default function HomePage() {
           <div className="grid grid-cols-4 gap-4">
             <ActionButton icon={GiPayMoney} label="Pay Bills" href="cash/pay-bills" />
             <ActionButton icon={GiBanknote} label="Send" href="cash/send" />
-            <ActionButton icon={GiReceiveMoney} label="Receive" href="cash/receive" />
-            <ActionButton icon={GiWallet} label="Convert" href="cash/convert" />
+            <ActionButton icon={GiReceiveMoney} label="Receive" href="cash/receive" disabled/>
+            <ActionButton icon={GiWallet} label="Convert" href="cash/convert" disabled/>
           </div>
 
           {/* <Wlcomemessages /> */}
@@ -299,11 +299,25 @@ function ActionButton({
   icon: Icon,
   label,
   href,
+  disabled = false
 }: {
   icon: React.ElementType;
   label: string;
   href: string;
+  disabled?: boolean;
 }) {
+  if (disabled) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center gap-2 bg-app-card py-4 rounded-xl border border-white/5 bg-gradient-to-b from-[#1A1A1A] to-[#0F0F0F] opacity-50 cursor-not-allowed"
+        aria-disabled="true"
+      >
+        <Icon className="w-7 h-7 text-gray-500" />
+        <span className="text-xs text-gray-500">{label}</span>
+      </div>
+    );
+  }
+
   return (
     <Link
       href={href}

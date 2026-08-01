@@ -353,7 +353,7 @@ export default function TVPage() {
       { label: "Account Name", value: customerName || "N/A" },
       { label: "Package", value: selectedPlan.name },
       { label: "Payment Method", value: selectedPaymentMethod.type === "fiat" ? "Fiat" : `Crypto (${selectedPaymentMethod.name})` },
-      ...(selectedPlan.cashback > 0 ? [{ label: "Bonus to Earn", value: `₦${selectedPlan.cashback.toFixed(2)} Cashback` }] : []),
+      ...(selectedPlan.cashback > 0 ? [{ label: "Bolts to Earn", value: `₦${selectedPlan.cashback.toFixed(2)} Cashback` }] : []),
       ...(quoteData?.expiresAtTimestamp && quoteData.expiresAtTimestamp !== null ? [
         { label: "Quote Expires", value: countdown || "Loading..." }
       ] : []),

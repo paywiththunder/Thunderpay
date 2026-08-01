@@ -9,8 +9,15 @@ export default function QueryProvider({ children }: { children: ReactNode }) {
             new QueryClient({
                 defaultOptions: {
                     queries: {
-                        staleTime: 0, // 0 = Always fetch (no cache) - for development only
-                        gcTime: 0, // Don't keep unused data in memory
+                        // Serve cached data for a minute before refetching in the
+                        // background. Anything that must be fresh sooner is
+                        // invalidated explicitly — see utils/moneyQueries.
+                        staleTime: 1000 * 60,
+                        // Must stay well above staleTime: this is how long data
+                        // survives after a component unmounts. At 0 every cache
+                        // entry was dropped on navigation, so per-query staleTime
+                        // never had anything left to serve.
+                        gcTime: 1000 * 60 * 5,
                         retry: 1,
                         refetchOnWindowFocus: false,
                     },

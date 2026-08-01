@@ -4,6 +4,7 @@ import { ChevronDown, Loader2, Wallet } from "lucide-react";
 import { createWallet, getCurrencies } from "@/services/wallet";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { invalidateMoneyQueries } from "@/utils/moneyQueries";
 
 interface Network {
     id: number;
@@ -92,9 +93,10 @@ export default function WalletForm({ onSuccess }: WalletFormProps = {}) {
         onSuccess: (data) => {
             if (data.success) {
                 setCreatedWallet(true);
-                // Invalidate wallets query to refresh list in parent components
-                queryClient.invalidateQueries({ queryKey: ['wallets'] });
-                queryClient.invalidateQueries({ queryKey: ['walletsUsd'] });
+                // Invalidate wallets query to refresh list in parent components.
+                // Uses the shared list so CryptoPage's ['walletsNgn'] key is
+                // covered too — it was previously missed here.
+                invalidateMoneyQueries(queryClient);
 
                 setTimeout(() => {
                     if (onSuccess) {

@@ -158,10 +158,15 @@ export default function SignupForm() {
             <p className="text-red-500 text-sm">{error}</p>
           )}
 
+          {/* Stays type="submit" so Enter and the inputs' `required` checks keep
+              working — the login screen uses onClick only because it has no form. */}
           <button
             type="submit"
-            disabled={loading}
-            className="w-full p-3 rounded-full bg-blue-600 hover:bg-blue-700 transition"
+            disabled={!email || !password || loading}
+            className={`w-full py-4 rounded-full font-medium transition-all ${email && password
+              ? "bg-linear-to-b from-[#161616] to-[#0F0F0F] border border-white/20 text-white shadow-[inset_0_1px_4px_rgba(255,255,255,0.1)]"
+              : "bg-[#111] text-gray-200 border border-[#222] cursor-not-allowed"
+              }`}
           >
             {loading ? "Creating account..." : "Create account"}
           </button>

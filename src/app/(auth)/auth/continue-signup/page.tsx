@@ -6,6 +6,31 @@ import axios from "axios";
 import { useRouter } from "next/navigation";
 import { API_BASE_URL } from "@/config";
 
+/**
+ * Reduce whatever was typed or pasted to the bare local 11-digit number.
+ *
+ * `+234 901 234 5678`, `2349012345678` and `0901 234 5678` all become
+ * `09012345678`. A leading 234 can only ever be the country code, since a local
+ * Nigerian number always starts with 0 — so it is swapped for that 0 rather than
+ * being counted as part of the number.
+ */
+const normalisePhone = (raw: string) => {
+  const digits = raw.replace(/\D/g, "");
+  const local = digits.startsWith("234") ? `0${digits.slice(3)}` : digits;
+  return local.slice(0, 11);
+};
+
+/**
+ * Group 11 digits as `0801 234 5678` for display only.
+ *
+ * The `phone` state itself always holds bare digits, so the payload is never
+ * affected by this — spaces exist purely for reading.
+ */
+const formatPhone = (digits: string) =>
+  [digits.slice(0, 4), digits.slice(4, 7), digits.slice(7, 11)]
+    .filter(Boolean)
+    .join(" ");
+
 export default function ContinueSignup() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -26,6 +51,19 @@ export default function ContinueSignup() {
   const handleContinueSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors([]);
+
+    // Both are exactly 11 digits. The inputs already cap at 11, so this is what
+    // catches a short or empty one before the request goes out.
+    const idErrors = [
+      ...(nin.length === 11 ? [] : ["NIN must be exactly 11 digits"]),
+      ...(bvn.length === 11 ? [] : ["BVN must be exactly 11 digits"]),
+    ];
+
+    if (idErrors.length > 0) {
+      setErrors(idErrors);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -185,19 +223,37 @@ export default function ContinueSignup() {
               </div>
               <input
                 type="tel"
+                inputMode="numeric"
+                // 11 digits plus the two spaces the formatter inserts.
+                maxLength={13}
                 placeholder="Phone Number"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                // Spaced for reading; `phone` stays bare digits underneath.
+                value={formatPhone(phone)}
+                // Bare digits in local form, capped at 11 — see normalisePhone.
+                onChange={(e) => setPhone(normalisePhone(e.target.value))}
                 className="flex-1 bg-[#161616] border border-[#2B2F33] text-white placeholder-gray-600 px-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium"
               />
             </div>
 
-            <input
-              type="date"
-              value={dob}
-              onChange={(e) => setDob(e.target.value)}
-              className="w-full bg-[#161616] border border-[#2B2F33] text-white px-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium"
-            />
+            {/* A date input ignores `placeholder` in every browser — it draws its
+                own editor instead. Desktop Chrome fills that with a "mm/dd/yyyy"
+                hint, but iOS Safari leaves the field blank until tapped, so the
+                only thing that reliably labels it is a real label. */}
+            <div className="space-y-2">
+              <label
+                htmlFor="dob"
+                className="text-xs font-medium text-gray-400 block"
+              >
+                Date of Birth
+              </label>
+              <input
+                id="dob"
+                type="date"
+                value={dob}
+                onChange={(e) => setDob(e.target.value)}
+                className="w-full bg-[#161616] border border-[#2B2F33] text-white px-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium"
+              />
+            </div>
 
             <input
               type="text"
@@ -236,17 +292,21 @@ export default function ContinueSignup() {
             <div className="grid grid-cols-2 gap-4">
               <input
                 type="text"
+                inputMode="numeric"
+                maxLength={11}
                 placeholder="NIN"
                 value={nin}
-                onChange={(e) => setNin(e.target.value)}
+                onChange={(e) => setNin(e.target.value.replace(/\D/g, "").slice(0, 11))}
                 className="w-full bg-[#161616] border border-[#2B2F33] text-white placeholder-gray-600 px-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium"
               />
 
               <input
                 type="text"
+                inputMode="numeric"
+                maxLength={11}
                 placeholder="BVN"
                 value={bvn}
-                onChange={(e) => setBvn(e.target.value)}
+                onChange={(e) => setBvn(e.target.value.replace(/\D/g, "").slice(0, 11))}
                 className="w-full bg-[#161616] border border-[#2B2F33] text-white placeholder-gray-600 px-4 py-3.5 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium"
               />
             </div>

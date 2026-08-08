@@ -209,8 +209,19 @@ export default function RewardsPage() {
                 </button>
               )}
             </div>
-            {/* Background Decoration */}
-            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/5 rounded-full blur-2xl group-hover:bg-white/10 transition-colors"></div>
+            {/* Background Decoration.
+                Gradient rather than `blur-2xl`, for the same reason as the Total
+                Assets card on the dashboard: a blur filter on a box overflowing
+                this rounded, overflow-hidden `.assets` card corrupts on Android
+                GPUs. Drops the group-hover brightening, which never applied on
+                touch devices anyway. */}
+            <div
+              className="absolute -right-4 -bottom-4 w-24 h-24 rounded-full pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(circle, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)",
+              }}
+            ></div>
           </div>
 
           {/* Stats Bar */}

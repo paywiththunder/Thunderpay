@@ -184,7 +184,11 @@ export default function HomePage() {
               </div>
 
               {/* Bolts Badge */}
-              <Link href="/rewards" className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 hover:bg-white/20 transition-all active:scale-95 shadow-lg group">
+              {/* No backdrop-blur here: a backdrop-filter nested inside this
+                  rounded/overflow-hidden card is the other half of the Android
+                  corruption above. bg-white/10 over the card image already reads
+                  as glass. */}
+              <Link href="/rewards" className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-full border border-white/20 hover:bg-white/20 transition-all active:scale-95 shadow-lg group">
                 <HiMiniBolt className="text-yellow-400 w-4 h-4 group-hover:animate-bounce" />
                 <span className="text-white text-xs font-bold">{boltsBalance !== null ? boltsBalance : "..."} Bolts</span>
               </Link>
@@ -205,8 +209,21 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Background Decoration */}
-            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
+            {/* Background Decoration.
+                Painted as a radial gradient rather than `bg-white/5 blur-3xl`.
+                A 64px `filter: blur()` on a box positioned to overflow this
+                rounded, overflow-hidden, image-backed card forces a clipped
+                filter layer, which Android GPU drivers corrupt — it rendered as
+                a band of garbage pixels across the dashboard. The gradient is
+                visually equivalent and needs no filter pass. Inline style keeps
+                it independent of Tailwind's arbitrary-value parsing. */}
+            <div
+              className="absolute -right-6 -bottom-6 w-32 h-32 rounded-full pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(circle, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 45%, transparent 70%)",
+              }}
+            ></div>
           </div>
 
           {/* Action Buttons Grid */}

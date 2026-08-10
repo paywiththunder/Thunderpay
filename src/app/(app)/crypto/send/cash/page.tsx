@@ -842,7 +842,6 @@ export default function SendCryptoToCashPage() {
                         </div>
                         <div className="flex flex-col items-start flex-grow">
                           <span className="text-white font-medium">{bank.name}</span>
-                          <span className="text-gray-400 text-xs">Code: {bank.code}</span>
                         </div>
                         {selectedBank?.id === bank.id && (
                           <HiCheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />

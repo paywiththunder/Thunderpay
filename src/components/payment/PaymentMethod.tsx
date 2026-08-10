@@ -117,7 +117,7 @@ export default function PaymentMethod({
       const currUpper = currencyCode.toUpperCase();
       if (currUpper === "USDT") return "trc20"; // Default USDT to TRC20
       if (currUpper === "ETH") return "erc20";
-      if (currUpper === "BTC") return "bitcoin";
+      if (currUpper === "BTC") return "btc";
       if (currUpper === "SOL") return "solana";
       return "trc20"; // Safe default
     }
@@ -128,7 +128,7 @@ export default function PaymentMethod({
     if (upper === "ETH" || upper === "ETHEREUM" || upper === "ERC20") return "erc20";
     if (upper === "BSC" || upper === "BEP20" || upper === "BINANCE") return "bep20";
     if (upper === "SOL" || upper === "SOLANA") return "solana";
-    if (upper === "BTC" || upper === "BITCOIN") return "bitcoin";
+    if (upper === "BTC" || upper === "BITCOIN") return "btc";
 
     // If already in correct format, return lowercase
     return code.toLowerCase();

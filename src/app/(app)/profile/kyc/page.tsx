@@ -1,10 +1,11 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { HiChevronLeft, HiOutlineCloudArrowUp } from "react-icons/hi2";
 import { getKycConfigs, submitKycTier2, DocumentType } from "@/services/user";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
+import { setKycTier1PromptDismissed } from "@/utils/kycPrompt";
 
 export default function KycPage() {
   const router = useRouter();
@@ -12,6 +13,10 @@ export default function KycPage() {
   const [documentNumber, setDocumentNumber] = useState("");
   const [documentImage, setDocumentImage] = useState<File | null>(null);
   const [selfieImage, setSelfieImage] = useState<File | null>(null);
+
+  useEffect(() => {
+    setKycTier1PromptDismissed(true);
+  }, []);
 
   // Fetch KYC configs
   const { data: kycConfigsResponse, isLoading: configsLoading } = useQuery({

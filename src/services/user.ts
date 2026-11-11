@@ -183,6 +183,7 @@ export const getKycConfigs = async () => {
                 Authorization: `Bearer ${token}`,
             },
         });
+        console.log(response.data)
         return response.data;
     } catch (error: any) {
         throw error.response?.data || error.message;

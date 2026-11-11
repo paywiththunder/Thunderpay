@@ -2,6 +2,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
+import { clearLegacyKycFlag } from "@/utils/legacyKyc";
 
 export default function SignOutPage() {
     const router = useRouter();
@@ -9,6 +10,7 @@ export default function SignOutPage() {
     const handleSignOut = () => {
         // Remove auth token from local storage
         localStorage.removeItem("authToken");
+        clearLegacyKycFlag();
 
         // Also clear any potential cookies by expiring them
         document.cookie.split(";").forEach((c) => {

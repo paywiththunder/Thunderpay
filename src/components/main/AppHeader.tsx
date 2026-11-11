@@ -10,6 +10,7 @@ import {
 import { getUserProfile } from "@/services/user";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
+import LegacyKycBanner from "@/components/kyc/LegacyKycBanner";
 
 export default function AppHeader() {
     const pathname = usePathname();
@@ -88,6 +89,9 @@ export default function AppHeader() {
                     International
                 </Link> */}
             </div>
+
+            {/* Legacy KYC reminder — hidden once hasCompletedLegacyKyc is true */}
+            <LegacyKycBanner name={[fName, lName].filter(Boolean).join(" ")} />
         </div>
     );
 }

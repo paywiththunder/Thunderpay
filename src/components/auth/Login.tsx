@@ -10,6 +10,10 @@ import {
   isEmailNotVerifiedError,
   setPendingVerificationEmail,
 } from "@/utils/authFlow";
+import {
+  clearLegacyKycFlag,
+  setHasCompletedLegacyKyc,
+} from "@/utils/legacyKyc";
 
 // --- Types ---
 type PhoneStepProps = {
@@ -268,6 +272,12 @@ export default function Login() {
       localStorage.setItem("authToken", data.token);
       if (data.referralCode) {
         localStorage.setItem("referralCode", data.referralCode);
+      }
+      // Drives the "complete your KYC" banner on the home screen.
+      if (typeof data.hasCompletedLegacyKyc === "boolean") {
+        setHasCompletedLegacyKyc(data.hasCompletedLegacyKyc);
+      } else {
+        clearLegacyKycFlag();
       }
       console.log('token', data.token);
       const isContinueSignup = data.hasCompletedSignup

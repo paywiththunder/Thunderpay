@@ -64,3 +64,29 @@ export const changePassword = async (currentPassword: string, newPassword: strin
         throw error.response?.data || error.message;
     }
 };
+
+export interface CompleteLegacyKycParams {
+    nin: string;
+    bvn: string;
+}
+
+export const completeLegacyKyc = async ({ nin, bvn }: CompleteLegacyKycParams) => {
+    const token = getAuthToken();
+    if (!token) throw new Error("No auth token found");
+
+    try {
+        const response = await axios.post(
+            `${API_URL}/complete-legacy-kyc`,
+            { nin, bvn },
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+        return response.data;
+    } catch (error: any) {
+        throw error.response?.data || error.message;
+    }
+};

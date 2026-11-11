@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { getUserProfile } from '@/services/user';
 import {
@@ -11,8 +11,14 @@ import {
   shouldShowKycTier1Prompt,
 } from '@/utils/kycPrompt';
 
+// The home screen is the Crypto and Cash tabs; the prompt only appears there.
+const HOME_PATHS = ['/crypto', '/cash'];
+const PROMPT_DELAY_MS = 5000;
+
 export default function KycTier1Prompt() {
   const router = useRouter();
+  const pathname = usePathname();
+  const isHomePage = HOME_PATHS.includes(pathname ?? '');
   const [isOpen, setIsOpen] = useState(false);
 
   const { data: userResponse } = useQuery({
@@ -25,19 +31,22 @@ export default function KycTier1Prompt() {
   const user = userResponse?.success ? userResponse.data : null;
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !isHomePage) {
+      setIsOpen(false);
+      return;
+    }
 
     const status = getKycStatus(user);
     const shouldShow = shouldShowKycTier1Prompt(user);
 
     if (status && isKycRejected(status)) {
-      const timer = window.setTimeout(() => setIsOpen(true), 2000);
+      const timer = window.setTimeout(() => setIsOpen(true), PROMPT_DELAY_MS);
       return () => window.clearTimeout(timer);
     }
 
-    const timer = window.setTimeout(() => setIsOpen(shouldShow), 2000);
+    const timer = window.setTimeout(() => setIsOpen(shouldShow), PROMPT_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [user]);
+  }, [user, isHomePage]);
 
   const handleLater = () => {
     setKycTier1PromptDismissed(true);
